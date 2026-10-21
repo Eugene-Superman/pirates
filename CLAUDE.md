@@ -93,6 +93,8 @@ Separate files in `.claude/rules/` are loaded when working on the matching part 
 - Commit message and PR title: `[TYPE]: short description` in English, where TYPE is `FEATURE`, `FIX`, `REFACTOR`, `DOCS` or `CHORE`.
   Branch: `feature/…`, `fix/…`, `refactor/…`, `docs/…`, `chore/…` in kebab-case, e.g. `feature/cannon-fire`.
 - Commit only when asked. Running `/git-push` counts as asking.
+- No AI attribution in commits and PRs: no `Co-Authored-By: Claude`, no "Generated with Claude Code", no session links.
+  Also turned off in `.claude/settings.json` (`attribution`).
 
 ## Skills
 

@@ -10,6 +10,9 @@ allowed-tools: Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git show
 
 Ship the current changes as a pull request into `main`. Go through the steps in order; when a step says to ask, stop and wait for the answer.
 
+**No AI attribution anywhere:** commit messages, PR titles and PR bodies never mention Claude, Claude Code or AI —
+no `Co-Authored-By: Claude` trailer, no "Generated with Claude Code" line, no session links.
+
 ## 1. Check the state
 
 - Run `git status --short`, `git branch --show-current`, `git log --oneline main..HEAD`.
