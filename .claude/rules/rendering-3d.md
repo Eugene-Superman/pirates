@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/views/**"
+  - 'src/views/**'
 ---
 
 # Rendering (`src/views/`)
@@ -14,11 +14,11 @@ paths:
 
 ## Coordinate systems
 
-| Space | x | y | z |
-|---|---|---|---|
-| World | east | south | up from water |
-| Ship (`ship3d.ts`) | towards bow | towards starboard | up from water |
-| Camera (`Camera3D`) | right | up the screen | into the screen, larger = farther |
+| Space               | x           | y                 | z                                 |
+| ------------------- | ----------- | ----------------- | --------------------------------- |
+| World               | east        | south             | up from water                     |
+| Ship (`ship3d.ts`)  | towards bow | towards starboard | up from water                     |
+| Camera (`Camera3D`) | right       | up the screen     | into the screen, larger = farther |
 
 - `Vec3` is a `readonly [x, y, z]` tuple in world coordinates.
 - `CameraConfig.pitch` / `yaw` are in **degrees** (90 = straight down, yaw 0 = north at the top). Camera direction is fixed after construction.
@@ -28,6 +28,7 @@ paths:
 ## Draw order (painter's algorithm)
 
 There is no z-buffer, so order is everything. In `ProjectedView.update`:
+
 1. Background: the renderer clears the screen to `SEA_COLOR` (set in the `ProjectedView` constructor).
 2. Everything flat on the water (`z = 0`): waves → island "ground" (shallows, sand, cliff shadows) → world border → foam → ship shadow → target marker.
 3. Volumetric objects (islands, ship) — sorted by `painter.depth(...)` **from far to near**.

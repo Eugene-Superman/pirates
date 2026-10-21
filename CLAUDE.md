@@ -1,16 +1,17 @@
 # Pirate Game
 
-Frontend of a browser naval game in the style of *Pirate Storm: Death or Glory*.
+Frontend of a browser naval game in the style of _Pirate Storm: Death or Glory_.
 Click on the sea and the ship sails there, steering around islands.
 Camera: classic 2:1 isometric pseudo-3D (no perspective) — the target look of the game.
 
-Stack: TypeScript 7 (strict) + Pixi.js v8 + Vite 8. No backend yet, no tests, no linter.
+Stack: TypeScript 7 (strict) + Pixi.js v8 + Vite 8, Prettier + Oxlint. No backend yet, no tests.
 
 ## Planned online part
 
 An online part (server, other players) will be added later, with a **NestJS** backend in a **separate repository**.
 This repo is the frontend only. How the shared logic reaches the backend (e.g. a private npm package) is decided
 when the backend starts. Don't build networking or a server until asked, but keep the code ready for it:
+
 - `src/game/` stays free of Pixi, DOM and browser APIs — this logic is the candidate to share with the server.
 - The shared logic has no runtime dependencies and no framework code (no Pixi, no Nest decorators/DI) —
   the server will wrap it in its own services.
@@ -21,7 +22,9 @@ when the backend starts. Don't build networking or a server until asked, but kee
 ## Commands
 
 - `npm run dev` — Vite dev server, opens the browser automatically
-- `npx tsc` — type check (~0.5 s). **Run after every code change**
+- `npm run format` — Prettier rewrites files in place
+- `npm run check` — `tsc` + Oxlint + `prettier --check`. **After every code change run `npm run format`, then `npm run check`**
+- `npx tsc` / `npm run lint` — type check / Oxlint only
 - `npm run build` — `tsc && vite build` into `dist/`
 
 There are no automated tests. Visual changes are checked by a human in the browser — say what to look at.
@@ -60,7 +63,11 @@ they were tried and removed (commit `2c8125f` still has them).
 - A comment explains "why", not what the code does.
 - `verbatimModuleSyntax`: type-only imports must use `import type` / inline `type X` inside `{}`.
 - `noUnusedLocals` / `noUnusedParameters` are on — unused code will not compile.
-- 2 spaces, single quotes, semicolons, trailing commas in multiline lists.
+- Formatting is Prettier's job (`.prettierrc.json`: single quotes, width 120) — don't format by hand.
+  `// prettier-ignore` only for data tables such as model vertices.
+- Lint rules live in `.oxlintrc.json`. Linting is Oxlint, not ESLint: typescript-eslint doesn't support TypeScript 7.
+  Fix a lint error instead of silencing it; if a rule is wrong for this project, turn it off in the config with a comment why.
+- Oxlint enforces the `src/game/` boundary: no `pixi.js` or `views/` imports, no `window` / `document`.
 - Colors are `0xRRGGBB` numbers; a model's colors live in a `COLORS` object at the top of the file.
 - Magic numbers go into `UPPER_CASE` constants with a comment about units.
 - Before writing a new helper, check `game/math.ts` and the exports of `Painter3D.ts` (`shade`, `shadowPoint`).
@@ -68,6 +75,7 @@ they were tried and removed (commit `2c8125f` still has them).
 ## Pixi.js v8 — don't mix up with v7
 
 The project uses **Pixi v8**. Do not use v7 API (`beginFill`, `drawCircle`, `lineStyle`, `new Application({...})`).
+
 - `await app.init({...})`, then `app.canvas`
 - `Graphics`: shape first, then style — `g.circle(x, y, r).fill({ color, alpha })`, `g.poly(points).stroke({ width, color })`
 - `new Text({ text, style })`
@@ -75,6 +83,7 @@ The project uses **Pixi v8**. Do not use v7 API (`beginFill`, `drawCircle`, `lin
 ## Detailed rules
 
 Separate files in `.claude/rules/` are loaded when working on the matching part of the code:
+
 - [.claude/rules/game-logic.md](.claude/rules/game-logic.md) — `src/game/**`: units, map determinism, ship physics
 - [.claude/rules/rendering-3d.md](.claude/rules/rendering-3d.md) — `src/views/**`: coordinate systems, draw order, performance
 

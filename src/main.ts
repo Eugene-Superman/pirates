@@ -91,4 +91,5 @@ async function main() {
   });
 }
 
-main();
+// A startup failure still reaches the console as an unhandled rejection
+void main();

@@ -1,8 +1,8 @@
 ---
 name: code-review
 description: Review the current changes in this repo for bugs, performance, best practices and code quality/architecture, checked against CLAUDE.md and .claude/rules. Use when asked to review changes, before committing, and as the first step of /git-push.
-argument-hint: "[base-branch | file paths]"
-allowed-tools: Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(npx tsc *)
+argument-hint: '[base-branch | file paths]'
+allowed-tools: Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(npx tsc *) Bash(npm run check *)
 ---
 
 # Code review
@@ -12,6 +12,7 @@ Review the changes in this repository. This is a **read-only** task: do not edit
 ## 1. Collect the changes
 
 Pick the scope:
+
 - `$ARGUMENTS` names files or folders → review those files in full.
 - `$ARGUMENTS` names a branch → review `git diff <branch>...HEAD` plus any uncommitted changes.
 - No arguments:
@@ -29,18 +30,21 @@ layer boundaries, folder structure, conventions and the planned online part. Bre
 
 ## 3. Run the checks
 
-Run `npx tsc`. Every type error is a "Must fix".
+Run `npm run check` (type check, Oxlint, Prettier check). Every type error and lint error is a "Must fix";
+files Prettier would change are one "Should fix" (fixed with `npm run format`).
 
 ## 4. Review
 
 Report only real problems in the changed code. Keep it proportionate: no micro-optimizations for code that runs once.
 
 ### Correctness
+
 - Logic bugs, wrong edge cases, off-by-one, angle wrap-around (use `normalizeAngle`), division by zero, NaN.
 - Time handling: everything frame-dependent must scale with `dt` (seconds).
 - Event listeners, timers and Pixi objects that are created repeatedly or never cleaned up.
 
 ### Architecture
+
 - Layer rules from `CLAUDE.md`: the game-logic layer has no Pixi, DOM or browser APIs; rendering never mutates game state;
   player actions reach the game only through game-logic methods; gameplay randomness is seeded.
 - Readiness for the online part (separate NestJS backend): logic the server will need lives in the logic layer and is framework-free.
@@ -49,7 +53,9 @@ Report only real problems in the changed code. Keep it proportionate: no micro-o
 - No speculative abstractions (interfaces with one implementation "for later", unused parameters/options) — and no copy-paste either.
 
 ### Performance
+
 The hot path is everything that runs every frame: the `app.ticker` callback, `update(dt)` of views and logic, model `draw*` functions, `Painter3D` methods.
+
 - Allocations inside large per-frame loops (there are 1200 waves): new arrays, objects or closures per item, `filter`/`map` chains on big arrays.
 - O(n²) loops, sorting more than needed, work that could be done once in a constructor or cached.
 - Drawing invisible things: big loops must cull with `painter.isVisible` first.
@@ -58,13 +64,16 @@ The hot path is everything that runs every frame: the `app.ticker` callback, `up
   textures/graphics never destroyed.
 
 ### Code quality and best practices
+
 - TypeScript: no `any`, no `!` or `as` without a reason, `import type` for type-only imports, `readonly` where it applies.
 - Pixi v8 API only (no v7 `beginFill`, `drawCircle`, `lineStyle`, `new Application({...})`).
 - Naming is clear and matches the surrounding code; magic numbers are `UPPER_CASE` constants with a units comment.
 - Comments are in English and explain "why"; comments made outdated by the change are updated.
+- `oxlint-disable` / `prettier-ignore` comments and rules turned off in `.oxlintrc.json` have a reason; a real problem isn't silenced.
 - Dead code left behind: unused functions, exports, constants, CSS.
 
 ### Docs
+
 If behavior, commands, folder structure or conventions changed, `CLAUDE.md`, `.claude/rules/` and `README.md` are updated to match.
 
 ## 5. Report
@@ -82,5 +91,6 @@ Problems in code the change didn't touch go into a short "Outside this change" l
 If there are no findings, say what was checked in one or two lines.
 
 End the report with exactly one line:
+
 - `VERDICT: CLEAN` — no Must fix and no Should fix (nits are allowed)
 - `VERDICT: CHANGES REQUESTED` — at least one Must fix or Should fix

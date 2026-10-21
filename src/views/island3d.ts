@@ -25,7 +25,11 @@ function outline(island: Island, scale: number, z: number): Vec3[] {
 export function drawIslandGround(p: Painter3D, island: Island) {
   p.polygon(outline(island, 1.35, 0), COLORS.shallow, 0.4);
   p.polygon(outline(island, 1, 0), COLORS.sand);
-  p.polygon(outline(island, 0.7, island.height).map((q) => shadowPoint(q)), 0x000000, SHADOW_ALPHA);
+  p.polygon(
+    outline(island, 0.7, island.height).map((q) => shadowPoint(q)),
+    0x000000,
+    SHADOW_ALPHA,
+  );
 }
 
 /** Raised parts: cliff, plateau, hill, palms */
@@ -38,7 +42,11 @@ export function drawIslandRaised(p: Painter3D, island: Island, time: number) {
 
   if (island.hillHeight > 0) {
     const hillTop = outline(island, 0.22, island.height + island.hillHeight);
-    p.polygon(hillTop.map((q) => shadowPoint(q, island.height)), 0x000000, SHADOW_ALPHA);
+    p.polygon(
+      hillTop.map((q) => shadowPoint(q, island.height)),
+      0x000000,
+      SHADOW_ALPHA,
+    );
     parts.push({
       depth: p.depth([island.x, island.y, island.height]),
       draw: () => {

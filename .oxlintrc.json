@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "rules": {
+    // Mistakes Pixi's Graphics.fill({ color, alpha }) for Array.prototype.fill
+    "unicorn/no-array-fill-with-reference-type": "off"
+  },
+  "options": {
+    // Type-aware rules (no-floating-promises etc.) run on oxlint-tsgolint, which supports TypeScript 7
+    "typeAware": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "env": {
+    "builtin": true
+  },
+  "overrides": [
+    {
+      // Game logic will be shared with the server: no rendering and no browser APIs
+      "files": ["src/game/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [{ "name": "pixi.js", "message": "src/game/ must not depend on rendering." }],
+            "patterns": [{ "group": ["**/views/**"], "message": "src/game/ must not depend on rendering." }]
+          }
+        ],
+        "eslint/no-restricted-globals": [
+          "error",
+          { "name": "window", "message": "src/game/ must not use browser APIs." },
+          { "name": "document", "message": "src/game/ must not use browser APIs." }
+        ]
+      }
+    }
+  ]
+}
