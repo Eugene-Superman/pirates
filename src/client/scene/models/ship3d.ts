@@ -1,6 +1,6 @@
-import type { Ship } from '../game/Ship';
-import type { Vec3 } from './Camera3D';
-import { shadowPoint, type Painter3D } from './Painter3D';
+import type { Ship } from '../../../game';
+import type { Vec3 } from '../../render/Camera3D';
+import { shadowPoint, type Painter3D } from '../../render/Painter3D';
 
 // Ship coordinates: x towards the bow, y towards starboard, z up from the water
 const DECK_Z = 10;

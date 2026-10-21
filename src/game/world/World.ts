@@ -1,3 +1,5 @@
+import { createRandom } from '../lib/random';
+
 export const WORLD_WIDTH = 4000;
 export const WORLD_HEIGHT = 4000;
 
@@ -18,32 +20,15 @@ export interface Island {
   palms: Palm[];
 }
 
-export interface Wave {
-  x: number;
-  y: number;
-  width: number;
-  phase: number;
-}
-
+// Only what affects gameplay. Decorations like waves live on the client
 export interface WorldData {
   islands: Island[];
-  waves: Wave[];
 }
 
-// Deterministic random so the map is the same on every run
-function createRandom(seed: number) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
+// A fixed seed keeps the map the same on every run
 export function createWorld(): WorldData {
   return {
     islands: createIslands(25, createRandom(42)),
-    waves: createWaves(1200, createRandom(1)),
   };
 }
 
@@ -55,15 +40,6 @@ export function islandOutline(island: Island, scale: number) {
     const r = island.radius * scale * k;
     return { x: island.x + Math.cos(angle) * r, y: island.y + Math.sin(angle) * r };
   });
-}
-
-function createWaves(count: number, random: () => number): Wave[] {
-  return Array.from({ length: count }, () => ({
-    x: random() * WORLD_WIDTH,
-    y: random() * WORLD_HEIGHT,
-    width: 10 + random() * 18,
-    phase: random() * Math.PI * 2,
-  }));
 }
 
 function createIslands(count: number, random: () => number): Island[] {

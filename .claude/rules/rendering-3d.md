@@ -1,13 +1,21 @@
 ---
 paths:
-  - 'src/views/**'
+  - 'src/client/**'
 ---
 
-# Rendering (`src/views/`)
+# Client and rendering (`src/client/`)
+
+## Folders
+
+- `render/` — the 3D engine (`Camera3D`, `Painter3D`). It knows nothing about ships or islands: no imports from `game/` or `scene/`.
+- `scene/models/` — how game objects look: `draw*(painter, object, time)` functions that only read game data.
+- `scene/effects/` — client-only decorations with their own state (foam, waves, target marker). They may use `Math.random`.
+- `hud/` — screen-space Pixi `Text`/`Container`, not projected. `input/` — turns pointer events into game method calls.
+- Game logic is imported only from `game/index.ts` (`'../../game'`); Oxlint rejects deep imports into `game/`.
 
 ## How it works
 
-- **`ProjectedView`** is the only view: classic 2:1 isometric (parallel projection, pitch 30°, yaw 45°).
+- **`SceneView`** is the only scene: classic 2:1 isometric (parallel projection, pitch 30°, yaw 45°).
 - Immediate mode: `scene.clear()` and a full redraw every frame via `Painter3D`.
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
 - No perspective: sizes don't depend on distance, line widths are `width * camera.zoom`.
@@ -27,9 +35,9 @@ paths:
 
 ## Draw order (painter's algorithm)
 
-There is no z-buffer, so order is everything. In `ProjectedView.update`:
+There is no z-buffer, so order is everything. In `SceneView.update`:
 
-1. Background: the renderer clears the screen to `SEA_COLOR` (set in the `ProjectedView` constructor).
+1. Background: the renderer clears the screen to `SEA_COLOR` (set in the `SceneView` constructor).
 2. Everything flat on the water (`z = 0`): waves → island "ground" (shallows, sand, cliff shadows) → world border → foam → ship shadow → target marker.
 3. Volumetric objects (islands, ship) — sorted by `painter.depth(...)` **from far to near**.
 4. Parts within an object are also sorted by depth (ship masts/sails, island hill and palms).
@@ -45,6 +53,16 @@ Add a new volumetric object to the `objects` array with `depth` and `draw`; don'
 - `line`, `curve`, `disc`, `ring` — width and radius are in world units.
 - Shadows: `shadowPoint(p, groundZ)` projects a point along `LIGHT` onto a plane; draw the shadow as a black `polygon` with `SHADOW_ALPHA`.
 - Color: `shade(color, k)` changes brightness. The sun (`LIGHT`) shines from the west, from high above.
+
+## Foam wake (`effects/Wake.ts`)
+
+- Owned and updated by `SceneView` (it is view state, not game state), before drawing.
+- Fixed pool of `POOL_SIZE` particles reused round-robin. No new objects are created during gameplay.
+- A particle is "dead" when `life >= WAKE_LIFETIME`; animation progress is `foamProgress(p)` from 0 to 1.
+
+## Waves (`effects/waves.ts`)
+
+- 1200 waves generated once with `createRandom(1)`, so they are identical on every run. Culled with `isVisible` every frame.
 
 ## Performance
 

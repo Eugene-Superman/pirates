@@ -1,24 +1,27 @@
 import { Container, Graphics, type Application } from 'pixi.js';
-import type { GameState } from '../game/GameState';
-import { foamProgress } from '../game/Wake';
-import { WORLD_HEIGHT, WORLD_WIDTH } from '../game/World';
-import { Camera3D, type CameraConfig, type Vec3 } from './Camera3D';
-import { drawIslandGround, drawIslandRaised } from './island3d';
-import { Painter3D } from './Painter3D';
-import { drawShip, drawShipShadow } from './ship3d';
+import { WORLD_HEIGHT, WORLD_WIDTH, type GameState } from '../../game';
+import { Camera3D, type CameraConfig, type Vec3 } from '../render/Camera3D';
+import { Painter3D } from '../render/Painter3D';
+import { drawTargetMarker } from './effects/targetMarker';
+import { Wake, drawWake } from './effects/Wake';
+import { createWaves, drawWaves } from './effects/waves';
+import { drawIslandGround, drawIslandRaised } from './models/island3d';
+import { drawShip, drawShipShadow } from './models/ship3d';
 
 // Classic 2:1 isometric: tilted 30°, world rotated 45°
 const CAMERA: CameraConfig = { pitch: 30, yaw: 45, zoom: 1.4, originY: 0.5 };
 
 const SEA_COLOR = 0x1b6f93;
-const WAVE_COLOR = 0x5fb3d6;
 const BORDER_COLOR = 0x0b3a52;
 
 // Pseudo-3D: the world has height and the camera looks at it at an angle.
 // The scene is redrawn every frame through the Camera3D projection.
-export class ProjectedView {
+// Decorations (waves, foam) are view state: the scene owns and updates them itself.
+export class SceneView {
   readonly container = new Container();
   private readonly scene = new Graphics();
+  private readonly wake = new Wake();
+  private readonly waves = createWaves();
   private readonly app: Application;
   private readonly state: GameState;
   private readonly camera: Camera3D;
@@ -39,9 +42,11 @@ export class ProjectedView {
   }
 
   update(dt: number) {
-    const { ship, wake, world, time } = this.state;
+    const { ship, world, time } = this.state;
     const { camera, painter } = this;
     const { width, height } = this.app.screen;
+
+    this.wake.update(dt, ship);
 
     // Smooth camera following the ship
     const follow = Math.min(1, dt * 6);
@@ -55,18 +60,7 @@ export class ProjectedView {
     this.scene.clear();
 
     // Everything lying on the water
-    for (const wave of world.waves) {
-      const x = wave.x + Math.sin(time * 0.8 + wave.phase) * 4;
-      if (!painter.isVisible(x + wave.width / 2, wave.y, 0, wave.width)) continue;
-      painter.curve(
-        [x, wave.y, 0],
-        [x + wave.width / 2, wave.y - 5, 0],
-        [x + wave.width, wave.y, 0],
-        2,
-        WAVE_COLOR,
-        0.45,
-      );
-    }
+    drawWaves(painter, this.waves, time);
 
     const islands = world.islands.filter((island) =>
       painter.isVisible(island.x, island.y, 0, island.radius * 1.4 + 60),
@@ -75,19 +69,9 @@ export class ProjectedView {
 
     this.drawWorldBorder();
 
-    for (const foam of wake.particles) {
-      const t = foamProgress(foam);
-      if (t < 1) painter.disc(foam.x, foam.y, 0, 4 * (1 + t * 2.5), 0xffffff, foam.startAlpha * (1 - t));
-    }
-
+    drawWake(painter, this.wake);
     drawShipShadow(painter, ship, time);
-
-    if (ship.target) {
-      const { x, y } = ship.target;
-      painter.ring(x, y, 0, 14 * (1 + Math.sin(time * 6) * 0.15), 2, 0xffffff, 0.8);
-      painter.line([x - 6, y, 0], [x + 6, y, 0], 2, 0xffffff, 0.8);
-      painter.line([x, y - 6, 0], [x, y + 6, 0], 2, 0xffffff, 0.8);
-    }
+    if (ship.target) drawTargetMarker(painter, ship.target, time);
 
     // Volumetric objects: from far to near
     const objects = islands.map((island) => ({

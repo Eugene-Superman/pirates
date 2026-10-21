@@ -16,7 +16,8 @@ when the backend starts. Don't build networking or a server until asked, but kee
 - The shared logic has no runtime dependencies and no framework code (no Pixi, no Nest decorators/DI) —
   the server will wrap it in its own services.
 - Player actions reach the game only through game-logic methods (like `ship.setTarget`) — later they become commands sent to the server.
-- Gameplay randomness is seeded and deterministic; `Math.random()` only for cosmetics.
+- Gameplay randomness is seeded and deterministic (`createRandom`). Cosmetics that don't affect gameplay
+  (waves, foam) live in `src/client/` and may use `Math.random()`; in `src/game/` it is a lint error.
 - If a change would make the future online part harder, say so explicitly.
 
 ## Commands
@@ -31,28 +32,46 @@ There are no automated tests. Visual changes are checked by a human in the brows
 
 ## Architecture
 
+The code is split by where it runs, then by domain inside each part:
+
 ```
 src/
-  main.ts          entry point: Pixi Application, HUD, mouse controls, game loop
-  game/            LOGIC: data and math only, no Pixi
-    GameState.ts   GameState: everything the view reads and draws
-    World.ts       map generation (islands, waves) from a fixed seed
-    Ship.ts        ship movement towards target, island collisions
-    Wake.ts        foam wake (particle pool)
-    math.ts        clamp, normalizeAngle
-  views/           RENDERING: read GameState and draw it
-    ProjectedView.ts isometric view: redraws the scene every frame via Camera3D + Painter3D
-    Camera3D.ts    parallel projection world → camera → screen and back (screenToGround)
-    Painter3D.ts   3D primitives on top of Pixi Graphics: projection, lighting, shadows
-    ship3d.ts, island3d.ts  3D models of the ship and islands
+  main.ts              entry point: creates the Pixi Application and starts GameClient
+  game/                SHARED LOGIC — future package for the server: data, physics, math. No Pixi, DOM, Math.random
+    index.ts           public API: everything outside game/ imports it only from here
+    Game.ts            owns GameState, update(dt) advances the simulation in a fixed order
+    GameState.ts       everything the client reads and draws
+    world/World.ts     world size, islands generated from a fixed seed, islandOutline
+    ships/Ship.ts      ship movement towards target, island collisions
+    lib/               math.ts (clamp, normalizeAngle), random.ts (seeded createRandom)
+  client/              BROWSER: Pixi, DOM, input. Reads GameState, never mutates it except through game methods
+    GameClient.ts      wires Game + SceneView + Hud + input, runs the frame loop
+    input/             pointerInput.ts: mouse/touch → ship.setTarget
+    hud/               Hud.ts (screen-space texts), FpsMeter.ts
+    render/            3D engine with no game knowledge
+      Camera3D.ts      parallel projection world → camera → screen and back (screenToGround)
+      Painter3D.ts     3D primitives on top of Pixi Graphics: projection, lighting, shadows
+    scene/
+      SceneView.ts     isometric scene: camera follow, draw order, redraws every frame
+      models/          ship3d.ts, island3d.ts — 3D models of game objects
+      effects/         client-only decorations with their own state: Wake.ts (foam), waves.ts, targetMarker.ts
 ```
 
-Frame flow (`main.ts`): `ship.update(dt, islands)` → `wake.update(dt, ship)` → `view.update(dt)`.
+Frame flow (`GameClient`): `game.update(dt)` → `view.update(dt)` (updates the wake, then draws) → `hud.update(...)`.
 `dt` is in seconds, capped at 0.05.
 
-Core rule: **`game/` knows nothing about rendering, `views/` never mutate game state.**
+Core rule: **`game/` knows nothing about the client; the client changes game state only through game methods.**
 
-Camera settings are the `CAMERA` constant in [src/views/ProjectedView.ts](src/views/ProjectedView.ts)
+Where new code goes:
+
+- Gameplay (anything the server must agree on: movement, combat, damage, loot) → a domain folder in `game/`
+  (`game/ships/`, `game/world/`, a new one like `game/combat/`), stepped from `Game.update`. Export what the client needs from `game/index.ts`.
+- How a game object looks → `client/scene/models/<thing>3d.ts`, called from `SceneView`.
+- Visual-only things with their own state (particles, decorations) → `client/scene/effects/`.
+- Screen-space UI → `client/hud/`; new controls → `client/input/`.
+- A domain folder appears when its first file does; a file grows into a folder when it gets a second file.
+
+Camera settings are the `CAMERA` constant in [src/client/scene/SceneView.ts](src/client/scene/SceneView.ts)
 (pitch 30°, yaw 45°, zoom 1.4). Don't add perspective, sky or other camera modes unless asked —
 they were tried and removed (commit `2c8125f` still has them).
 
@@ -67,10 +86,12 @@ they were tried and removed (commit `2c8125f` still has them).
   `// prettier-ignore` only for data tables such as model vertices.
 - Lint rules live in `.oxlintrc.json`. Linting is Oxlint, not ESLint: typescript-eslint doesn't support TypeScript 7.
   Fix a lint error instead of silencing it; if a rule is wrong for this project, turn it off in the config with a comment why.
-- Oxlint enforces the `src/game/` boundary: no `pixi.js` or `views/` imports, no `window` / `document`.
+- Oxlint enforces the boundaries: `src/game/` has no `pixi.js` or `client/` imports, no `window` / `document`,
+  no `Math.random`; `src/client/` and `src/*.ts` import game logic only from `game/index.ts`.
+- File names follow the main export: PascalCase for a class (`Ship.ts`, `SceneView.ts`), camelCase for functions (`ship3d.ts`, `pointerInput.ts`).
 - Colors are `0xRRGGBB` numbers; a model's colors live in a `COLORS` object at the top of the file.
 - Magic numbers go into `UPPER_CASE` constants with a comment about units.
-- Before writing a new helper, check `game/math.ts` and the exports of `Painter3D.ts` (`shade`, `shadowPoint`).
+- Before writing a new helper, check `game/lib/` and the exports of `client/render/Painter3D.ts` (`shade`, `shadowPoint`).
 
 ## Pixi.js v8 — don't mix up with v7
 
@@ -85,7 +106,7 @@ The project uses **Pixi v8**. Do not use v7 API (`beginFill`, `drawCircle`, `lin
 Separate files in `.claude/rules/` are loaded when working on the matching part of the code:
 
 - [.claude/rules/game-logic.md](.claude/rules/game-logic.md) — `src/game/**`: units, map determinism, ship physics
-- [.claude/rules/rendering-3d.md](.claude/rules/rendering-3d.md) — `src/views/**`: coordinate systems, draw order, performance
+- [.claude/rules/rendering-3d.md](.claude/rules/rendering-3d.md) — `src/client/**`: coordinate systems, draw order, effects, performance
 
 ## Git
 
