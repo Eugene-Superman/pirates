@@ -13,6 +13,7 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
 - **npm** — comes with Node.js.
 - **Git**.
 - A modern browser with WebGL (Chrome, Firefox, Safari, Edge).
+- [Blender](https://www.blender.org/) — only to change the ship sprite, see [art/README.md](art/README.md).
 
 ## Getting started
 

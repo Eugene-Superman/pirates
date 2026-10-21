@@ -72,6 +72,11 @@ const COLORS = {
 
 type ShipPoint = (x: number, y: number, z: number) => Vec3;
 
+/** Height of the ship above the water while it bobs on the waves, in world units. Shared with ShipSprite */
+export function shipBob(time: number) {
+  return Math.sin(time * 2.1) * 0.8;
+}
+
 // Converts ship coordinates to world ones, with bobbing on the waves and heeling in turns
 function shipTransform(ship: Ship, time: number): ShipPoint {
   const cos = Math.cos(ship.rotation);
@@ -79,7 +84,7 @@ function shipTransform(ship: Ship, time: number): ShipPoint {
   const roll = Math.sin(time * 1.3) * 0.04 - ship.turnRate * (ship.speed / ship.maxSpeed) * 0.12;
   const rollCos = Math.cos(roll);
   const rollSin = Math.sin(roll);
-  const bob = Math.sin(time * 2.1) * 0.8;
+  const bob = shipBob(time);
 
   return (lx, ly, lz) => {
     const y = ly * rollCos - lz * rollSin;
