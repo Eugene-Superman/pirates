@@ -48,13 +48,13 @@ Report only real problems in the changed code. Keep it proportionate: no micro-o
 - Layer rules from `CLAUDE.md`: the game-logic layer has no Pixi, DOM or browser APIs; rendering never mutates game state;
   player actions reach the game only through game-logic methods; gameplay randomness is seeded.
 - Readiness for the online part (separate NestJS backend): logic the server will need lives in the logic layer and is framework-free.
-- New code sits in the right folder; each file does one thing; no circular imports.
-- Reuse existing helpers (`math.ts`, `Painter3D` exports) instead of writing duplicates.
+- New code sits in the right folder ("Where new code goes" in `CLAUDE.md`); each file does one thing; no circular imports.
+- Reuse existing helpers (`game/lib/`, `Painter3D` exports) instead of writing duplicates.
 - No speculative abstractions (interfaces with one implementation "for later", unused parameters/options) — and no copy-paste either.
 
 ### Performance
 
-The hot path is everything that runs every frame: the `app.ticker` callback, `update(dt)` of views and logic, model `draw*` functions, `Painter3D` methods.
+The hot path is everything that runs every frame: the `app.ticker` callback, `update(dt)` of `Game`, `SceneView` and effects, model and effect `draw*` functions, `Painter3D` methods.
 
 - Allocations inside large per-frame loops (there are 1200 waves): new arrays, objects or closures per item, `filter`/`map` chains on big arrays.
 - O(n²) loops, sorting more than needed, work that could be done once in a constructor or cached.

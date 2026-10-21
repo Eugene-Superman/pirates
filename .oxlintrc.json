@@ -21,20 +21,36 @@
   },
   "overrides": [
     {
-      // Game logic will be shared with the server: no rendering and no browser APIs
+      // Game logic will be shared with the server: no rendering, no browser APIs, only seeded randomness
       "files": ["src/game/**"],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",
           {
             "paths": [{ "name": "pixi.js", "message": "src/game/ must not depend on rendering." }],
-            "patterns": [{ "group": ["**/views/**"], "message": "src/game/ must not depend on rendering." }]
+            "patterns": [{ "group": ["**/client/**"], "message": "src/game/ must not depend on the client." }]
           }
         ],
         "eslint/no-restricted-globals": [
           "error",
           { "name": "window", "message": "src/game/ must not use browser APIs." },
           { "name": "document", "message": "src/game/ must not use browser APIs." }
+        ],
+        "eslint/no-restricted-properties": [
+          "error",
+          { "object": "Math", "property": "random", "message": "Use createRandom(seed) from lib/random." }
+        ]
+      }
+    },
+    {
+      // The client sees game/ only through its public API, so game/ can become a package
+      "files": ["src/client/**", "src/*.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [{ "group": ["**/game/**"], "message": "Import game logic from its index: '…/game'." }]
+          }
         ]
       }
     }

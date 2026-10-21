@@ -1,17 +1,18 @@
-import type { Ship } from './Ship';
+import type { Ship } from '../../../game';
+import type { Painter3D } from '../../render/Painter3D';
 
-export const WAKE_LIFETIME = 1.6; // seconds
+const WAKE_LIFETIME = 1.6; // seconds
 const POOL_SIZE = 120;
 const SPAWN_INTERVAL = 0.04;
 
-export interface Foam {
+interface Foam {
   x: number;
   y: number;
   life: number;
   startAlpha: number;
 }
 
-// Foam wake behind the ship (data only, views draw it).
+// Foam wake behind the ship. Pure decoration, so it lives on the client and may use Math.random.
 // Particles are reused from the pool round-robin, nothing is allocated during gameplay.
 export class Wake {
   readonly particles: Foam[] = Array.from({ length: POOL_SIZE }, () => ({
@@ -54,6 +55,13 @@ export class Wake {
 }
 
 /** How much of its life a particle has lived: 0 = just spawned, 1 = gone */
-export function foamProgress(p: Foam) {
+function foamProgress(p: Foam) {
   return Math.min(p.life / WAKE_LIFETIME, 1);
+}
+
+export function drawWake(p: Painter3D, wake: Wake) {
+  for (const foam of wake.particles) {
+    const t = foamProgress(foam);
+    if (t < 1) p.disc(foam.x, foam.y, 0, 4 * (1 + t * 2.5), 0xffffff, foam.startAlpha * (1 - t));
+  }
 }

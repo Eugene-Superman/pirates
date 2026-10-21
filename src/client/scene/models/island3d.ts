@@ -1,6 +1,6 @@
-import { islandOutline, type Island, type Palm } from '../game/World';
-import type { Vec3 } from './Camera3D';
-import { shadowPoint, type Painter3D } from './Painter3D';
+import { islandOutline, type Island, type Palm } from '../../../game';
+import type { Vec3 } from '../../render/Camera3D';
+import { shadowPoint, type Painter3D } from '../../render/Painter3D';
 
 const PALM_HEIGHT = 26;
 const SHADOW_ALPHA = 0.18;

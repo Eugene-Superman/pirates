@@ -1,5 +1,5 @@
-import { clamp, normalizeAngle } from './math';
-import { WORLD_HEIGHT, WORLD_WIDTH, type Island } from './World';
+import { clamp, normalizeAngle } from '../lib/math';
+import { WORLD_HEIGHT, WORLD_WIDTH, type Island } from '../world/World';
 
 const ARRIVE_DISTANCE = 20;
 
