@@ -12,9 +12,9 @@ export interface Island {
   x: number;
   y: number;
   radius: number;
-  shape: number[]; // множники радіуса для нерівного берега, по одному на сегмент
-  height: number; // висота плато над водою
-  hillHeight: number; // висота пагорба на плато (0 = без пагорба)
+  shape: number[]; // radius multipliers for a jagged coastline, one per segment
+  height: number; // plateau height above the water
+  hillHeight: number; // height of the hill on the plateau (0 = no hill)
   palms: Palm[];
 }
 
@@ -30,7 +30,7 @@ export interface WorldData {
   waves: Wave[];
 }
 
-// Детермінований рандом, щоб карта була однаковою при кожному запуску
+// Deterministic random so the map is the same on every run
 function createRandom(seed: number) {
   return () => {
     seed = (seed + 0x6d2b79f5) | 0;
@@ -47,7 +47,7 @@ export function createWorld(): WorldData {
   };
 }
 
-/** Точки берега острова, масштабовані відносно його радіуса */
+/** Island coastline points, scaled relative to the island's radius */
 export function islandOutline(island: Island, scale: number) {
   const segments = island.shape.length;
   return island.shape.map((k, i) => {
@@ -80,7 +80,7 @@ function createIslands(count: number, random: () => number): Island[] {
     const overlaps = islands.some((o) => Math.hypot(x - o.x, y - o.y) < radius + o.radius + 150);
     if (overlaps) continue;
 
-    // Нерівний берег: випадкові радіуси, згладжені з сусідами
+    // Jagged coastline: random radii smoothed with their neighbours
     const segments = 18;
     const raw = Array.from({ length: segments }, () => 0.8 + random() * 0.4);
     const shape = raw.map((v, i) => (raw[(i - 1 + segments) % segments] + v + raw[(i + 1) % segments]) / 3);
@@ -88,7 +88,7 @@ function createIslands(count: number, random: () => number): Island[] {
     const hillHeight = radius > 120 ? 16 + random() * 16 : 0;
     const palms = Array.from({ length: 2 + Math.floor(random() * 4) }, () => {
       const angle = random() * Math.PI * 2;
-      // На великих островах пальми ростуть навколо пагорба, а не на ньому
+      // On large islands palms grow around the hill, not on it
       const dist = radius * (hillHeight > 0 ? 0.5 + random() * 0.08 : random() * 0.45);
       const leanAngle = random() * Math.PI * 2;
       const lean = 3 + random() * 5;

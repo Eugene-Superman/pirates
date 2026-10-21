@@ -1,6 +1,6 @@
 import type { Ship } from './Ship';
 
-export const WAKE_LIFETIME = 1.6; // секунд
+export const WAKE_LIFETIME = 1.6; // seconds
 const POOL_SIZE = 120;
 const SPAWN_INTERVAL = 0.04;
 
@@ -11,8 +11,8 @@ export interface Foam {
   startAlpha: number;
 }
 
-// Пінний слід за кораблем (тільки дані, малюють його view).
-// Частинки беруться з пулу по колу, нічого не створюється під час гри.
+// Foam wake behind the ship (data only, views draw it).
+// Particles are reused from the pool round-robin, nothing is allocated during gameplay.
 export class Wake {
   readonly particles: Foam[] = Array.from({ length: POOL_SIZE }, () => ({
     x: 0,
@@ -35,7 +35,7 @@ export class Wake {
       const sin = Math.sin(ship.rotation);
       const alpha = 0.6 * (ship.speed / ship.maxSpeed);
 
-      // Дві смуги піни з боків корми
+      // Two foam trails on both sides of the stern
       for (const side of [-8, 8]) {
         this.spawn(ship.x - cos * 32 - sin * side, ship.y - sin * 32 + cos * side, alpha);
       }
@@ -53,7 +53,7 @@ export class Wake {
   }
 }
 
-/** Скільки частинка вже прожила: 0 = щойно з'явилась, 1 = зникла */
+/** How much of its life a particle has lived: 0 = just spawned, 1 = gone */
 export function foamProgress(p: Foam) {
   return Math.min(p.life / WAKE_LIFETIME, 1);
 }
