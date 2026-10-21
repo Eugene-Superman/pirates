@@ -58,10 +58,19 @@ export class ProjectedView {
     for (const wave of world.waves) {
       const x = wave.x + Math.sin(time * 0.8 + wave.phase) * 4;
       if (!painter.isVisible(x + wave.width / 2, wave.y, 0, wave.width)) continue;
-      painter.curve([x, wave.y, 0], [x + wave.width / 2, wave.y - 5, 0], [x + wave.width, wave.y, 0], 2, WAVE_COLOR, 0.45);
+      painter.curve(
+        [x, wave.y, 0],
+        [x + wave.width / 2, wave.y - 5, 0],
+        [x + wave.width, wave.y, 0],
+        2,
+        WAVE_COLOR,
+        0.45,
+      );
     }
 
-    const islands = world.islands.filter((island) => painter.isVisible(island.x, island.y, 0, island.radius * 1.4 + 60));
+    const islands = world.islands.filter((island) =>
+      painter.isVisible(island.x, island.y, 0, island.radius * 1.4 + 60),
+    );
     for (const island of islands) drawIslandGround(painter, island);
 
     this.drawWorldBorder();

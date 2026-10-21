@@ -2,13 +2,16 @@
 name: git-push
 description: Review the current changes with the project code review, then commit them to a feature branch, push, and open a GitHub pull request into main.
 disable-model-invocation: true
-argument-hint: "[short description of the change]"
-allowed-tools: Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git branch *) Bash(git fetch *) Bash(git remote *) Bash(git switch *) Bash(git add *) Bash(git commit *) Bash(npx tsc *)
+argument-hint: '[short description of the change]'
+allowed-tools: Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git branch *) Bash(git fetch *) Bash(git remote *) Bash(git switch *) Bash(git add *) Bash(git commit *) Bash(npx tsc *) Bash(npm run check *) Bash(npm run format *)
 ---
 
 # Review, commit, push, open a PR
 
 Ship the current changes as a pull request into `main`. Go through the steps in order; when a step says to ask, stop and wait for the answer.
+
+**No AI attribution anywhere:** commit messages, PR titles and PR bodies never mention Claude, Claude Code or AI —
+no `Co-Authored-By: Claude` trailer, no "Generated with Claude Code" line, no session links.
 
 ## 1. Check the state
 
@@ -27,20 +30,21 @@ uncommitted changes plus commits of the current branch that are not in `main`.
   - ship as is;
   - abort.
 
-  After fixing: run `npx tsc`, re-review the files you touched, show a short summary of the fixes, and ask whether to continue to the PR.
+  After fixing: run `npm run format` and `npm run check`, re-review the files you touched, show a short summary of the fixes, and ask whether to continue to the PR.
+
 - **`VERDICT: CLEAN`** → continue. Mention nits in one line, they don't block.
 
 ## 3. Describe the change
 
 Decide from the diff (use `$ARGUMENTS` as the basis for the description if it's given):
 
-| Type | When | Branch prefix |
-|---|---|---|
-| `FEATURE` | new gameplay, visuals or capability | `feature/` |
-| `FIX` | a bug fix | `fix/` |
-| `REFACTOR` | restructuring without behavior change | `refactor/` |
-| `DOCS` | only docs: `README.md`, `CLAUDE.md`, `.claude/` | `docs/` |
-| `CHORE` | dependencies, configs, tooling | `chore/` |
+| Type       | When                                            | Branch prefix |
+| ---------- | ----------------------------------------------- | ------------- |
+| `FEATURE`  | new gameplay, visuals or capability             | `feature/`    |
+| `FIX`      | a bug fix                                       | `fix/`        |
+| `REFACTOR` | restructuring without behavior change           | `refactor/`   |
+| `DOCS`     | only docs: `README.md`, `CLAUDE.md`, `.claude/` | `docs/`       |
+| `CHORE`    | dependencies, configs, tooling                  | `chore/`      |
 
 - **Description**: English, imperative, lowercase, no trailing period, up to ~60 characters — `add cannon fire`, `fix ship stuck at island edge`.
 - **Commit message and PR title**: `[TYPE]: description` — e.g. `[FEATURE]: add cannon fire`.
@@ -76,16 +80,20 @@ PR body:
 
 ```markdown
 ## What
+
 - <main changes, 2–5 bullets>
 
 ## Why
+
 <one or two sentences>
 
 ## How to test
+
 1. `npm run dev`
 2. <what to do in the game and what to look at>
 
 ## Code review
+
 <clean | findings fixed: … | shipped with known findings: …>
 ```
 

@@ -5,6 +5,7 @@ import { shadowPoint, type Painter3D } from './Painter3D';
 // Ship coordinates: x towards the bow, y towards starboard, z up from the water
 const DECK_Z = 10;
 const BAND_Z = 7;
+// prettier-ignore
 const DECK: [number, number][] = [
   [42, 0], [30, 8], [12, 13], [-10, 13], [-30, 11], [-36, 8],
   [-36, -8], [-30, -11], [-10, -13], [12, -13], [30, -8],
@@ -91,11 +92,19 @@ export function drawShipShadow(p: Painter3D, ship: Ship, time: number) {
   const point = shipTransform(ship, time);
   const shadow = (x: number, y: number, z: number) => shadowPoint(point(x, y, z));
 
-  p.polygon(DECK.map(([x, y]) => shadow(x, y, DECK_Z)), 0x000000, SHADOW_ALPHA);
+  p.polygon(
+    DECK.map(([x, y]) => shadow(x, y, DECK_Z)),
+    0x000000,
+    SHADOW_ALPHA,
+  );
   for (const mast of MASTS) {
     p.line(shadow(mast.x, 0, DECK_Z), shadow(mast.x, 0, DECK_Z + mast.height), 2.5, 0x000000, SHADOW_ALPHA);
     for (const sail of mast.sails) {
-      p.polygon(sailOutline(mast, sail).map(([x, y, z]) => shadow(x, y, z)), 0x000000, SHADOW_ALPHA);
+      p.polygon(
+        sailOutline(mast, sail).map(([x, y, z]) => shadow(x, y, z)),
+        0x000000,
+        SHADOW_ALPHA,
+      );
     }
   }
 }
@@ -104,8 +113,16 @@ export function drawShip(p: Painter3D, ship: Ship, time: number) {
   const point = shipTransform(ship, time);
   const deck = DECK.map(([x, y]) => point(x, y, DECK_Z));
 
-  p.sides(WATERLINE.map(([x, y]) => point(x, y, 0)), BAND.map(([x, y]) => point(x, y, BAND_Z)), COLORS.hull);
-  p.sides(BAND.map(([x, y]) => point(x, y, BAND_Z)), deck, COLORS.band);
+  p.sides(
+    WATERLINE.map(([x, y]) => point(x, y, 0)),
+    BAND.map(([x, y]) => point(x, y, BAND_Z)),
+    COLORS.hull,
+  );
+  p.sides(
+    BAND.map(([x, y]) => point(x, y, BAND_Z)),
+    deck,
+    COLORS.band,
+  );
   drawGunports(p, point);
   p.top(deck, COLORS.deck);
   for (const y of [-5, 0, 5]) {
@@ -151,9 +168,18 @@ function drawGunports(p: Painter3D, point: ShipPoint) {
 }
 
 function drawCastle(p: Painter3D, point: ShipPoint) {
-  const rect: [number, number][] = [[-35, -9], [-21, -9], [-21, 9], [-35, 9]];
+  const rect: [number, number][] = [
+    [-35, -9],
+    [-21, -9],
+    [-21, 9],
+    [-35, 9],
+  ];
   const top = rect.map(([x, y]) => point(x, y, DECK_Z + 7));
-  p.sides(rect.map(([x, y]) => point(x, y, DECK_Z)), top, COLORS.castle);
+  p.sides(
+    rect.map(([x, y]) => point(x, y, DECK_Z)),
+    top,
+    COLORS.castle,
+  );
   p.top(top, COLORS.deck);
 }
 

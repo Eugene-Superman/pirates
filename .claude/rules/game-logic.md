@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/game/**"
+  - 'src/game/**'
 ---
 
 # Game logic (`src/game/`)
