@@ -7,9 +7,13 @@ import { Wake, drawWake } from './effects/Wake';
 import { createWaves, drawWaves } from './effects/waves';
 import { drawIslandGround, drawIslandRaised } from './models/island3d';
 import { drawShip, drawShipShadow } from './models/ship3d';
+import { ShipSprite } from './models/ShipSprite';
 
 // Classic 2:1 isometric: tilted 30°, world rotated 45°
 const CAMERA: CameraConfig = { pitch: 30, yaw: 45, zoom: 1.4, originY: 0.5 };
+// The ship atlas from Blender is rendered for exactly this camera (art/render_sprites.py).
+// Changing the camera means re-rendering the sprites
+const SHIP_SPRITE_URL = `${import.meta.env.BASE_URL}sprites/ship-iso.json`;
 
 const SEA_COLOR = 0x1b6f93;
 const BORDER_COLOR = 0x0b3a52;
@@ -20,25 +24,30 @@ const BORDER_COLOR = 0x0b3a52;
 export class SceneView {
   readonly container = new Container();
   private readonly scene = new Graphics();
+  /** Islands nearer than the ship sprite: they must be drawn on top of it */
+  private readonly front = new Graphics();
   private readonly wake = new Wake();
   private readonly waves = createWaves();
   private readonly app: Application;
   private readonly state: GameState;
   private readonly camera: Camera3D;
   private readonly painter: Painter3D;
+  private readonly frontPainter: Painter3D;
+  private readonly shipSprite = new ShipSprite(SHIP_SPRITE_URL);
 
   constructor(app: Application, state: GameState) {
     this.app = app;
     this.state = state;
     this.camera = new Camera3D(CAMERA);
     this.painter = new Painter3D(this.scene, this.camera);
+    this.frontPainter = new Painter3D(this.front, this.camera);
     // The whole screen behind the scene is open sea
     app.renderer.background.color = SEA_COLOR;
 
     this.camera.focusX = state.ship.x;
     this.camera.focusY = state.ship.y;
 
-    this.container.addChild(this.scene);
+    this.container.addChild(this.scene, this.shipSprite.sprite, this.front);
   }
 
   update(dt: number) {
@@ -54,8 +63,10 @@ export class SceneView {
     camera.focusY += (ship.y - camera.focusY) * follow;
     camera.originX = width / 2;
     camera.originY = height * CAMERA.originY;
-    painter.screenWidth = width;
-    painter.screenHeight = height;
+    painter.screenWidth = this.frontPainter.screenWidth = width;
+    painter.screenHeight = this.frontPainter.screenHeight = height;
+    // While the atlas is loading, the drawn ship is shown
+    const sprite = this.shipSprite.ready ? this.shipSprite : null;
 
     this.scene.clear();
 
@@ -70,17 +81,25 @@ export class SceneView {
     this.drawWorldBorder();
 
     drawWake(painter, this.wake);
-    drawShipShadow(painter, ship, time);
+    // The sprite has its shadow baked in
+    if (!sprite) drawShipShadow(painter, ship, time);
     if (ship.target) drawTargetMarker(painter, ship.target, time);
 
     // Volumetric objects: from far to near
     const objects = islands.map((island) => ({
       depth: painter.depth([island.x, island.y, island.height / 2]),
-      draw: () => drawIslandRaised(painter, island, time),
+      draw: (p: Painter3D) => drawIslandRaised(p, island, time),
     }));
-    objects.push({ depth: painter.depth([ship.x, ship.y, 20]), draw: () => drawShip(painter, ship, time) });
+    const shipDepth = painter.depth([ship.x, ship.y, 20]);
+    if (!sprite) objects.push({ depth: shipDepth, draw: (p) => drawShip(p, ship, time) });
     objects.sort((a, b) => b.depth - a.depth);
-    for (const object of objects) object.draw();
+
+    // A sprite can't go inside a Graphics, so everything nearer than the ship goes to a layer on top of it
+    this.front.clear();
+    for (const object of objects) {
+      object.draw(sprite && object.depth < shipDepth ? this.frontPainter : painter);
+    }
+    sprite?.update(ship, camera, time);
   }
 
   screenToWorld(x: number, y: number) {

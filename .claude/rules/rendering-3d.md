@@ -9,6 +9,7 @@ paths:
 
 - `render/` — the 3D engine (`Camera3D`, `Painter3D`). It knows nothing about ships or islands: no imports from `game/` or `scene/`.
 - `scene/models/` — how game objects look: `draw*(painter, object, time)` functions that only read game data.
+  `ShipSprite` is the exception: a Pixi `Sprite` from a pre-rendered atlas (see "Ship sprite" below).
 - `scene/effects/` — client-only decorations with their own state (foam, waves, target marker). They may use `Math.random`.
 - `hud/` — screen-space Pixi `Text`/`Container`, not projected. `input/` — turns pointer events into game method calls.
 - Game logic is imported only from `game/index.ts` (`'../../game'`); Oxlint rejects deep imports into `game/`.
@@ -18,6 +19,7 @@ paths:
 - **`SceneView`** is the only scene: classic 2:1 isometric (parallel projection, pitch 30°, yaw 45°).
 - Immediate mode: `scene.clear()` and a full redraw every frame via `Painter3D`.
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
+  The only exception is the ship sprite, which is already projected and lit by Blender.
 - No perspective: sizes don't depend on distance, line widths are `width * camera.zoom`.
 
 ## Coordinate systems
@@ -31,7 +33,7 @@ paths:
 - `Vec3` is a `readonly [x, y, z]` tuple in world coordinates.
 - `CameraConfig.pitch` / `yaw` are in **degrees** (90 = straight down, yaw 0 = north at the top). Camera direction is fixed after construction.
 - `screenToGround` maps a screen point to the water plane (`z = 0`); it always returns a point.
-- Ship-local points are converted to world space via `shipTransform` — it also adds bobbing (`bob`) and heeling (`roll`).
+- Ship-local points are converted to world space via `shipTransform` — it also adds bobbing (`shipBob`) and heeling (`roll`).
 
 ## Draw order (painter's algorithm)
 
@@ -42,7 +44,20 @@ There is no z-buffer, so order is everything. In `SceneView.update`:
 3. Volumetric objects (islands, ship) — sorted by `painter.depth(...)` **from far to near**.
 4. Parts within an object are also sorted by depth (ship masts/sails, island hill and palms).
 
-Add a new volumetric object to the `objects` array with `depth` and `draw`; don't draw it separately after sorting.
+Add a new volumetric object to the `objects` array with `depth` and `draw(painter)`; don't draw it separately after sorting.
+
+With the ship sprite loaded, a sprite can't go inside a `Graphics`, so the scene is three layers in `container`:
+`scene` (flat things and objects farther than the ship) → ship sprite → `front` (objects nearer than the ship, drawn with `frontPainter`).
+`draw` receives the painter of its layer — draw with it, not with `this.painter`. The ship shadow is baked into the sprite,
+so `drawShipShadow` is skipped. While the atlas loads (or if it fails to load), the drawn `ship3d` ship is used as before.
+
+## Ship sprite (`models/ShipSprite.ts`)
+
+- The atlas `public/sprites/ship-iso.{webp,json}` is rendered from `art/ship.blend` by `art/render_sprites.py`: 64 directions,
+  frame `i` = ship rotation `i * 360 / 64` degrees. `meta.ship` holds `pxPerUnit` (atlas pixels per world unit) and the camera `pitch`/`yaw`.
+- It matches `CAMERA` only: a different pitch or yaw needs a re-render (`art/README.md`). Scale is `camera.zoom / pxPerUnit`.
+- The anchor is the ship's centre on the waterline; the sprite bobs with `shipBob` but doesn't heel in turns.
+- The baked shadow lies on the water plane, so it is drawn over islands farther than the ship instead of being hidden by them.
 
 ## `Painter3D` primitives
 
