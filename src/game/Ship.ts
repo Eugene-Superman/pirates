@@ -3,18 +3,18 @@ import { WORLD_HEIGHT, WORLD_WIDTH, type Island } from './World';
 
 const ARRIVE_DISTANCE = 20;
 
-// Тільки логіка руху. Як корабель виглядає, вирішує view.
+// Movement logic only. How the ship looks is up to the view.
 export class Ship {
   x = 0;
   y = 0;
   rotation = 0;
   speed = 0;
-  turnRate = 0; // поточна швидкість повороту, рад/с (для крену)
-  maxSpeed = 220; // пікселів за секунду
+  turnRate = 0; // current turn speed, rad/s (for heeling)
+  maxSpeed = 220; // world units per second
   acceleration = 90;
   deceleration = 140;
-  turnSpeed = 1.8; // радіан за секунду
-  radius = 22; // для зіткнень
+  turnSpeed = 1.8; // radians per second
+  radius = 22; // for collisions
   target: { x: number; y: number } | null = null;
 
   setTarget(x: number, y: number) {
@@ -41,7 +41,7 @@ export class Ship {
         turn = clamp(angleDiff, -maxTurn, maxTurn);
         this.rotation = normalizeAngle(this.rotation + turn);
 
-        // Сповільнюємось біля цілі та на крутих поворотах
+        // Slow down near the target and on sharp turns
         const arriveFactor = clamp(dist / 250, 0.15, 1);
         const turnFactor = Math.abs(angleDiff) > Math.PI / 2 ? 0.35 : 1;
         desiredSpeed = this.maxSpeed * arriveFactor * turnFactor;
@@ -67,7 +67,7 @@ export class Ship {
       const minDist = island.radius + this.radius;
 
       if (dist > 0 && dist < minDist) {
-        // Виштовхуємо корабель з острова і гасимо швидкість
+        // Push the ship out of the island and kill its speed
         this.x = island.x + (dx / dist) * minDist;
         this.y = island.y + (dy / dist) * minDist;
         this.speed = Math.min(this.speed, this.maxSpeed * 0.25);

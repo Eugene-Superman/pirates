@@ -21,14 +21,14 @@ function outline(island: Island, scale: number, z: number): Vec3[] {
   return islandOutline(island, scale).map((pt): Vec3 => [pt.x, pt.y, z]);
 }
 
-/** Пласкі частини острова (мілина, пляж, тінь від скелі). Малюються разом з морем */
+/** Flat parts of the island (shallows, beach, cliff shadow). Drawn together with the sea */
 export function drawIslandGround(p: Painter3D, island: Island) {
   p.polygon(outline(island, 1.35, 0), COLORS.shallow, 0.4);
   p.polygon(outline(island, 1, 0), COLORS.sand);
   p.polygon(outline(island, 0.7, island.height).map((q) => shadowPoint(q)), 0x000000, SHADOW_ALPHA);
 }
 
-/** Об'ємні частини: скеля, плато, пагорб, пальми */
+/** Raised parts: cliff, plateau, hill, palms */
 export function drawIslandRaised(p: Painter3D, island: Island, time: number) {
   const plateau = outline(island, 0.7, island.height);
   p.sides(outline(island, 0.78, 0), plateau, COLORS.cliff);
@@ -69,7 +69,7 @@ function drawPalm(p: Painter3D, palm: Palm, groundZ: number, top: Vec3) {
   p.polygon(leaves([top[0], top[1], top[2] + 1], 7, 3, 2), COLORS.palmLight);
 }
 
-// Крона-зірка: кінчики листя опущені на droop
+// Star-shaped crown: leaf tips hang down by droop
 function leaves(center: Vec3, outer: number, inner: number, droop: number): Vec3[] {
   const points: Vec3[] = [];
   for (let k = 0; k < 12; k++) {

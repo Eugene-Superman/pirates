@@ -2,14 +2,14 @@ import type { Ship } from '../game/Ship';
 import type { Vec3 } from './Camera3D';
 import { shadowPoint, type Painter3D } from './Painter3D';
 
-// Координати корабля: x до носа, y до правого борту, z вгору від води
+// Ship coordinates: x towards the bow, y towards starboard, z up from the water
 const DECK_Z = 10;
 const BAND_Z = 7;
 const DECK: [number, number][] = [
   [42, 0], [30, 8], [12, 13], [-10, 13], [-30, 11], [-36, 8],
   [-36, -8], [-30, -11], [-10, -13], [12, -13], [30, -8],
 ];
-// Корпус звужується донизу
+// The hull narrows towards the bottom
 const WATERLINE = DECK.map(([x, y]): [number, number] => [x * 0.92, y * 0.78]);
 const BAND = DECK.map(([x, y], i): [number, number] => {
   const [wx, wy] = WATERLINE[i];
@@ -51,7 +51,7 @@ const MASTS: Mast[] = [
   },
 ];
 
-const SAIL_BRACE = 0.25; // реї трохи повернуті, щоб вітрила було видно і збоку
+const SAIL_BRACE = 0.25; // yards are turned slightly so the sails are visible from the side too
 const SAIL_BULGE = 7;
 const SAIL_COLUMNS = 6;
 const SAIL_ROWS = 3;
@@ -71,7 +71,7 @@ const COLORS = {
 
 type ShipPoint = (x: number, y: number, z: number) => Vec3;
 
-// Переводить координати корабля у світові, з погойдуванням на хвилях і креном у поворотах
+// Converts ship coordinates to world ones, with bobbing on the waves and heeling in turns
 function shipTransform(ship: Ship, time: number): ShipPoint {
   const cos = Math.cos(ship.rotation);
   const sin = Math.sin(ship.rotation);
@@ -112,7 +112,7 @@ export function drawShip(p: Painter3D, ship: Ship, time: number) {
     p.line(point(-32, y, DECK_Z), point(30, y, DECK_Z), 0.6, COLORS.plank);
   }
 
-  // Все, що над палубою, малюємо від дальнього до ближнього
+  // Everything above the deck is drawn from far to near
   const parts = [
     { depth: p.depth(point(-28, 0, DECK_Z + 3)), draw: () => drawCastle(p, point) },
     { depth: p.depth(point(38, 0, DECK_Z + 15)), draw: () => drawJib(p, point) },
@@ -142,7 +142,7 @@ function drawGunports(p: Painter3D, point: ShipPoint) {
 
   for (const side of [-1, 1]) {
     for (const { x, halfWidth } of ports) {
-      // Борт розширюється від ватерлінії (0.78 ширини) до палуби
+      // The side widens from the waterline (0.78 of the width) up to the deck
       const y = (z: number) => side * (halfWidth * (0.78 + (0.22 * z) / DECK_Z) + 0.3);
       const quad = [point(x - 2.5, y(3), 3), point(x + 2.5, y(3), 3), point(x + 2.5, y(6), 6), point(x - 2.5, y(6), 6)];
       if (p.facesCamera(quad, center)) p.polygon(quad, COLORS.port);
@@ -167,7 +167,7 @@ function drawMast(p: Painter3D, point: ShipPoint, mast: Mast, time: number) {
   p.line(point(mast.x, 0, DECK_Z), point(mast.x, 0, top), 2.6, COLORS.mast);
 
   if (mast.flag) {
-    // Прапор майорить назад
+    // The flag streams backwards
     const near = Math.sin(time * 7) * 1.5;
     const far = Math.sin(time * 7 - 1) * 2.5;
     p.surface(
@@ -184,7 +184,7 @@ function drawMast(p: Painter3D, point: ShipPoint, mast: Mast, time: number) {
   }
 }
 
-// Точка сітки вітрила: i поперек (0..COLUMNS), j знизу вгору (0..ROWS)
+// Sail grid point: i across (0..COLUMNS), j bottom to top (0..ROWS)
 function sailPoint(mast: Mast, sail: Sail, i: number, j: number): Vec3 {
   const s = (i / SAIL_COLUMNS) * 2 - 1;
   const v = (j / SAIL_ROWS) * 2 - 1;
@@ -215,7 +215,7 @@ function drawSail(p: Painter3D, point: ShipPoint, mast: Mast, sail: Sail) {
     grid.push(row);
   }
 
-  // Вітрило вигнуте, тож його клаптики теж сортуємо за глибиною
+  // The sail is curved, so its patches are depth-sorted too
   const quads: { points: Vec3[]; depth: number }[] = [];
   for (let j = 0; j < SAIL_ROWS; j++) {
     for (let i = 0; i < SAIL_COLUMNS; i++) {
@@ -224,10 +224,10 @@ function drawSail(p: Painter3D, point: ShipPoint, mast: Mast, sail: Sail) {
     }
   }
   quads.sort((a, b) => b.depth - a.depth);
-  // Тканина просвічує, тому вітрила світліші й м'якше затінені за дерево
+  // Cloth lets light through, so sails are lighter and more softly shaded than wood
   for (const quad of quads) p.surface(quad.points, COLORS.sail, 0.85, 0.2);
 
-  // Рея вздовж верхнього краю
+  // Yard along the top edge
   const yard = sail.halfWidth + 2;
   const top = DECK_Z + sail.top;
   p.line(
