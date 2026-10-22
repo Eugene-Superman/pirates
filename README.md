@@ -13,7 +13,6 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
 - **npm** — comes with Node.js.
 - **Git**.
 - A modern browser with WebGL (Chrome, Firefox, Safari, Edge).
-- [Blender](https://www.blender.org/) — only to change the ship sprite, see [art/README.md](art/README.md).
 
 ## Getting started
 
@@ -68,6 +67,8 @@ hosting or CDN — there is no backend yet.
 - Architecture, code conventions and project rules are described in [CLAUDE.md](CLAUDE.md)
   (also used as context by Claude Code). Detailed rules per area are in [.claude/rules/](.claude/rules/).
 - There are no automated tests yet: run `npm run check` and check changes in the browser.
+- The ship sprite atlas in `public/sprites/` is rendered in [Blender](https://www.blender.org/) from a source kept
+  outside this repo — don't edit it by hand.
 - Code is formatted by [Prettier](https://prettier.io/) and linted by [Oxlint](https://oxc.rs/docs/guide/usage/linter)
   (ESLint's TypeScript parser doesn't support TypeScript 7 yet). In VS Code, install the recommended extensions
   (Prettier, Oxc) — the project settings format files on save.

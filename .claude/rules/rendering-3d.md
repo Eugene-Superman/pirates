@@ -53,9 +53,10 @@ so `drawShipShadow` is skipped. While the atlas loads (or if it fails to load), 
 
 ## Ship sprite (`models/ShipSprite.ts`)
 
-- The atlas `public/sprites/ship-iso.{webp,json}` is rendered from `art/ship.blend` by `art/render_sprites.py`: 64 directions,
-  frame `i` = ship rotation `i * 360 / 64` degrees. `meta.ship` holds `pxPerUnit` (atlas pixels per world unit) and the camera `pitch`/`yaw`.
-- It matches `CAMERA` only: a different pitch or yaw needs a re-render (`art/README.md`). Scale is `camera.zoom / pxPerUnit`.
+- The atlas `public/sprites/ship-iso.{webp,json}` is rendered in Blender by `render_sprites.py`, whose source lives outside
+  this repo (see the camera paragraph in `CLAUDE.md`): 64 directions, frame `i` = ship rotation `i * 360 / 64` degrees.
+  `meta.ship` holds `pxPerUnit` (atlas pixels per world unit) and the camera `pitch`/`yaw`.
+- It matches `CAMERA` only: a different pitch or yaw needs a re-render from that source. Scale is `camera.zoom / pxPerUnit`.
 - The anchor is the ship's centre on the waterline; the sprite bobs with `shipBob` but doesn't heel in turns.
 - The baked shadow lies on the water plane, so it is drawn over islands farther than the ship instead of being hidden by them.
 
