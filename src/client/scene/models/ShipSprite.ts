@@ -3,7 +3,7 @@ import type { Ship } from '../../../game';
 import type { Camera3D } from '../../render/Camera3D';
 import { shipBob } from './ship3d';
 
-/** The part of the atlas's meta.ship (written by art/render_sprites.py) that the game reads */
+/** The part of the atlas's meta.ship (written by the Blender render script) that the game reads */
 interface ShipSheetMeta {
   pxPerUnit: number;
   yaw: number;
@@ -23,7 +23,7 @@ function isShipSheetMeta(value: unknown): value is ShipSheetMeta {
   );
 }
 
-// The ship from an atlas rendered in Blender (art/render_sprites.py).
+// The ship from an atlas rendered in Blender.
 // Frame i is the ship turned by i * 360 / N degrees, with its shadow on the water already baked in.
 // Only fits a camera with the same pitch.
 export class ShipSprite {

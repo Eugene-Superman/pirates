@@ -1,8 +1,3 @@
 node_modules
 dist
 *.local
-
-# Blender: unpacked render frames, auto-backups of .blend files, Python bytecode of the scripts
-art/frames
-*.blend1
-__pycache__/

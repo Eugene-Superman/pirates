@@ -11,8 +11,8 @@ import { ShipSprite } from './models/ShipSprite';
 
 // Classic 2:1 isometric: tilted 30°, world rotated 45°
 const CAMERA: CameraConfig = { pitch: 30, yaw: 45, zoom: 1.4, originY: 0.5 };
-// The ship atlas from Blender is rendered for exactly this camera (art/render_sprites.py).
-// Changing the camera means re-rendering the sprites
+// The ship atlas from Blender is rendered for exactly this camera.
+// Changing the camera means re-rendering the sprites from their source outside this repo
 const SHIP_SPRITE_URL = `${import.meta.env.BASE_URL}sprites/ship-iso.json`;
 
 const SEA_COLOR = 0x1b6f93;
