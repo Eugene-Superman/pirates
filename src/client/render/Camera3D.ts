@@ -13,7 +13,7 @@ export interface CameraConfig {
   pitch: number;
   /** Rotation in degrees: 0 = north at the top of the screen */
   yaw: number;
-  /** Pixels per world unit */
+  /** Pixels per world unit at the start; the camera's zoom can change later */
   zoom: number;
   /** Where the ship sits on the screen height (0..1) */
   originY: number;
@@ -28,7 +28,8 @@ export class Camera3D {
   originX = 0;
   originY = 0;
 
-  readonly zoom: number;
+  /** Pixels per world unit. Changes at runtime (zoom buttons), so read it every frame, never cache it */
+  zoom: number;
   readonly sinP: number;
   readonly cosP: number;
 

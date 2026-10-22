@@ -39,7 +39,8 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    Code changes reload the page on save.
 
 4. Play: click (or tap) on the sea to set a course. Hold the button and drag to steer continuously.
-   Speed and FPS are shown in the top-left corner.
+   Speed, hull integrity and FPS are shown in the top-left corner, with debug buttons that set the ship's damage
+   and the camera zoom.
 
 ## Scripts
 
@@ -67,8 +68,8 @@ hosting or CDN — there is no backend yet.
 - Architecture, code conventions and project rules are described in [CLAUDE.md](CLAUDE.md)
   (also used as context by Claude Code). Detailed rules per area are in [.claude/rules/](.claude/rules/).
 - There are no automated tests yet: run `npm run check` and check changes in the browser.
-- The ship sprite atlas in `public/sprites/` is rendered in [Blender](https://www.blender.org/) from a source kept
-  outside this repo — don't edit it by hand.
+- Ship sprite atlases in `public/sprites/ships/` are rendered in [Blender](https://www.blender.org/) from a source kept
+  outside this repo — don't edit them by hand. Ship lines and how to add a ship: [docs/ships.md](docs/ships.md).
 - Code is formatted by [Prettier](https://prettier.io/) and linted by [Oxlint](https://oxc.rs/docs/guide/usage/linter)
   (ESLint's TypeScript parser doesn't support TypeScript 7 yet). In VS Code, install the recommended extensions
   (Prettier, Oxc) — the project settings format files on save.
