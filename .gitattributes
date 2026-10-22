@@ -1,0 +1,2 @@
+# Prettier expects LF. Without this, Git for Windows (core.autocrlf) checks files out with CRLF and `npm run check` fails
+* text=auto eol=lf
