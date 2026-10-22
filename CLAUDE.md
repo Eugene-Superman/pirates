@@ -43,19 +43,25 @@ src/
     GameState.ts       everything the client reads and draws
     world/World.ts     world size, islands generated from a fixed seed, islandOutline
     ships/Ship.ts      ship movement towards target, island collisions
+    ships/shipClasses.ts  ship catalog: lines and classes with size and handling; STARTER_SHIP (the starter sloop)
+    ships/damage.ts    hull health scale (0–100 %) and the damage stages derived from it
     lib/               math.ts (clamp, normalizeAngle), random.ts (seeded createRandom)
   client/              BROWSER: Pixi, DOM, input. Reads GameState, never mutates it except through game methods
     GameClient.ts      wires Game + SceneView + Hud + input, runs the frame loop
     input/             pointerInput.ts: mouse/touch → ship.setTarget
-    hud/               Hud.ts (screen-space texts), FpsMeter.ts
+    hud/               Hud.ts (screen-space texts, zoom buttons), FpsMeter.ts, ButtonRow.ts (a row of HUD buttons),
+                       DamagePanel.ts (debug buttons that set hull health)
     render/            3D engine with no game knowledge
       Camera3D.ts      parallel projection world → camera → screen and back (screenToGround)
       Painter3D.ts     3D primitives on top of Pixi Graphics: projection, lighting, shadows
     scene/
       SceneView.ts     isometric scene: camera follow, draw order, redraws every frame
-      models/          ship3d.ts, island3d.ts — 3D models of game objects; ShipSprite.ts — the ship from the Blender atlas
-      effects/         client-only decorations with their own state: Wake.ts (foam), waves.ts, targetMarker.ts
-public/sprites/        ship atlas (ship-iso.webp + .json) rendered in Blender from a source outside this repo — don't edit by hand
+      models/          island3d.ts — 3D model of islands; ShipSprite.ts — ships from their Blender atlases
+      effects/         client-only decorations with their own state: Wake.ts (foam), waves.ts, targetMarker.ts,
+                       ShipFire.ts (fire and smoke of a damaged ship), Sinking.ts (the sinking animation)
+public/sprites/ships/  ship atlases: <line>/<id>/<damage stage>.{webp,json}, rendered in Blender from a source
+                       outside this repo — don't edit by hand
+docs/ships.md          ship lines (planned factions and tiers), where a ship's files live, how to add a ship
 ```
 
 Frame flow (`GameClient`): `game.update(dt)` → `view.update(dt)` (updates the wake, then draws) → `hud.update(...)`.
@@ -68,15 +74,17 @@ Where new code goes:
 - Gameplay (anything the server must agree on: movement, combat, damage, loot) → a domain folder in `game/`
   (`game/ships/`, `game/world/`, a new one like `game/combat/`), stepped from `Game.update`. Export what the client needs from `game/index.ts`.
 - How a game object looks → `client/scene/models/<thing>3d.ts`, called from `SceneView`.
+  A new ship → follow [docs/ships.md](docs/ships.md): its model and atlases, not code, decide how it looks.
 - Visual-only things with their own state (particles, decorations) → `client/scene/effects/`.
 - Screen-space UI → `client/hud/`; new controls → `client/input/`.
 - A domain folder appears when its first file does; a file grows into a folder when it gets a second file.
 
 Camera settings are the `CAMERA` constant in [src/client/scene/SceneView.ts](src/client/scene/SceneView.ts)
-(pitch 30°, yaw 45°, zoom 1.4). Don't add perspective, sky or other camera modes unless asked —
-they were tried and removed (commit `2c8125f` still has them). The ship atlas is rendered for this pitch and yaw:
-changing them means re-rendering it with `CAM_PITCH` / `CAM_YAW` updated in `render_sprites.py`. The Blender source
-(`ship.blend` + scripts) is moving to a separate art repository that doesn't exist yet; until then commit `5db229d` has it in `art/`.
+(pitch 30°, yaw 45°, zoom 1.4); the HUD's zoom buttons scale the zoom ×1–×3 at runtime (`SceneView.setZoom`). Don't add perspective, sky or other camera modes unless asked —
+they were tried and removed (commit `2c8125f` still has them). The ship atlases are rendered for this pitch and yaw:
+changing them means re-rendering them with `CAM_PITCH` / `CAM_YAW` updated in `render_sprites.py`. The Blender source
+lives outside this repo, in a `blender-assets` folder next to it (`ships/<line>/<id>/` + `render_sprites.py`,
+`render_stages.py`; see its README); a separate art repository is planned.
 
 ## Code style
 
@@ -91,7 +99,7 @@ changing them means re-rendering it with `CAM_PITCH` / `CAM_YAW` updated in `ren
   Fix a lint error instead of silencing it; if a rule is wrong for this project, turn it off in the config with a comment why.
 - Oxlint enforces the boundaries: `src/game/` has no `pixi.js` or `client/` imports, no `window` / `document`,
   no `Math.random`; `src/client/` and `src/*.ts` import game logic only from `game/index.ts`.
-- File names follow the main export: PascalCase for a class (`Ship.ts`, `SceneView.ts`), camelCase for functions (`ship3d.ts`, `pointerInput.ts`).
+- File names follow the main export: PascalCase for a class (`Ship.ts`, `SceneView.ts`), camelCase for functions (`island3d.ts`, `pointerInput.ts`).
 - Colors are `0xRRGGBB` numbers; a model's colors live in a `COLORS` object at the top of the file.
 - Magic numbers go into `UPPER_CASE` constants with a comment about units.
 - Before writing a new helper, check `game/lib/` and the exports of `client/render/Painter3D.ts` (`shade`, `shadowPoint`).

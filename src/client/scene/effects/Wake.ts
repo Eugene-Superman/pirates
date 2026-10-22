@@ -4,12 +4,19 @@ import type { Painter3D } from '../../render/Painter3D';
 const WAKE_LIFETIME = 1.6; // seconds
 const POOL_SIZE = 120;
 const SPAWN_INTERVAL = 0.04;
+// Where the foam starts and how big it is, in ship radii, so the wake fits ships of every size
+const STERN_OFFSET = 1.45;
+const SIDE_OFFSET = 0.36;
+const FOAM_RADIUS = 0.18;
+const FOAM_JITTER = 0.18;
 
 interface Foam {
   x: number;
   y: number;
   life: number;
   startAlpha: number;
+  /** Starting radius, world units */
+  size: number;
 }
 
 // Foam wake behind the ship. Pure decoration, so it lives on the client and may use Math.random.
@@ -20,6 +27,7 @@ export class Wake {
     y: 0,
     life: WAKE_LIFETIME,
     startAlpha: 0,
+    size: 0,
   }));
   private next = 0;
   private spawnTimer = 0;
@@ -37,20 +45,24 @@ export class Wake {
       const alpha = 0.6 * (ship.speed / ship.maxSpeed);
 
       // Two foam trails on both sides of the stern
-      for (const side of [-8, 8]) {
-        this.spawn(ship.x - cos * 32 - sin * side, ship.y - sin * 32 + cos * side, alpha);
+      const stern = ship.radius * STERN_OFFSET;
+      for (const side of [-1, 1]) {
+        const offset = side * ship.radius * SIDE_OFFSET;
+        this.spawn(ship.x - cos * stern - sin * offset, ship.y - sin * stern + cos * offset, alpha, ship.radius);
       }
     }
   }
 
-  private spawn(x: number, y: number, alpha: number) {
+  private spawn(x: number, y: number, alpha: number, shipRadius: number) {
     const p = this.particles[this.next];
     this.next = (this.next + 1) % POOL_SIZE;
 
-    p.x = x + (Math.random() - 0.5) * 4;
-    p.y = y + (Math.random() - 0.5) * 4;
+    const jitter = shipRadius * FOAM_JITTER;
+    p.x = x + (Math.random() - 0.5) * jitter;
+    p.y = y + (Math.random() - 0.5) * jitter;
     p.life = 0;
     p.startAlpha = alpha;
+    p.size = shipRadius * FOAM_RADIUS;
   }
 }
 
@@ -62,6 +74,6 @@ function foamProgress(p: Foam) {
 export function drawWake(p: Painter3D, wake: Wake) {
   for (const foam of wake.particles) {
     const t = foamProgress(foam);
-    if (t < 1) p.disc(foam.x, foam.y, 0, 4 * (1 + t * 2.5), 0xffffff, foam.startAlpha * (1 - t));
+    if (t < 1) p.disc(foam.x, foam.y, 0, foam.size * (1 + t * 2.5), 0xffffff, foam.startAlpha * (1 - t));
   }
 }

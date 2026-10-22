@@ -1,5 +1,6 @@
 import type { GameState } from './GameState';
 import { Ship } from './ships/Ship';
+import { SHIP_CLASSES, STARTER_SHIP } from './ships/shipClasses';
 import { WORLD_HEIGHT, WORLD_WIDTH, createWorld } from './world/World';
 
 // The simulation: owns the state and advances it. The update order lives here, not in the client,
@@ -8,7 +9,7 @@ export class Game {
   readonly state: GameState;
 
   constructor() {
-    const ship = new Ship();
+    const ship = new Ship(SHIP_CLASSES[STARTER_SHIP]);
     ship.x = WORLD_WIDTH / 2;
     ship.y = WORLD_HEIGHT / 2;
     this.state = { world: createWorld(), ship, time: 0 };

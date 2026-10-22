@@ -103,6 +103,12 @@ export class Painter3D {
     this.g.ellipse(e.x, e.y, e.rx, e.ry).fill({ color, alpha });
   }
 
+  /** A round blob that looks the same from any side (a puff of smoke, a tongue of flame): a circle around the projected point */
+  ball(p: Vec3, radius: number, color: number, alpha = 1) {
+    const s = this.camera.project(p[0], p[1], p[2]);
+    this.g.circle(s.x, s.y, radius * this.camera.zoom).fill({ color, alpha });
+  }
+
   ring(x: number, y: number, z: number, radius: number, width: number, color: number, alpha = 1) {
     const e = this.ellipseAt(x, y, z, radius);
     this.g.ellipse(e.x, e.y, e.rx, e.ry).stroke({ width: width * this.camera.zoom, color, alpha });

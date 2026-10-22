@@ -1,23 +1,52 @@
 import { clamp, normalizeAngle } from '../lib/math';
 import { WORLD_HEIGHT, WORLD_WIDTH, type Island } from '../world/World';
+import { MAX_HEALTH, damageStage, type DamageStage } from './damage';
+import type { ShipClass } from './shipClasses';
 
 const ARRIVE_DISTANCE = 20;
 
-// Movement logic only. How the ship looks is up to the view.
+// Movement and hull state only. How the ship looks is up to the view.
 export class Ship {
+  readonly shipClass: ShipClass;
   x = 0;
   y = 0;
   rotation = 0;
   speed = 0;
-  turnRate = 0; // current turn speed, rad/s (for heeling)
-  maxSpeed = 220; // world units per second
-  acceleration = 90;
-  deceleration = 140;
-  turnSpeed = 1.8; // radians per second
-  radius = 22; // for collisions
+  readonly maxSpeed: number; // world units per second
+  readonly acceleration: number;
+  readonly deceleration: number;
+  readonly turnSpeed: number; // radians per second
+  readonly radius: number; // for collisions
+  /** Hull integrity, percent of MAX_HEALTH */
+  health = MAX_HEALTH;
   target: { x: number; y: number } | null = null;
 
+  constructor(shipClass: ShipClass) {
+    this.shipClass = shipClass;
+    this.maxSpeed = shipClass.maxSpeed;
+    this.acceleration = shipClass.acceleration;
+    this.deceleration = shipClass.deceleration;
+    this.turnSpeed = shipClass.turnSpeed;
+    this.radius = shipClass.radius;
+  }
+
+  get damageStage(): DamageStage {
+    return damageStage(this.health);
+  }
+
+  /** A sinking ship can't be steered any more */
+  get isSinking() {
+    return this.health <= 0;
+  }
+
+  /** Sets hull integrity directly, in percent. For now only the debug buttons use it; later combat will */
+  setHealth(health: number) {
+    this.health = clamp(health, 0, MAX_HEALTH);
+    if (this.isSinking) this.target = null;
+  }
+
   setTarget(x: number, y: number) {
+    if (this.isSinking) return;
     this.target = {
       x: clamp(x, this.radius, WORLD_WIDTH - this.radius),
       y: clamp(y, this.radius, WORLD_HEIGHT - this.radius),
@@ -26,7 +55,6 @@ export class Ship {
 
   update(dt: number, islands: readonly Island[]) {
     let desiredSpeed = 0;
-    let turn = 0;
 
     if (this.target) {
       const dx = this.target.x - this.x;
@@ -38,8 +66,7 @@ export class Ship {
       } else {
         const angleDiff = normalizeAngle(Math.atan2(dy, dx) - this.rotation);
         const maxTurn = this.turnSpeed * dt;
-        turn = clamp(angleDiff, -maxTurn, maxTurn);
-        this.rotation = normalizeAngle(this.rotation + turn);
+        this.rotation = normalizeAngle(this.rotation + clamp(angleDiff, -maxTurn, maxTurn));
 
         // Slow down near the target and on sharp turns
         const arriveFactor = clamp(dist / 250, 0.15, 1);
@@ -47,8 +74,6 @@ export class Ship {
         desiredSpeed = this.maxSpeed * arriveFactor * turnFactor;
       }
     }
-
-    this.turnRate = dt > 0 ? turn / dt : 0;
 
     const rate = desiredSpeed > this.speed ? this.acceleration : this.deceleration;
     this.speed += clamp(desiredSpeed - this.speed, -rate * dt, rate * dt);

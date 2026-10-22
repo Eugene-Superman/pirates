@@ -59,7 +59,7 @@ The hot path is everything that runs every frame: the `app.ticker` callback, `up
 - Allocations inside large per-frame loops (there are 1200 waves): new arrays, objects or closures per item, `filter`/`map` chains on big arrays.
 - O(n²) loops, sorting more than needed, work that could be done once in a constructor or cached.
 - Drawing invisible things: big loops must cull with `painter.isVisible` first.
-- Polygon count: model detail constants (`SAIL_COLUMNS`, `SAIL_ROWS`, coastline segments) raised without need.
+- Shape count: model detail (coastline segments) or particle pools and spawn rates (`ShipFire`, `Wake`) raised without need.
 - Pixi: `Text.text` assigned every frame (re-renders a texture — update only on change), new `Graphics` per frame instead of `clear()`,
   textures/graphics never destroyed.
 
