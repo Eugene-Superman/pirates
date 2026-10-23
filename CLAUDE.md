@@ -41,30 +41,49 @@ src/
     index.ts           public API: everything outside game/ imports it only from here
     Game.ts            owns GameState, update(dt) advances the simulation in a fixed order
     GameState.ts       everything the client reads and draws
-    world/World.ts     world size, islands generated from a fixed seed, islandOutline
-    ships/Ship.ts      ship movement towards target, island collisions
+    world/World.ts     world size, islands placed from a fixed seed, each one of ten shapes (islandShapes.json,
+                       written by blender-assets/islands/build_islands.py with their pictures), islandOutline
+    ships/Ship.ts      a ship's state: target and route, steering, hull, weapons
     ships/shipClasses.ts  ship catalog: lines and classes with size and handling; STARTER_SHIP (the starter sloop)
     ships/damage.ts    hull health scale (0–100 %) and the damage stages derived from it
-    lib/               math.ts (clamp, normalizeAngle), random.ts (seeded createRandom)
+    combat/            weapons.ts (cannon, harpoon: range, speed, reload), targets.ts (practice targets: a barrel
+                       and a boat sailing in circles), combat.ts (firing, homing projectiles, hits, events)
+    navigation/        NavGrid.ts (open water as a grid with clearance from land; routes round islands, A*),
+                       pilot.ts (steers each ship along its route, slows for turns, swerves round ships and targets)
+    physics/           hull.ts (hulls as capsules, the Body interface), collisions.ts (ships pushed out of coasts,
+                       targets and each other, sliding instead of stopping)
+    lib/               math.ts (clamp, normalizeAngle), geometry.ts (points, segments, polygons), random.ts (seeded createRandom)
   client/              BROWSER: Pixi, DOM, input. Reads GameState, never mutates it except through game methods
     GameClient.ts      wires Game + SceneView + Hud + input, runs the frame loop
-    input/             pointerInput.ts: mouse/touch → ship.setTarget
-    hud/               Hud.ts (screen-space texts, zoom buttons), FpsMeter.ts, ButtonRow.ts (a row of HUD buttons),
-                       DamagePanel.ts (debug buttons that set hull health)
+    input/             pointerInput.ts: mouse/touch → ship.setTarget, or ship.orderFire on a target
+    hud/               Hud.ts (screen-space overlay: the items picked in the settings, a Settings button),
+                       hudItems.ts (every metric and control the HUD can show, grouped), SettingsPanel.ts (dev settings:
+                       all controls, and checkboxes for what is also on the screen), FpsMeter.ts,
+                       ButtonRow.ts (a row of HUD buttons), Checkbox.ts, DamagePanel.ts (debug buttons that set hull health)
     render/            3D engine with no game knowledge
       Camera3D.ts      parallel projection world → camera → screen and back (screenToGround)
       Painter3D.ts     3D primitives on top of Pixi Graphics: projection, lighting, shadows
     scene/
-      SceneView.ts     isometric scene: camera follow, draw order, redraws every frame
-      models/          island3d.ts — 3D model of islands; ShipSprite.ts — ships from their Blender atlases
+      SceneView.ts     isometric scene: draw order, redraws every frame
+      cameraControl.ts how the camera keeps up with the ship: follow / dead zone / recenter
+      models/          island3d.ts (low-poly islands), barrel3d.ts, targetBoat3d.ts, projectile3d.ts (cannonball,
+                       harpoon) — 3D models; IslandSprites.ts — textured islands from their Blender pictures;
+                       ShipSprite.ts — ships from their Blender atlases
       effects/         client-only decorations with their own state: Wake.ts (foam), waves.ts, targetMarker.ts,
-                       ShipFire.ts (fire and smoke of a damaged ship), Sinking.ts (the sinking animation)
+                       ShipFire.ts (fire and smoke of a damaged ship), Sinking.ts (the sinking animation),
+                       ShotEffects.ts (muzzle flashes, smoke, splashes, splinters), rangeRings.ts, wind.ts,
+                       fogOfWar.ts (haze and mist beyond the ship's view range, one shader), FogClouds.ts (its puffs),
+                       seaSurface.ts (the sea's surface, one shader), seaStyles.ts (its looks, switched by the HUD)
 public/sprites/ships/  ship atlases: <line>/<id>/<damage stage>.{webp,json}, rendered in Blender from a source
                        outside this repo — don't edit by hand
+public/sprites/fog/    fog of war textures (puffs.webp/json, wisps.webp), made by blender-assets/effects/fog/build_fog.py
+public/sprites/sea/    sea wave maps and caustics, made by blender-assets/effects/sea/build_sea.py
+public/sprites/islands/ island pictures: <look>/<shape>_ground|_raised.webp + islands.json, made by build_islands.py
 docs/ships.md          ship lines (planned factions and tiers), where a ship's files live, how to add a ship
 ```
 
-Frame flow (`GameClient`): `game.update(dt)` → `view.update(dt)` (updates the wake, then draws) → `hud.update(...)`.
+Frame flow (`GameClient`): `game.update(dt)` → `view.update(dt)` (updates the wake and effects, reading the game's
+`state.events` of this update, then draws) → `hud.update(...)`.
 `dt` is in seconds, capped at 0.05.
 
 Core rule: **`game/` knows nothing about the client; the client changes game state only through game methods.**
@@ -80,8 +99,9 @@ Where new code goes:
 - A domain folder appears when its first file does; a file grows into a folder when it gets a second file.
 
 Camera settings are the `CAMERA` constant in [src/client/scene/SceneView.ts](src/client/scene/SceneView.ts)
-(pitch 30°, yaw 45°, zoom 1.4); the HUD's zoom buttons scale the zoom ×1–×3 at runtime (`SceneView.setZoom`). Don't add perspective, sky or other camera modes unless asked —
-they were tried and removed (commit `2c8125f` still has them). The ship atlases are rendered for this pitch and yaw:
+(pitch 30°, yaw 45°, zoom 1.4); the HUD's zoom buttons scale the zoom ×1–×3 at runtime (`SceneView.setZoom`). Don't add perspective, sky or other projections unless asked —
+they were tried and removed (commit `2c8125f` still has them). How the camera follows the ship is a separate, switchable
+choice (`scene/cameraControl.ts`, the HUD's Camera buttons). The ship atlases are rendered for this pitch and yaw:
 changing them means re-rendering them with `CAM_PITCH` / `CAM_YAW` updated in `render_sprites.py`. The Blender source
 lives outside this repo, in a `blender-assets` folder next to it (`ships/<line>/<id>/` + `render_sprites.py`,
 `render_stages.py`; see its README); a separate art repository is planned.

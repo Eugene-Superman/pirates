@@ -2,7 +2,7 @@ import type { Graphics } from 'pixi.js';
 import type { Camera3D, Vec3 } from './Camera3D';
 
 // Where the sun shines from: the west and slightly south, high up
-const LIGHT = normalize([-0.6, 0.1, 0.8])!;
+export const LIGHT = normalize([-0.6, 0.1, 0.8])!;
 const UP: Vec3 = [0, 0, 1];
 const AMBIENT = 0.62; // brightness in shadow
 const DIFFUSE = 0.45; // how much direct sunlight adds
@@ -114,6 +114,31 @@ export class Painter3D {
     this.g.ellipse(e.x, e.y, e.rx, e.ry).stroke({ width: width * this.camera.zoom, color, alpha });
   }
 
+  /**
+   * Horizontal dashed circle: `dashes` dashes with equal gaps, turned by `offset` radians.
+   * All dashes are one path, stroked once
+   */
+  dashedRing(
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    dashes: number,
+    offset: number,
+    width: number,
+    color: number,
+    alpha = 1,
+  ) {
+    const step = Math.PI / dashes;
+    for (let i = 0; i < dashes; i++) {
+      const a = offset + i * 2 * step;
+      const s0 = this.camera.project(x + Math.cos(a) * radius, y + Math.sin(a) * radius, z);
+      const s1 = this.camera.project(x + Math.cos(a + step) * radius, y + Math.sin(a + step) * radius, z);
+      this.g.moveTo(s0.x, s0.y).lineTo(s1.x, s1.y);
+    }
+    this.g.stroke({ width: width * this.camera.zoom, color, alpha });
+  }
+
   private ellipseAt(x: number, y: number, z: number, radius: number) {
     const center = this.camera.project(x, y, z);
     const side = this.camera.project(x + radius * this.camera.rightX, y + radius * this.camera.rightY, z);
@@ -131,6 +156,15 @@ export class Painter3D {
 export function shadowPoint(p: Vec3, groundZ = 0): Vec3 {
   const h = p[2] - groundZ;
   return [p[0] - (LIGHT[0] / LIGHT[2]) * h, p[1] - (LIGHT[1] / LIGHT[2]) * h, groundZ];
+}
+
+/** The color t of the way from a to b, t from 0 to 1 */
+export function mixColor(a: number, b: number, t: number) {
+  const k = Math.min(Math.max(t, 0), 1);
+  const r = Math.round(((a >> 16) & 0xff) * (1 - k) + ((b >> 16) & 0xff) * k);
+  const g = Math.round(((a >> 8) & 0xff) * (1 - k) + ((b >> 8) & 0xff) * k);
+  const bl = Math.round((a & 0xff) * (1 - k) + (b & 0xff) * k);
+  return (r << 16) | (g << 8) | bl;
 }
 
 /** Multiplies a color's brightness by k */

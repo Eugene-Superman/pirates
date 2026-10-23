@@ -32,7 +32,8 @@ A ship has one id, unique across all lines (`sloop`), and the same `<line>/<id>`
 | ------------------------ | ---------------------------------------------------------------------------------- |
 | Model (outside the repo) | `blender-assets/ships/<line>/<id>/`: `<id>.blend`, `build.py`, its own `textures/` |
 | Sprite atlases           | `public/sprites/ships/<line>/<id>/<stage>.{webp,json}`, one per damage stage       |
-| Size and handling        | `SHIP_CLASSES` in `src/game/ships/shipClasses.ts`                                  |
+| Size, speed and handling | `SHIP_CLASSES` in `src/game/ships/shipClasses.ts`                                  |
+| Where shots leave it     | `mounts` of its entry in `SHIP_CLASSES`                                            |
 | Which atlases exist      | `ATLAS_STAGES` in `src/client/scene/models/ShipSprite.ts`                          |
 | Fire and smoke points    | `EMITTERS` in `src/client/scene/effects/ShipFire.ts`                               |
 
@@ -47,7 +48,11 @@ Only `intact` is required; a missing stage shows the nearest one before it.
 2. **Sprites.** With the `.blend` open in Blender, run `render_stages.py` (all damage stages) or `render_sprites.py`
    (the current one) from the `blender-assets` root. The atlases land in `public/sprites/ships/<line>/<id>/` by themselves.
 3. **Game.** Add the id to `ShipClassId` (and the line to `ShipLineId` if it is new), then an entry in `SHIP_CLASSES`:
-   `line`, `tier`, `name`, collision `radius` (about half the hull length), handling.
+   `line`, `tier`, `name`, `radius` (rough size for effects, about half the hull length), `hull` (what it collides with:
+   how far the hull reaches to the bow and stern and its half beam, measured on the model), `viewRange` (the fog of war's edge),
+   `maxSpeed` (intact) and `minSpeed` (hull nearly
+   gone; damage slows the ship between them), handling, and `mounts`: the muzzles of its
+   cannons (on both sides) and of its harpoon launcher, in the model's coordinates with y negated (y to starboard).
 4. **Client.** Add the class to `ATLAS_STAGES` (the stages it has atlases for) and to `EMITTERS` (where it burns,
    in the model's coordinates with y negated).
 5. Run `npm run format` and `npm run check`, look at every damage stage with the HUD's debug buttons, and commit the atlases

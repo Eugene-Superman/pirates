@@ -1,0 +1,837 @@
+{
+ "pxPerUnit": 2.2,
+ "looks": [
+  {
+   "id": "tropical",
+   "name": "Tropical"
+  },
+  {
+   "id": "green",
+   "name": "Green isle"
+  },
+  {
+   "id": "desert",
+   "name": "Desert"
+  },
+  {
+   "id": "volcanic",
+   "name": "Volcanic"
+  },
+  {
+   "id": "northern",
+   "name": "Northern"
+  }
+ ],
+ "sprites": {
+  "tropical": {
+   "bean": {
+    "ground": {
+     "file": "tropical/bean_ground.webp",
+     "w": 726,
+     "h": 525,
+     "x": 370.1,
+     "y": 256.2
+    },
+    "raised": {
+     "file": "tropical/bean_raised.webp",
+     "w": 513,
+     "h": 391,
+     "x": 261.1,
+     "y": 206.2
+    }
+   },
+   "round": {
+    "ground": {
+     "file": "tropical/round_ground.webp",
+     "w": 617,
+     "h": 325,
+     "x": 301.3,
+     "y": 155.8
+    },
+    "raised": {
+     "file": "tropical/round_raised.webp",
+     "w": 446,
+     "h": 249,
+     "x": 222.3,
+     "y": 135.8
+    }
+   },
+   "long": {
+    "ground": {
+     "file": "tropical/long_ground.webp",
+     "w": 1559,
+     "h": 335,
+     "x": 828.1,
+     "y": 159.1
+    },
+    "raised": {
+     "file": "tropical/long_raised.webp",
+     "w": 1105,
+     "h": 266,
+     "x": 589.1,
+     "y": 146.1
+    }
+   },
+   "cay": {
+    "ground": {
+     "file": "tropical/cay_ground.webp",
+     "w": 338,
+     "h": 195,
+     "x": 167.2,
+     "y": 87.8
+    },
+    "raised": {
+     "file": "tropical/cay_raised.webp",
+     "w": 220,
+     "h": 135,
+     "x": 109.2,
+     "y": 72.8
+    }
+   },
+   "spire": {
+    "ground": {
+     "file": "tropical/spire_ground.webp",
+     "w": 460,
+     "h": 238,
+     "x": 219.5,
+     "y": 115.5
+    },
+    "raised": {
+     "file": "tropical/spire_raised.webp",
+     "w": 334,
+     "h": 198,
+     "x": 159.5,
+     "y": 115.5
+    }
+   },
+   "twins": {
+    "ground": {
+     "file": "tropical/twins_ground.webp",
+     "w": 654,
+     "h": 635,
+     "x": 328.8,
+     "y": 309.1
+    },
+    "raised": {
+     "file": "tropical/twins_raised.webp",
+     "w": 468,
+     "h": 464,
+     "x": 235.8,
+     "y": 239.1
+    }
+   },
+   "bay": {
+    "ground": {
+     "file": "tropical/bay_ground.webp",
+     "w": 1128,
+     "h": 530,
+     "x": 548.3,
+     "y": 249.3
+    },
+    "raised": {
+     "file": "tropical/bay_raised.webp",
+     "w": 804,
+     "h": 391,
+     "x": 391.3,
+     "y": 198.3
+    }
+   },
+   "cape": {
+    "ground": {
+     "file": "tropical/cape_ground.webp",
+     "w": 765,
+     "h": 378,
+     "x": 418.0,
+     "y": 172.5
+    },
+    "raised": {
+     "file": "tropical/cape_raised.webp",
+     "w": 547,
+     "h": 293,
+     "x": 298.0,
+     "y": 151.5
+    }
+   },
+   "jagged": {
+    "ground": {
+     "file": "tropical/jagged_ground.webp",
+     "w": 788,
+     "h": 415,
+     "x": 400.2,
+     "y": 188.8
+    },
+    "raised": {
+     "file": "tropical/jagged_raised.webp",
+     "w": 570,
+     "h": 322,
+     "x": 288.2,
+     "y": 166.8
+    }
+   },
+   "flat": {
+    "ground": {
+     "file": "tropical/flat_ground.webp",
+     "w": 750,
+     "h": 531,
+     "x": 376.3,
+     "y": 270.4
+    },
+    "raised": {
+     "file": "tropical/flat_raised.webp",
+     "w": 516,
+     "h": 381,
+     "x": 257.3,
+     "y": 208.4
+    }
+   }
+  },
+  "northern": {
+   "spire": {
+    "ground": {
+     "file": "northern/spire_ground.webp",
+     "w": 460,
+     "h": 237,
+     "x": 219.5,
+     "y": 115.2
+    },
+    "raised": {
+     "file": "northern/spire_raised.webp",
+     "w": 334,
+     "h": 202,
+     "x": 159.5,
+     "y": 119.2
+    }
+   },
+   "round": {
+    "ground": {
+     "file": "northern/round_ground.webp",
+     "w": 614,
+     "h": 325,
+     "x": 301.3,
+     "y": 155.8
+    },
+    "raised": {
+     "file": "northern/round_raised.webp",
+     "w": 434,
+     "h": 246,
+     "x": 214.3,
+     "y": 132.8
+    }
+   },
+   "bean": {
+    "ground": {
+     "file": "northern/bean_ground.webp",
+     "w": 723,
+     "h": 524,
+     "x": 370.1,
+     "y": 256.2
+    },
+    "raised": {
+     "file": "northern/bean_raised.webp",
+     "w": 513,
+     "h": 395,
+     "x": 261.1,
+     "y": 210.2
+    }
+   },
+   "long": {
+    "ground": {
+     "file": "northern/long_ground.webp",
+     "w": 1559,
+     "h": 334,
+     "x": 828.1,
+     "y": 159.1
+    },
+    "raised": {
+     "file": "northern/long_raised.webp",
+     "w": 1105,
+     "h": 269,
+     "x": 589.1,
+     "y": 149.1
+    }
+   },
+   "cay": {
+    "ground": {
+     "file": "northern/cay_ground.webp",
+     "w": 340,
+     "h": 195,
+     "x": 168.2,
+     "y": 87.8
+    },
+    "raised": {
+     "file": "northern/cay_raised.webp",
+     "w": 220,
+     "h": 141,
+     "x": 109.2,
+     "y": 78.8
+    }
+   },
+   "twins": {
+    "ground": {
+     "file": "northern/twins_ground.webp",
+     "w": 652,
+     "h": 635,
+     "x": 326.8,
+     "y": 309.1
+    },
+    "raised": {
+     "file": "northern/twins_raised.webp",
+     "w": 468,
+     "h": 465,
+     "x": 235.8,
+     "y": 240.1
+    }
+   },
+   "bay": {
+    "ground": {
+     "file": "northern/bay_ground.webp",
+     "w": 1126,
+     "h": 530,
+     "x": 549.3,
+     "y": 249.3
+    },
+    "raised": {
+     "file": "northern/bay_raised.webp",
+     "w": 804,
+     "h": 398,
+     "x": 391.3,
+     "y": 205.3
+    }
+   },
+   "cape": {
+    "ground": {
+     "file": "northern/cape_ground.webp",
+     "w": 762,
+     "h": 378,
+     "x": 414.0,
+     "y": 172.5
+    },
+    "raised": {
+     "file": "northern/cape_raised.webp",
+     "w": 547,
+     "h": 300,
+     "x": 298.0,
+     "y": 158.5
+    }
+   },
+   "jagged": {
+    "ground": {
+     "file": "northern/jagged_ground.webp",
+     "w": 788,
+     "h": 415,
+     "x": 400.2,
+     "y": 188.8
+    },
+    "raised": {
+     "file": "northern/jagged_raised.webp",
+     "w": 570,
+     "h": 319,
+     "x": 288.2,
+     "y": 163.8
+    }
+   },
+   "flat": {
+    "ground": {
+     "file": "northern/flat_ground.webp",
+     "w": 748,
+     "h": 531,
+     "x": 374.3,
+     "y": 270.4
+    },
+    "raised": {
+     "file": "northern/flat_raised.webp",
+     "w": 516,
+     "h": 376,
+     "x": 257.3,
+     "y": 203.4
+    }
+   }
+  },
+  "green": {
+   "jagged": {
+    "ground": {
+     "file": "green/jagged_ground.webp",
+     "w": 788,
+     "h": 415,
+     "x": 400.2,
+     "y": 188.8
+    },
+    "raised": {
+     "file": "green/jagged_raised.webp",
+     "w": 570,
+     "h": 325,
+     "x": 288.2,
+     "y": 169.8
+    }
+   },
+   "round": {
+    "ground": {
+     "file": "green/round_ground.webp",
+     "w": 614,
+     "h": 325,
+     "x": 301.3,
+     "y": 155.8
+    },
+    "raised": {
+     "file": "green/round_raised.webp",
+     "w": 434,
+     "h": 239,
+     "x": 214.3,
+     "y": 125.8
+    }
+   },
+   "bean": {
+    "ground": {
+     "file": "green/bean_ground.webp",
+     "w": 726,
+     "h": 525,
+     "x": 370.1,
+     "y": 256.2
+    },
+    "raised": {
+     "file": "green/bean_raised.webp",
+     "w": 513,
+     "h": 387,
+     "x": 261.1,
+     "y": 202.2
+    }
+   },
+   "long": {
+    "ground": {
+     "file": "green/long_ground.webp",
+     "w": 1559,
+     "h": 334,
+     "x": 828.1,
+     "y": 159.1
+    },
+    "raised": {
+     "file": "green/long_raised.webp",
+     "w": 1105,
+     "h": 268,
+     "x": 589.1,
+     "y": 148.1
+    }
+   },
+   "cay": {
+    "ground": {
+     "file": "green/cay_ground.webp",
+     "w": 340,
+     "h": 195,
+     "x": 168.2,
+     "y": 87.8
+    },
+    "raised": {
+     "file": "green/cay_raised.webp",
+     "w": 220,
+     "h": 129,
+     "x": 109.2,
+     "y": 66.8
+    }
+   },
+   "spire": {
+    "ground": {
+     "file": "green/spire_ground.webp",
+     "w": 460,
+     "h": 238,
+     "x": 219.5,
+     "y": 115.5
+    },
+    "raised": {
+     "file": "green/spire_raised.webp",
+     "w": 334,
+     "h": 203,
+     "x": 159.5,
+     "y": 120.5
+    }
+   },
+   "twins": {
+    "ground": {
+     "file": "green/twins_ground.webp",
+     "w": 652,
+     "h": 635,
+     "x": 326.8,
+     "y": 309.1
+    },
+    "raised": {
+     "file": "green/twins_raised.webp",
+     "w": 468,
+     "h": 458,
+     "x": 235.8,
+     "y": 233.1
+    }
+   },
+   "bay": {
+    "ground": {
+     "file": "green/bay_ground.webp",
+     "w": 1125,
+     "h": 530,
+     "x": 548.3,
+     "y": 249.3
+    },
+    "raised": {
+     "file": "green/bay_raised.webp",
+     "w": 804,
+     "h": 394,
+     "x": 391.3,
+     "y": 201.3
+    }
+   },
+   "cape": {
+    "ground": {
+     "file": "green/cape_ground.webp",
+     "w": 762,
+     "h": 378,
+     "x": 414.0,
+     "y": 172.5
+    },
+    "raised": {
+     "file": "green/cape_raised.webp",
+     "w": 547,
+     "h": 289,
+     "x": 298.0,
+     "y": 147.5
+    }
+   },
+   "flat": {
+    "ground": {
+     "file": "green/flat_ground.webp",
+     "w": 748,
+     "h": 531,
+     "x": 374.3,
+     "y": 270.4
+    },
+    "raised": {
+     "file": "green/flat_raised.webp",
+     "w": 516,
+     "h": 368,
+     "x": 257.3,
+     "y": 195.4
+    }
+   }
+  },
+  "desert": {
+   "bay": {
+    "ground": {
+     "file": "desert/bay_ground.webp",
+     "w": 1128,
+     "h": 530,
+     "x": 548.3,
+     "y": 249.3
+    },
+    "raised": {
+     "file": "desert/bay_raised.webp",
+     "w": 804,
+     "h": 377,
+     "x": 391.3,
+     "y": 184.3
+    }
+   },
+   "round": {
+    "ground": {
+     "file": "desert/round_ground.webp",
+     "w": 617,
+     "h": 325,
+     "x": 301.3,
+     "y": 155.8
+    },
+    "raised": {
+     "file": "desert/round_raised.webp",
+     "w": 434,
+     "h": 231,
+     "x": 214.3,
+     "y": 117.8
+    }
+   },
+   "bean": {
+    "ground": {
+     "file": "desert/bean_ground.webp",
+     "w": 726,
+     "h": 525,
+     "x": 370.1,
+     "y": 256.2
+    },
+    "raised": {
+     "file": "desert/bean_raised.webp",
+     "w": 513,
+     "h": 374,
+     "x": 261.1,
+     "y": 189.2
+    }
+   },
+   "long": {
+    "ground": {
+     "file": "desert/long_ground.webp",
+     "w": 1559,
+     "h": 335,
+     "x": 828.1,
+     "y": 159.1
+    },
+    "raised": {
+     "file": "desert/long_raised.webp",
+     "w": 1105,
+     "h": 250,
+     "x": 589.1,
+     "y": 130.1
+    }
+   },
+   "cay": {
+    "ground": {
+     "file": "desert/cay_ground.webp",
+     "w": 338,
+     "h": 195,
+     "x": 167.2,
+     "y": 87.8
+    },
+    "raised": {
+     "file": "desert/cay_raised.webp",
+     "w": 220,
+     "h": 126,
+     "x": 109.2,
+     "y": 63.8
+    }
+   },
+   "spire": {
+    "ground": {
+     "file": "desert/spire_ground.webp",
+     "w": 460,
+     "h": 237,
+     "x": 219.5,
+     "y": 115.2
+    },
+    "raised": {
+     "file": "desert/spire_raised.webp",
+     "w": 334,
+     "h": 198,
+     "x": 159.5,
+     "y": 115.2
+    }
+   },
+   "twins": {
+    "ground": {
+     "file": "desert/twins_ground.webp",
+     "w": 654,
+     "h": 635,
+     "x": 328.8,
+     "y": 309.1
+    },
+    "raised": {
+     "file": "desert/twins_raised.webp",
+     "w": 468,
+     "h": 451,
+     "x": 235.8,
+     "y": 226.1
+    }
+   },
+   "cape": {
+    "ground": {
+     "file": "desert/cape_ground.webp",
+     "w": 765,
+     "h": 378,
+     "x": 418.0,
+     "y": 172.5
+    },
+    "raised": {
+     "file": "desert/cape_raised.webp",
+     "w": 547,
+     "h": 279,
+     "x": 298.0,
+     "y": 137.5
+    }
+   },
+   "jagged": {
+    "ground": {
+     "file": "desert/jagged_ground.webp",
+     "w": 788,
+     "h": 415,
+     "x": 400.2,
+     "y": 188.8
+    },
+    "raised": {
+     "file": "desert/jagged_raised.webp",
+     "w": 570,
+     "h": 303,
+     "x": 288.2,
+     "y": 147.8
+    }
+   },
+   "flat": {
+    "ground": {
+     "file": "desert/flat_ground.webp",
+     "w": 750,
+     "h": 531,
+     "x": 376.3,
+     "y": 270.4
+    },
+    "raised": {
+     "file": "desert/flat_raised.webp",
+     "w": 516,
+     "h": 365,
+     "x": 257.3,
+     "y": 192.4
+    }
+   }
+  },
+  "volcanic": {
+   "cape": {
+    "ground": {
+     "file": "volcanic/cape_ground.webp",
+     "w": 762,
+     "h": 378,
+     "x": 414.0,
+     "y": 172.5
+    },
+    "raised": {
+     "file": "volcanic/cape_raised.webp",
+     "w": 547,
+     "h": 273,
+     "x": 298.0,
+     "y": 131.5
+    }
+   },
+   "round": {
+    "ground": {
+     "file": "volcanic/round_ground.webp",
+     "w": 614,
+     "h": 325,
+     "x": 301.3,
+     "y": 155.8
+    },
+    "raised": {
+     "file": "volcanic/round_raised.webp",
+     "w": 434,
+     "h": 240,
+     "x": 214.3,
+     "y": 126.8
+    }
+   },
+   "bean": {
+    "ground": {
+     "file": "volcanic/bean_ground.webp",
+     "w": 722,
+     "h": 524,
+     "x": 370.1,
+     "y": 256.2
+    },
+    "raised": {
+     "file": "volcanic/bean_raised.webp",
+     "w": 513,
+     "h": 380,
+     "x": 261.1,
+     "y": 195.2
+    }
+   },
+   "long": {
+    "ground": {
+     "file": "volcanic/long_ground.webp",
+     "w": 1559,
+     "h": 334,
+     "x": 828.1,
+     "y": 159.1
+    },
+    "raised": {
+     "file": "volcanic/long_raised.webp",
+     "w": 1105,
+     "h": 250,
+     "x": 589.1,
+     "y": 130.1
+    }
+   },
+   "cay": {
+    "ground": {
+     "file": "volcanic/cay_ground.webp",
+     "w": 340,
+     "h": 195,
+     "x": 168.2,
+     "y": 87.8
+    },
+    "raised": {
+     "file": "volcanic/cay_raised.webp",
+     "w": 220,
+     "h": 126,
+     "x": 109.2,
+     "y": 63.8
+    }
+   },
+   "spire": {
+    "ground": {
+     "file": "volcanic/spire_ground.webp",
+     "w": 460,
+     "h": 237,
+     "x": 219.5,
+     "y": 115.2
+    },
+    "raised": {
+     "file": "volcanic/spire_raised.webp",
+     "w": 334,
+     "h": 198,
+     "x": 159.5,
+     "y": 115.2
+    }
+   },
+   "twins": {
+    "ground": {
+     "file": "volcanic/twins_ground.webp",
+     "w": 652,
+     "h": 635,
+     "x": 326.8,
+     "y": 309.1
+    },
+    "raised": {
+     "file": "volcanic/twins_raised.webp",
+     "w": 468,
+     "h": 451,
+     "x": 235.8,
+     "y": 226.1
+    }
+   },
+   "bay": {
+    "ground": {
+     "file": "volcanic/bay_ground.webp",
+     "w": 1125,
+     "h": 530,
+     "x": 548.3,
+     "y": 249.3
+    },
+    "raised": {
+     "file": "volcanic/bay_raised.webp",
+     "w": 804,
+     "h": 396,
+     "x": 391.3,
+     "y": 203.3
+    }
+   },
+   "jagged": {
+    "ground": {
+     "file": "volcanic/jagged_ground.webp",
+     "w": 788,
+     "h": 415,
+     "x": 400.2,
+     "y": 188.8
+    },
+    "raised": {
+     "file": "volcanic/jagged_raised.webp",
+     "w": 570,
+     "h": 322,
+     "x": 288.2,
+     "y": 166.8
+    }
+   },
+   "flat": {
+    "ground": {
+     "file": "volcanic/flat_ground.webp",
+     "w": 748,
+     "h": 531,
+     "x": 374.3,
+     "y": 270.4
+    },
+    "raised": {
+     "file": "volcanic/flat_raised.webp",
+     "w": 516,
+     "h": 377,
+     "x": 257.3,
+     "y": 204.4
+    }
+   }
+  }
+ }
+}

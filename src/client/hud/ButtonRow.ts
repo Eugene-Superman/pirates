@@ -2,7 +2,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 
 export interface ButtonSpec<K> {
   label: string;
-  /** The button shown pressed when the row's active key equals this; null for plain action buttons */
+  /** What the owner calls this button when it says which are pressed; null for plain action buttons */
   key: K | null;
   onTap: () => void;
 }
@@ -12,6 +12,8 @@ interface Button<K> {
   text: Text;
   width: number;
   key: K | null;
+  /** As last painted; undefined until the first paint */
+  pressed: boolean | undefined;
 }
 
 const BUTTON_HEIGHT = 26; // pixels
@@ -25,14 +27,12 @@ const COLORS = {
   border: 0xffffff,
 };
 
-// A row of HUD buttons. One of them can be shown pressed: the row doesn't decide which, the owner tells it
-// from the real state (ship health, camera zoom), so the highlight never disagrees with the game
+// A row of HUD buttons. Some of them can be shown pressed: the row doesn't decide which, the owner tells it
+// from the real state (ship health, camera zoom, shown range rings), so the highlight never disagrees with the game
 export class ButtonRow<K> {
   static readonly HEIGHT = BUTTON_HEIGHT;
   readonly container = new Container();
   private readonly buttons: Button<K>[] = [];
-  // undefined until the first setActive, so the first call always paints
-  private active: K | null | undefined = undefined;
 
   constructor(specs: readonly ButtonSpec<K>[]) {
     let x = 0;
@@ -44,11 +44,18 @@ export class ButtonRow<K> {
     this.setActive(null);
   }
 
+  /** One button pressed, the one with this key: a choice of one option */
   setActive(key: K | null) {
-    if (key === this.active) return;
-    this.active = key;
+    this.setPressed((k) => k === key);
+  }
+
+  /** Any number of buttons pressed: on/off switches */
+  setPressed(isPressed: (key: K) => boolean) {
     for (const b of this.buttons) {
-      const pressed = b.key !== null && b.key === key;
+      const pressed = b.key !== null && isPressed(b.key);
+      // Repainting re-renders the text's texture, so only on change
+      if (pressed === b.pressed) continue;
+      b.pressed = pressed;
       b.background
         .clear()
         .roundRect(0, 0, b.width, BUTTON_HEIGHT, 6)
@@ -72,6 +79,6 @@ export class ButtonRow<K> {
     container.on('pointerdown', (e) => e.stopPropagation());
     container.on('pointertap', spec.onTap);
     this.container.addChild(container);
-    return { background, text, width, key: spec.key };
+    return { background, text, width, key: spec.key, pressed: undefined };
   }
 }

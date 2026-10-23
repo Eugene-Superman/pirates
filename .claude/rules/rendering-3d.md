@@ -9,9 +9,10 @@ paths:
 
 - `render/` — the 3D engine (`Camera3D`, `Painter3D`). It knows nothing about ships or islands: no imports from `game/` or `scene/`.
 - `scene/models/` — how game objects look: `draw*(painter, object, time)` functions that only read game data.
-  `ShipSprite` is the exception: a Pixi `Sprite` from pre-rendered atlases (see "Ship sprite" below).
+  `ShipSprite` and `IslandSprites` are the exceptions: Pixi `Sprite`s from pictures rendered in Blender (see "Ship sprite" below).
 - `scene/effects/` — client-only decorations with their own state (foam, waves, target marker, ship fire and smoke,
-  the sinking animation). They may use `Math.random`.
+  the sinking animation, shot effects, the sea surface, the fog of war). They may use `Math.random`.
+- `scene/cameraControl.ts` — how the camera keeps up with the ship (follow / dead zone / recenter), switched in the HUD.
 - `hud/` — screen-space Pixi `Text`/`Container`, not projected. `input/` — turns pointer events into game method calls.
 - Game logic is imported only from `game/index.ts` (`'../../game'`); Oxlint rejects deep imports into `game/`.
 
@@ -20,7 +21,9 @@ paths:
 - **`SceneView`** is the only scene: classic 2:1 isometric (parallel projection, pitch 30°, yaw 45°).
 - Immediate mode: `scene.clear()` and a full redraw every frame via `Painter3D`.
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
-  The only exceptions are the ship sprite, which is already projected and lit by Blender, and its water mask.
+  The exceptions are things projected elsewhere: the ship sprite and its water mask, the island pictures (`IslandSprites`)
+  and fog puffs (`FogClouds`), all rendered in Blender for this camera, and the two shader meshes (`seaSurface.ts`,
+  `fogOfWar.ts`), whose vertices are projected with `Camera3D` every frame.
 - No perspective: sizes don't depend on distance, line widths are `width * camera.zoom`.
 - `camera.zoom` changes at runtime: the HUD's zoom buttons call `SceneView.setZoom`, and `update` eases the camera towards it.
   Read `camera.zoom` every frame; never cache it or anything derived from it.
@@ -43,18 +46,26 @@ paths:
 
 There is no z-buffer, so order is everything. In `SceneView.update`:
 
-1. Background: the renderer clears the screen to `SEA_COLOR` (set in the `SceneView` constructor).
-2. Everything flat on the water (`z = 0`): waves → island "ground" (shallows, sand, cliff shadows) → world border → wake foam → sinking foam → target marker.
+1. Background: the renderer clears the screen to the sea style's flat `color` (`SceneView.setSeaStyle`); the sea surface
+   mesh covers it once its maps have loaded (the Classic style has no surface).
+2. Everything flat on the water (`z = 0`): wave strokes (only styles with `arcs`, in their own `sea` layer) → island
+   "ground" (shallows, sand, cliff shadows; low-poly look) → world border → wake foam → sinking foam → range rings →
+   targets' foam → shot ripples → projectile shadows → target marker.
    There is no drawn ship shadow: it is baked into the sprite.
-3. Volumetric objects (islands) — sorted by `painter.depth(...)` **from far to near**. The ship sprite goes between them
-   by `shipDepth`, a point `ship.radius` above the water.
+3. Volumetric objects (low-poly islands, targets, projectiles) — sorted by `painter.depth(...)` **from far to near**.
+   The ship sprite goes between them by `shipDepth`, a point `ship.radius` above the water. A textured island's raised
+   picture goes to the far or near island layer by `SceneView.islandInFront`.
 4. Parts within an object are also sorted by depth (island hill and palms).
 
 Add a new volumetric object to the `objects` array with `depth` and `draw(painter)`; don't draw it separately after sorting.
 
 A sprite can't go inside a `Graphics`, so the scene is layers in `container`, bottom to top:
-`scene` (flat things and objects farther than the ship) → ship sprite → its `waterMask` → `fireLayer` (flames, then smoke)
-→ `front` (objects nearer than the ship, drawn with `frontPainter`).
+sea surface mesh → `sea` (wave strokes) → fog of war mesh (haze and mist) → fog puffs → island ground pictures →
+`scene` (flat things and objects farther than the ship) → far island pictures → ship sprite → its `waterMask` →
+`fireLayer` (flames, then smoke, then shot effects nearer than the ship) → near island pictures → `front` (objects
+nearer than the ship, drawn with `frontPainter`; the navigation debug drawings last, over everything).
+The fog lies under the islands, so islands stay clear of it; targets inside the fog are not drawn at all.
+Known limit: an object in `scene` stays under the far island pictures even where it is nearer than the island.
 `draw` receives the painter of its layer — draw with it, not with `this.painter`. Nothing is drawn for the ship until its
 `intact` atlas has loaded.
 
@@ -106,6 +117,21 @@ A sprite can't go inside a `Graphics`, so the scene is layers in `container`, bo
 ## Waves (`effects/waves.ts`)
 
 - 1200 waves generated once with `createRandom(1)`, so they are identical on every run. Culled with `isVisible` every frame.
+  Drawn only for sea styles with `arcs`, in that style's color.
+
+## Sea and fog shaders (`effects/seaSurface.ts`, `effects/fogOfWar.ts`)
+
+- Each is one `Mesh` with its own GLSL shader (WebGL only, Pixi's default renderer). The vertices carry their screen
+  position and their spot on the water, so the textures stay fixed to the water whatever the camera does.
+- Texture origins are moved by whole tiles to near the camera (sea) or the ship (fog): far from 0 a float can't tell
+  the texture's pixels apart.
+- Sea looks are data in `seaStyles.ts`. The fog starts at `ship.viewRange`; hiding its layers in the HUD changes only
+  the picture, never what the ship can see or shoot (`ship.canSee` in the game).
+
+## Shot effects (`effects/ShotEffects.ts`)
+
+- Animates the game's `state.events` (shots, impacts) and cannonball trails. Fixed pools reused round-robin, like the
+  wake. Effects farther than the ship go to `scene`, nearer ones to `fireLayer`.
 
 ## Performance
 
