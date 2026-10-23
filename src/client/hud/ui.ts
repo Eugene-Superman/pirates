@@ -174,3 +174,9 @@ export function drawAnchor(g: Graphics, size: number, color: number) {
     .stroke({ width: 3 * k, color, cap: 'round' });
   g.arc(0, 4 * k, 10 * k, 0.15, Math.PI - 0.15).stroke({ width: 3 * k, color, cap: 'round' });
 }
+
+/** A gold coin round (0, 0): the player's gold */
+export function drawCoin(g: Graphics, radius: number) {
+  g.circle(0, 0, radius).fill({ color: 0xe8b52e }).stroke({ width: 1, color: 0x7a5410 });
+  g.circle(0, 0, radius * 0.62).stroke({ width: 1, color: 0xfff0a8, alpha: 0.8 });
+}

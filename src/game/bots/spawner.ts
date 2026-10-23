@@ -1,9 +1,11 @@
 import type { GameState } from '../GameState';
+import type { Point } from '../lib/geometry';
+import { clamp } from '../lib/math';
 import type { NavGrid } from '../navigation/NavGrid';
 import { hullReach } from '../physics/hull';
 import { Ship } from '../ships/Ship';
 import { SHIP_CLASSES } from '../ships/shipClasses';
-import { START, WORLD_HEIGHT, WORLD_WIDTH } from '../world/World';
+import { MAP_SQUARES, START, WORLD_HEIGHT, WORLD_WIDTH } from '../world/World';
 import { BOT_KINDS, BOT_KIND_IDS, type BotKindId } from './botKinds';
 import { newBotMind } from './brain';
 
@@ -16,6 +18,9 @@ const SPAWN_GAP = 80; // world units from any other ship
 const ROOM = 30; // world units of open water round its hull
 const EDGE = 60; // world units from the world's edge
 const SPAWN_TRIES = 40;
+// World units round the place a sunk bot sailed (its home) where its replacement comes in: the sea round a player
+// fighting there stays as full as it was, instead of the bots drifting off to the rest of the world
+const RESPAWN_SPREAD = 1500;
 const RETRY_TIME = 1; // seconds before a bot that found no room tries again
 
 /** A bot waiting to come into the game in place of one that was sunk */
@@ -23,45 +28,56 @@ export interface Respawn {
   readonly kind: BotKindId;
   /** Game time it may come */
   readonly at: number;
+  /** Near where it comes in, within RESPAWN_SPREAD; null for anywhere */
+  readonly near: Point | null;
 }
 
 /** The bots of every kind, there when the game starts: anywhere on the sea, but not on top of a player */
 export function populate(state: GameState, nav: NavGrid, random: () => number) {
   for (const kind of BOT_KIND_IDS) {
-    for (let i = 0; i < BOT_KINDS[kind].count; i++) {
-      if (!spawn(state, nav, random, kind, false)) state.respawns.push({ kind, at: state.time + RETRY_TIME });
+    const count = Math.round(BOT_KINDS[kind].perSquare * MAP_SQUARES * MAP_SQUARES);
+    for (let i = 0; i < count; i++) {
+      if (!spawn(state, nav, random, kind, false, null)) {
+        state.respawns.push({ kind, at: state.time + RETRY_TIME, near: null });
+      }
     }
   }
 }
 
 /**
  * Takes the bots that were sunk this update out of the game (the client shows them going down), and brings new ones
- * in for them when their time comes: somewhere on open water that no player can see, so nothing appears out of thin
- * air. Stepped from Game.update after combat
+ * in for them when their time comes: on open water near where they sailed, but where no player can see, so nothing
+ * appears out of thin air. Stepped from Game.update after combat
  */
 export function stepSpawns(state: GameState, nav: NavGrid, random: () => number) {
   for (let i = state.ships.length - 1; i >= 0; i--) {
     const { bot, isSinking } = state.ships[i];
     if (!bot || !isSinking) continue;
     state.ships.splice(i, 1);
-    state.respawns.push({ kind: bot.kind, at: state.time + BOT_KINDS[bot.kind].respawnTime });
+    state.respawns.push({ kind: bot.kind, at: state.time + BOT_KINDS[bot.kind].respawnTime, near: bot.home });
   }
   const due = state.respawns.filter((r) => state.time >= r.at);
   if (due.length === 0) return;
   state.respawns = state.respawns.filter((r) => state.time < r.at);
-  for (const { kind } of due) {
-    if (!spawn(state, nav, random, kind, true)) state.respawns.push({ kind, at: state.time + RETRY_TIME });
+  for (const { kind, near } of due) {
+    if (!spawn(state, nav, random, kind, true, near)) state.respawns.push({ kind, at: state.time + RETRY_TIME, near });
   }
 }
 
-/** A bot of this kind, somewhere with room for it; false if no such place turned up this time */
-function spawn(state: GameState, nav: NavGrid, random: () => number, kindId: BotKindId, unseen: boolean) {
+/** A bot of this kind, somewhere with room for it (near `near`, if given); false if no such place turned up this time */
+function spawn(
+  state: GameState,
+  nav: NavGrid,
+  random: () => number,
+  kindId: BotKindId,
+  unseen: boolean,
+  near: Point | null,
+) {
   const kind = BOT_KINDS[kindId];
   const shipClass = SHIP_CLASSES[kind.shipClass];
   const need = hullReach(shipClass.hull) + ROOM;
   for (let attempt = 0; attempt < SPAWN_TRIES; attempt++) {
-    const x = EDGE + random() * (WORLD_WIDTH - 2 * EDGE);
-    const y = EDGE + random() * (WORLD_HEIGHT - 2 * EDGE);
+    const { x, y } = near ? around(near, random) : anywhere(random);
     if (nav.clearanceAt(x, y) < need) continue;
     if (kind.behaviour === 'aggressive' && Math.hypot(x - START.x, y - START.y) < SAFE_RADIUS) continue;
     const crowded = state.ships.some((other) => {
@@ -83,4 +99,18 @@ function spawn(state: GameState, nav: NavGrid, random: () => number, kindId: Bot
     return true;
   }
   return false;
+}
+
+function anywhere(random: () => number): Point {
+  return { x: EDGE + random() * (WORLD_WIDTH - 2 * EDGE), y: EDGE + random() * (WORLD_HEIGHT - 2 * EDGE) };
+}
+
+/** A point within RESPAWN_SPREAD of `near`, evenly over the disc, inside the world */
+function around(near: Point, random: () => number): Point {
+  const angle = random() * Math.PI * 2;
+  const distance = Math.sqrt(random()) * RESPAWN_SPREAD;
+  return {
+    x: clamp(near.x + Math.cos(angle) * distance, EDGE, WORLD_WIDTH - EDGE),
+    y: clamp(near.y + Math.sin(angle) * distance, EDGE, WORLD_HEIGHT - EDGE),
+  };
 }

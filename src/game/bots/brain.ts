@@ -15,6 +15,10 @@ const CIRCLE_STEP = 0.7; // radians round its foe a gunship moves on with each n
 const FLEE_DISTANCE = 400; // world units ahead of its foe a bot with no weapon runs to
 const REAIM_TIME = 0.6; // seconds between two new courses in a fight…
 const REAIM_DISTANCE = 20; // …and world units the new one must move the goal by: each may need a route round an island
+// World units from a player's ship: a bot farther than that from every player is dormant, waiting where it is (no
+// thinking, no sailing), so a big sea full of bots costs only the bots round the players. Well beyond a player's view
+// range and LEASH: a bot wakes before anyone can see it, and gives up a fight before it falls asleep
+export const WAKE_RANGE = 1500;
 
 /** What a bot remembers between updates */
 export interface BotMind {
@@ -44,22 +48,38 @@ export function isHostile(ship: Ship, playerId: number) {
   return mind !== null && (BOT_KINDS[mind.kind].behaviour === 'aggressive' || mind.foe === playerId);
 }
 
+/** Whether a point is within `range` of a player's ship, in a square round it: a cheap test of what is near */
+export function nearPlayers(x: number, y: number, range: number, players: readonly Ship[]) {
+  return players.some((p) => Math.abs(p.x - x) < range && Math.abs(p.y - y) < range);
+}
+
+/** Whether a ship sails this update: a player's always, a bot only within WAKE_RANGE of a player's ship */
+export function isAwake(ship: Ship, players: readonly Ship[]) {
+  return !ship.bot || nearPlayers(ship.x, ship.y, WAKE_RANGE, players);
+}
+
 /**
- * What every bot does this update, before the ships steer: it picks its foe (the player who hit it, or for an
- * aggressive one a player who came within its aggro range), then fights it, runs from it, or wanders round its home.
- * Bots never fight bots. The bots' own seeded `random` keeps it the same on the server and every client
+ * What every bot awake (`ships`, isAwake) does this update, before the ships steer: it picks its foe (the player who
+ * hit it, or for an aggressive one a player who came within its aggro range), then fights it, runs from it, or wanders
+ * round its home. Bots never fight bots. The bots' own seeded `random` keeps it the same on the server and every client
  */
-export function thinkBots(state: GameState, nav: NavGrid, random: () => number) {
-  for (const ship of state.ships) {
+export function thinkBots(
+  state: GameState,
+  ships: readonly Ship[],
+  players: readonly Ship[],
+  nav: NavGrid,
+  random: () => number,
+) {
+  for (const ship of ships) {
     const mind = ship.bot;
     if (!mind || ship.isSinking) continue;
-    const foe = pickFoe(state, ship, mind);
+    const foe = pickFoe(state, players, ship, mind);
     if (foe) fight(state.time, ship, mind, foe);
     else wander(state.time, nav, ship, mind, random);
   }
 }
 
-function pickFoe(state: GameState, ship: Ship, mind: BotMind): Ship | null {
+function pickFoe(state: GameState, players: readonly Ship[], ship: Ship, mind: BotMind): Ship | null {
   const { time } = state;
   // Hit by a player: it turns on them (or runs), whatever it is
   if (ship.lastHitBy !== null) {
@@ -70,8 +90,9 @@ function pickFoe(state: GameState, ship: Ship, mind: BotMind): Ship | null {
   const kind = BOT_KINDS[mind.kind];
   if (mind.foe === null && kind.behaviour === 'aggressive') {
     let nearest = kind.aggroRange;
-    for (const other of state.ships) {
-      if (other.bot || other.isSinking) continue;
+    for (const other of players) {
+      // In port, a player is out of the fight
+      if (other.isSinking || other.docked) continue;
       const distance = Math.hypot(other.x - ship.x, other.y - ship.y);
       if (distance <= nearest) {
         nearest = distance;
@@ -82,7 +103,7 @@ function pickFoe(state: GameState, ship: Ship, mind: BotMind): Ship | null {
   if (mind.foe === null) return null;
 
   const foe = state.ships.find((s) => s.id === mind.foe);
-  if (!foe || foe.isSinking) {
+  if (!foe || foe.isSinking || foe.docked) {
     calm(ship, mind, time);
     return null;
   }

@@ -14,7 +14,7 @@ const REPLAN_INTERVAL = 1; // seconds: at most this often a ship pushed off its 
 const STUCK_TIME = 4; // seconds without progress: the ship stops where it is (something sits on its target)
 const STUCK_PROGRESS = 2; // world units the route left to sail must shrink by to count as progress
 const SLOWEST_TURN = 0.2; // share of top speed: slowest the ship goes to make a sharp turn
-// Avoiding other ships and floating things: looks this far ahead in time, and keeps this much water between hulls
+// Avoiding other ships: looks this far ahead in time, and keeps this much water between hulls
 const AVOID_HORIZON = 3; // seconds
 const AVOID_MARGIN = 8; // world units
 const AVOID_STEP = (10 * Math.PI) / 180; // radians between the headings it tries
@@ -55,7 +55,7 @@ export function routeClearance(ship: Ship) {
 
 /**
  * Steers a ship to its target: plans a route round islands (NavGrid), follows it leg by leg, slows for turns it
- * couldn't make at speed, and swerves round other ships and floating things in the way (velocity obstacles: of the
+ * couldn't make at speed, and swerves round other ships in the way (velocity obstacles: of the
  * headings near the route's, the first that won't bring the hulls together within AVOID_HORIZON). Starboard is tried
  * first, as ships do to pass each other. Collisions are still handled by physics; the pilot only tries to avoid them
  */

@@ -8,8 +8,10 @@ import {
   averageDamage,
   type AmmoId,
   type GunId,
+  type Player,
   type Ship,
   type ShipClass,
+  gunPrice,
   type WeaponId,
 } from '../../game';
 import { Tile, UI, drawBall, drawHarpoon, show, text, tierColor, tint } from './ui';
@@ -24,19 +26,16 @@ const SLOT_HEIGHT = 44;
 const GUN_HEIGHT = 40;
 const AMMO_HEIGHT = 28;
 const ROW_GAP = 5;
-const SMALL_BUTTON = 36;
-const AMMO_STEPS = [10, 50] as const; // shots the + buttons put in the hold
+const LOAD_BUTTON = 54;
 const DIM_ALPHA = 0.5;
 const SLOT_NAMES: Readonly<Record<WeaponId, string>> = { cannon: 'Cannons', harpoon: 'Harpoon guns' };
 const AMMO_NAMES: Readonly<Record<WeaponId, string>> = { cannon: 'Cannonballs', harpoon: 'Harpoons' };
 
 export interface LoadoutActions {
-  /** Fits a gun into one of its weapon's slots, or empties the slot (null). For testing; bought later */
+  /** Fits a gun from the hold into one of its weapon's slots, or empties the slot (null): the old gun goes to the hold */
   fitGun: (weapon: WeaponId, slot: number, gun: GunId | null) => void;
   /** Picks the ammo its weapon fires */
   loadAmmo: (ammo: AmmoId) => void;
-  /** Puts ammo in the hold. For testing; bought later */
-  addAmmo: (ammo: AmmoId, count: number) => void;
 }
 
 interface SlotView {
@@ -70,9 +69,8 @@ function gunStats(gun: GunId) {
 
 /**
  * The loadout window (L, or the anchor on the skill bar): the ship's gun slots of each weapon, and the guns that
- * fit the slot picked, with what each does a shot with the loaded ammo; the ammo in the hold, which one is loaded, and
- * buttons to add more. A testing tool for now: any gun, any ammo, free. A shipyard and a shop later.
- * Closed by Close, Escape, L or a click beside it
+ * fit the slot picked, with what each does a shot with the loaded ammo and how many are in the hold (bought in port);
+ * the ammo in the hold and which one is loaded. Closed by Close, Escape, L or a click beside it
  */
 export class LoadoutPanel {
   readonly container = new Container();
@@ -109,7 +107,7 @@ export class LoadoutPanel {
       alpha: 0.4,
     });
     this.title.position.set(PAD, PAD);
-    const note = text('Testing: any gun and any ammo, free. Bought in port later', 12, UI.dim);
+    const note = text('Guns come from the hold; the one taken out goes back. Buy more in port', 12, UI.dim);
     note.position.set(PAD + this.title.width + 16, PAD + 6);
     const close = new Tile(70, 26, () => this.hide(), 6);
     const closeText = text('Close', 13);
@@ -184,7 +182,7 @@ export class LoadoutPanel {
     this.container.visible = false;
   }
 
-  update(ship: Ship) {
+  update(ship: Ship, player: Player) {
     if (!this.isOpen) return;
     const { width, height } = this.screen;
     this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: DIM_ALPHA });
@@ -224,11 +222,22 @@ export class LoadoutPanel {
     const fitted = ship.guns[weapon][slot];
     const bonus = AMMO[ship.loaded[weapon]].bonus;
     for (const row of this.rows) {
-      row.tile.setLook({ pressed: row.gun === fitted, border: row.gun ? tierColor(GUNS[row.gun].tier) : UI.border });
-      tint(row.name, row.gun === fitted ? UI.darkText : UI.text);
-      tint(row.average, row.gun === fitted ? UI.darkText : UI.active);
-      tint(row.details, row.gun === fitted ? UI.darkText : UI.dim);
-      if (row.gun) show(row.average, `≈${averageDamage(GUNS[row.gun], bonus).toFixed(1)} a shot`);
+      const here = row.gun === fitted;
+      const stock = row.gun ? (player.hold[row.gun] ?? 0) : 0;
+      // A gun that isn't in the hold can't be fitted: bought in port first
+      const missing = row.gun !== null && !here && stock === 0;
+      row.tile.setLook({
+        pressed: here,
+        disabled: missing,
+        border: row.gun ? tierColor(GUNS[row.gun].tier) : UI.border,
+      });
+      tint(row.name, here ? UI.darkText : UI.text);
+      tint(row.average, here ? UI.darkText : UI.active);
+      tint(row.details, here ? UI.darkText : UI.dim);
+      if (!row.gun) continue;
+      show(row.average, `≈${averageDamage(GUNS[row.gun], bonus).toFixed(1)} a shot`);
+      const where = here ? 'Fitted here' : stock > 0 ? `In the hold: ${stock}` : `In port: ${gunPrice(row.gun)} gold`;
+      show(row.details, `${where} · ${gunStats(row.gun)}`);
     }
 
     for (const row of this.ammoRows) {
@@ -252,7 +261,7 @@ export class LoadoutPanel {
       const average = text('', 12, UI.active, { fontWeight: 'bold' });
       average.anchor.set(1, 0);
       average.position.set(COLUMN.guns - 10, 5);
-      const details = text(gun ? `${gunStats(gun)} · ${GUNS[gun].role}` : 'Takes the gun out', 11, UI.dim);
+      const details = text(gun ? gunStats(gun) : 'Takes the gun out, into the hold', 11, UI.dim);
       details.position.set(40, 22);
       tile.content.addChild(name, average, details);
       if (gun) {
@@ -268,7 +277,7 @@ export class LoadoutPanel {
     });
   }
 
-  /** An ammo's row: its icon and name with the bonus, the count in the hold, + buttons, and Load */
+  /** An ammo's row: its icon and name with the bonus, the count in the hold, and Load */
   private ammoRow(ammo: AmmoId, x: number, y: number): AmmoRow {
     const { name, bonus, tier, weapon } = AMMO[ammo];
     const row = new Container();
@@ -279,27 +288,16 @@ export class LoadoutPanel {
     icon.position.set(8, AMMO_HEIGHT / 2);
     const label = text(`${name}  +${bonus}`, 12, tierColor(tier), { fontWeight: 'bold' });
     label.position.set(20, (AMMO_HEIGHT - label.height) / 2);
-    // The buttons on the right, the count just before them
-    const loadWidth = SMALL_BUTTON + 18;
-    let bx = COLUMN.ammo - AMMO_STEPS.length * (SMALL_BUTTON + 4) - loadWidth;
+    // Load on the right, the count just before it
+    const bx = COLUMN.ammo - LOAD_BUTTON;
     const count = text('', 12, UI.text, { fontWeight: 'bold' });
     count.anchor.set(1, 0.5);
-    count.position.set(bx - 8, AMMO_HEIGHT / 2);
+    count.position.set(bx - 10, AMMO_HEIGHT / 2);
     row.addChild(icon, label, count);
-    for (const step of AMMO_STEPS) {
-      const add = new Tile(SMALL_BUTTON, AMMO_HEIGHT - 4, () => this.actions.addAmmo(ammo, step), 4);
-      const plus = text(`+${step}`, 11);
-      plus.anchor.set(0.5);
-      plus.position.set(SMALL_BUTTON / 2, (AMMO_HEIGHT - 4) / 2);
-      add.content.addChild(plus);
-      add.container.position.set(bx, 2);
-      row.addChild(add.container);
-      bx += SMALL_BUTTON + 4;
-    }
-    const load = new Tile(loadWidth, AMMO_HEIGHT - 4, () => this.actions.loadAmmo(ammo), 4);
+    const load = new Tile(LOAD_BUTTON, AMMO_HEIGHT - 4, () => this.actions.loadAmmo(ammo), 4);
     const loadText = text('Load', 11);
     loadText.anchor.set(0.5);
-    loadText.position.set(loadWidth / 2, (AMMO_HEIGHT - 4) / 2);
+    loadText.position.set(LOAD_BUTTON / 2, (AMMO_HEIGHT - 4) / 2);
     load.content.addChild(loadText);
     load.container.position.set(bx, 2);
     row.addChild(load.container);

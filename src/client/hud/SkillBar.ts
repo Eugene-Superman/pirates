@@ -1,4 +1,4 @@
-import { Container, Graphics, type Text } from 'pixi.js';
+import { Container, Graphics, Rectangle, type Text } from 'pixi.js';
 import {
   AMMO,
   AMMO_IDS,
@@ -104,6 +104,11 @@ export class SkillBar {
       ...this.groups.map((g) => g.container),
       this.loadout.container,
     );
+  }
+
+  /** Where the bar is on the screen */
+  get box() {
+    return new Rectangle(this.container.x, this.container.y, this.width, SKILL + PAD * 2);
   }
 
   update(state: GameState, screenWidth: number, screenHeight: number) {

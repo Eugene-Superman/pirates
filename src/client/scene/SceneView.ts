@@ -4,12 +4,9 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
   isAfloat,
-  isAlive,
   isHostile,
-  isShip,
   projectilePosition,
   type GameState,
-  type Island,
   type Ship,
   type Unit,
   type WeaponId,
@@ -17,27 +14,26 @@ import {
 import type { Selection } from '../input/selection';
 import { Camera3D, type CameraConfig, type Vec3 } from '../render/Camera3D';
 import { Painter3D } from '../render/Painter3D';
-import { CameraControl, type CameraMode } from './cameraControl';
+import { CAMERA_MODES, CameraControl, type CameraMode } from './cameraControl';
 import { DamageNumbers } from './effects/DamageNumbers';
 import { FogClouds } from './effects/FogClouds';
-import { createFogOfWar, type FogLayer, type FogOfWar, updateFogOfWar } from './effects/fogOfWar';
+import { FOG_LAYERS, createFogOfWar, type FogLayer, type FogOfWar, updateFogOfWar } from './effects/fogOfWar';
 import { drawRangeRing } from './effects/rangeRings';
 import { RepairEffect } from './effects/RepairEffect';
 import { ShipFire } from './effects/ShipFire';
 import { ShotEffects } from './effects/ShotEffects';
 import { Sinking } from './effects/Sinking';
-import { drawHulls, drawRoute, type NavDebug } from './effects/navDebug';
+import { NAV_DEBUG, drawHulls, drawRoute, type NavDebug } from './effects/navDebug';
 import { drawSelection, drawTargetLock } from './effects/targetLock';
 import { drawTargetMarker } from './effects/targetMarker';
 import { Trails } from './effects/Trails';
 import { Wake } from './effects/Wake';
 import { Wrecks } from './effects/Wrecks';
-import { createSeaSurface, type SeaSurface, setSeaLook, updateSeaSurface } from './effects/seaSurface';
-import { SEA_STYLES } from './effects/seaStyles';
-import { createWaves, drawWaves } from './effects/waves';
+import { SEA_COLOR } from './effects/seaLook';
+import { createSeaSurface, type SeaSurface, updateSeaSurface } from './effects/seaSurface';
+import { drawChest, drawChestWater } from './models/chest3d';
 import { drawIslandGround, drawIslandRaised } from './models/island3d';
-import { ISLAND_LOOKS, IslandSprites } from './models/IslandSprites';
-import { drawBarrel, drawBarrelWater } from './models/barrel3d';
+import { portPieces } from './models/port3d';
 import { botShipTop, drawBotShip } from './models/botShip3d';
 import { drawProjectile, drawProjectileShadow } from './models/projectile3d';
 import { SPINE, drawSerpent, drawSerpentWater, type SpinePoint } from './models/serpent3d';
@@ -49,28 +45,40 @@ const CAMERA: CameraConfig = { pitch: 30, yaw: 45, zoom: 1.4, originY: 0.5 };
 // The ship atlases (see ShipSprite) are rendered in Blender for exactly this camera.
 // Changing the camera means re-rendering them from their source outside this repo
 
+// The zoom levels the HUD offers range over these, as multiples of CAMERA.zoom
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 3;
 // How fast the camera reaches a new zoom: the share of the remaining difference closed per second
 const ZOOM_EASE = 8;
 const ZOOM_SNAP = 0.001; // pixels per unit: close enough to stop easing
 
 // Range rings, one color per weapon
 const RANGE_COLORS: Readonly<Record<WeaponId, number>> = { cannon: 0xffb347, harpoon: 0x7fe3ff };
-// A barrel is a few pixels across, so a click this close to a unit on screen counts as a click on it; a big unit
-// counts out to its size
+// A small boat is a few pixels across at a low zoom, so a click this close to a unit on screen counts as a click on
+// it; a big unit counts out to its size
 const PICK_RADIUS = 22; // screen pixels
 // Ships and monsters this far beyond the ship's view range already leave a wake and lay a trail (a serpent's body), so
 // both are there when they come into sight
 const NEAR_MARGIN = 300; // world units
-// An island's picture reaches this many times its reach from its centre: the sea floor round it
-const ISLAND_PICTURE_REACH = 1.5;
-// Share of an island's coast radius where its land rises: what a ship is compared with to sort it against the island
-const ISLAND_CLIFF_SHARE = 0.85;
+// For culling: an island's shallows reach 1.35 times as far out as its coast (island3d), and its hill and palms rise
+// above it by up to ISLAND_MARGIN world units on the screen
+const ISLAND_SHALLOWS = 1.35;
+const ISLAND_MARGIN = 100;
 
 const BORDER_COLOR = 0x0b3a52;
 // Hit point bars over the units in sight: screen pixels, the same at every zoom. A red border marks a unit that attacks
 // the player (an aggressive bot, or one fighting them)
 const HP_BAR = { width: 36, height: 5, lift: 12 };
 const HP_COLORS = { back: 0x0b1a22, high: 0x5ad15a, mid: 0xf2c84b, low: 0xe5533d, border: 0xffffff, hostile: 0xff3b2f };
+
+/** Copies the kept on/off flags for these keys into a record of them: those that are true or false */
+function readFlags<K extends string>(value: unknown, keys: readonly K[], into: Record<K, boolean>) {
+  if (typeof value !== 'object' || value === null) return;
+  for (const key of keys) {
+    const flag: unknown = key in value ? Reflect.get(value, key) : undefined;
+    if (typeof flag === 'boolean') into[key] = flag;
+  }
+}
 
 /** Where a sea serpent's head is: its position is the middle of its body */
 function head(serpent: Ship) {
@@ -82,11 +90,9 @@ function head(serpent: Ship) {
 
 // Pseudo-3D: the world has height and the camera looks at it at an angle.
 // The scene is redrawn every frame through the Camera3D projection.
-// Decorations (waves, foam) are view state: the scene owns and updates them itself.
+// Decorations (wakes, foam) are view state: the scene owns and updates them itself.
 export class SceneView {
   readonly container = new Container();
-  /** The little wave strokes: over the sea's surface, under the fog of war, which is under the islands */
-  private readonly sea = new Graphics();
   private readonly scene = new Graphics();
   /** Islands nearer than the ship sprite: they must be drawn on top of it */
   private readonly front = new Graphics();
@@ -106,17 +112,11 @@ export class SceneView {
   private spines = new Map<number, SpinePoint[]>();
   private readonly selection: Selection;
   private readonly cameraControl = new CameraControl();
-  private readonly waves = createWaves();
   private readonly app: Application;
   private readonly state: GameState;
   private readonly camera: Camera3D;
   private readonly painter: Painter3D;
-  private readonly seaPainter: Painter3D;
   private readonly seaSurface: SeaSurface;
-  private seaStyleIndex = 0;
-  private readonly islandSprites = new IslandSprites();
-  /** 0: the simple low-poly islands; 1…: the textured looks of ISLAND_LOOKS */
-  private islandLookIndex = 1;
   private readonly fog: FogOfWar;
   private readonly fogClouds: FogClouds;
   private readonly frontPainter: Painter3D;
@@ -139,33 +139,28 @@ export class SceneView {
     this.selection = selection;
     this.camera = new Camera3D(CAMERA);
     this.painter = new Painter3D(this.scene, this.camera);
-    this.seaPainter = new Painter3D(this.sea, this.camera);
     this.seaSurface = createSeaSurface();
+    // The whole screen behind the scene is open sea: its flat color shows until the surface's maps have loaded
+    app.renderer.background.color = SEA_COLOR;
     this.fog = createFogOfWar();
     this.fogClouds = new FogClouds();
     this.frontPainter = new Painter3D(this.front, this.camera);
     this.firePainter = new Painter3D(this.fireLayer, this.camera);
     this.shipSprite = new ShipSprite(state.ship.shipClass);
-    this.setSeaStyle(0);
-    this.setIslandLook(this.islandLookIndex);
 
     this.camera.focusX = state.ship.x;
     this.camera.focusY = state.ship.y;
 
     this.container.addChild(
       this.seaSurface.mesh,
-      this.sea,
       this.fog.mesh,
       this.fogClouds.container,
-      this.islandSprites.ground,
       this.wake.mesh,
       this.sinking.water,
       this.scene,
-      this.islandSprites.far,
       this.shipSprite.sprite,
       this.shipSprite.waterMask,
       this.fireLayer,
-      this.islandSprites.near,
       this.front,
       this.hpBars,
       this.damageNumbers.container,
@@ -182,8 +177,8 @@ export class SceneView {
       (other) => other !== ship && Math.hypot(other.x - ship.x, other.y - ship.y) < ship.viewRange + NEAR_MARGIN,
     );
     const stage = ship.damageStage;
-    // Destroyed targets leave no wake; theirs fades where they went down. Far ships' wakes would never be seen
-    this.wake.update(time, [ship, ...near, ...this.state.targets.filter(isAlive)]);
+    // Far ships' wakes would never be seen
+    this.wake.update(time, [ship, ...near]);
     // Wrecks keep the serpent's body as last drawn, before this frame's trails move on
     this.wrecks.update(this.state, (id) => this.spines.get(id) ?? null);
     const serpents = near.filter((other) => other.shipClass.id === 'seaSerpent');
@@ -204,44 +199,34 @@ export class SceneView {
     camera.originX = width / 2;
     camera.originY = height * CAMERA.originY;
     this.cameraControl.update(camera, ship, dt, width, height);
-    painter.screenWidth = this.frontPainter.screenWidth = this.seaPainter.screenWidth = width;
-    painter.screenHeight = this.frontPainter.screenHeight = this.seaPainter.screenHeight = height;
+    painter.screenWidth = this.frontPainter.screenWidth = width;
+    painter.screenHeight = this.frontPainter.screenHeight = height;
 
     this.scene.clear();
 
     // Everything lying on the water
-    this.sea.clear();
     updateSeaSurface(this.seaSurface, camera, time, width, height);
-    const { arcs } = SEA_STYLES[this.seaStyleIndex];
-    if (arcs) drawWaves(this.seaPainter, this.waves, time, arcs.color, arcs.alpha);
     if (this.fogLayers.mist) updateFogOfWar(this.fog, camera, ship, time, width, height);
     else this.fog.mesh.visible = false;
     // Hidden clouds aren't updated either: placing them is most of their cost on the CPU
     this.fogClouds.container.visible = this.fogLayers.clouds;
     if (this.fogLayers.clouds) this.fogClouds.update(camera, ship, time, width, height);
 
-    // Pictures reach past the coast with the sea floor round the island, and up with its hills and trees
-    const visible = world.islands.filter((island) =>
-      painter.isVisible(island.x, island.y, 0, island.reach * ISLAND_PICTURE_REACH + 60),
+    const islands = world.islands.filter((island) =>
+      painter.isVisible(island.x, island.y, 0, island.reach * ISLAND_SHALLOWS + ISLAND_MARGIN),
     );
-    // Islands with their pictures loaded in the chosen look; the rest (all, for the low-poly look) are drawn here
-    const textured = this.islandLookIndex > 0 ? visible.filter((island) => this.islandSprites.has(island)) : [];
-    const islands = visible.filter((island) => !textured.includes(island));
     for (const island of islands) drawIslandGround(painter, island);
-    this.islandSprites.update(camera, textured, (island) => this.islandInFront(island, painter));
 
     this.drawWorldBorder();
 
-    this.wake.draw(camera, ship, time, world.islands);
-    this.sinking.drawWater(camera, ship, world.islands);
+    // Only the islands on the screen can fade a wake that is: hundreds of them would cost a lot per point
+    this.wake.draw(camera, ship, time, islands);
+    this.sinking.drawWater(camera, ship, islands);
     for (const id of WEAPON_IDS) {
       const range = ship.range(id);
       if (this.ranges[id] && range > 0) drawRangeRing(painter, ship, range, RANGE_COLORS[id], time);
     }
-    // Units in the fog of war are not drawn at all, nor destroyed ones. The serpent is long: it is culled by its body
-    const targets = this.state.targets.filter(
-      (t) => isAlive(t) && ship.canSee(t.x, t.y) && painter.isVisible(t.x, t.y, 0, t.height * 3 + t.hull.bow),
-    );
+    // Units in the fog of war are not drawn at all, nor wrecks. The serpent is long: it is culled by its body
     const others = near.filter(
       (other) =>
         !other.isSinking &&
@@ -256,17 +241,19 @@ export class SceneView {
           return [serpent.id, this.trails.spine(serpent.id, x, y, serpent.rotation, SPINE.points, SPINE.spacing)];
         }),
     );
-    // What lies on the water round the units: the barrel's foam, a serpent's body under the surface, a turtle's shell
-    // and the bubbles over wrecks; ships' water is their wake
-    for (const target of targets) drawBarrelWater(painter, target, time);
+    // What lies on the water round the units: a serpent's body under the surface, a turtle's shell and the bubbles over
+    // wrecks; ships' water is their wake
     for (const other of others) {
       const spine = this.spines.get(other.id);
       if (spine) drawSerpentWater(painter, spine, time);
       else if (other.shipClass.id === 'seaTurtle') drawTurtleWater(painter, other, time);
     }
     this.wrecks.drawWater(painter, time);
+    // Chests in sight: a ring of foam round each
+    const chests = this.state.chests.filter((c) => ship.canSee(c.x, c.y) && painter.isVisible(c.x, c.y, 0, 12));
+    for (const chest of chests) drawChestWater(painter, chest, time);
     this.repair.drawWater(painter);
-    const units: Unit[] = [...targets, ...others];
+    const units: Unit[] = others;
     const locked = units.find((u) => u.id === ship.attackTarget);
     if (locked) drawTargetLock(painter, locked, time, ship.holdReason !== null);
     const selected = units.find((u) => u.id === this.selection.id);
@@ -283,13 +270,6 @@ export class SceneView {
       depth: painter.depth([island.x, island.y, island.height / 2]),
       draw: (p: Painter3D) => drawIslandRaised(p, island, time),
     }));
-    for (const target of targets) {
-      const shake = this.shots.shake(target.id, time);
-      objects.push({
-        depth: painter.depth([target.x, target.y, target.height / 2]),
-        draw: (p) => drawBarrel(p, target, time, shake),
-      });
-    }
     for (const other of others) {
       const shake = this.shots.shake(other.id, time);
       const lunge = this.shots.lunge(other.id, time);
@@ -304,6 +284,13 @@ export class SceneView {
       });
     }
     objects.push(...this.wrecks.objects(painter, time));
+    for (const chest of chests) {
+      objects.push({ depth: painter.depth([chest.x, chest.y, 2]), draw: (p) => drawChest(p, chest, time) });
+    }
+    const { port } = world;
+    if (painter.isVisible(port.island.x, port.island.y, 0, port.island.reach * ISLAND_SHALLOWS + ISLAND_MARGIN)) {
+      objects.push(...portPieces(painter, port, time));
+    }
     for (const projectile of this.state.projectiles) {
       const at = projectilePosition(projectile);
       objects.push({ depth: painter.depth([at.x, at.y, at.z]), draw: (p) => drawProjectile(p, projectile) });
@@ -333,6 +320,38 @@ export class SceneView {
 
     this.drawHpBars(units);
     this.damageNumbers.update(dt, this.state, camera);
+  }
+
+  /** The view's settings as plain data, to keep between visits */
+  get settings() {
+    return {
+      zoom: this.zoomLevel,
+      cameraMode: this.cameraControl.mode,
+      zone: this.zoneOutlined,
+      ranges: { ...this.ranges },
+      fog: { ...this.fogLayers },
+      debug: { ...this.debug },
+    };
+  }
+
+  /** Puts kept settings back: whatever of them is valid; the rest stays as it is */
+  applySettings(saved: unknown) {
+    if (typeof saved !== 'object' || saved === null) return;
+    if ('zoom' in saved && typeof saved.zoom === 'number' && saved.zoom >= MIN_ZOOM && saved.zoom <= MAX_ZOOM) {
+      this.zoomLevel = saved.zoom;
+    }
+    const mode = 'cameraMode' in saved ? CAMERA_MODES.find((m) => m === saved.cameraMode) : undefined;
+    if (mode) this.cameraControl.mode = mode;
+    if ('zone' in saved && typeof saved.zone === 'boolean') this.zoneOutlined = saved.zone;
+    if ('ranges' in saved) readFlags(saved.ranges, WEAPON_IDS, this.ranges);
+    if ('fog' in saved) readFlags(saved.fog, FOG_LAYERS, this.fogLayers);
+    if ('debug' in saved) readFlags(saved.debug, NAV_DEBUG, this.debug);
+  }
+
+  /** Which way the screen's right and up point on the water: the maps turn the world as the camera does */
+  get mapAxes() {
+    const { rightX, rightY, fwdX, fwdY } = this.camera;
+    return { rightX, rightY, upX: fwdX, upY: fwdY };
   }
 
   /** Zoom as a multiple of the default one: 1 is the normal view, 2 shows everything twice as big */
@@ -379,48 +398,6 @@ export class SceneView {
     this.ranges[weapon] = !this.ranges[weapon];
   }
 
-  /**
-   * Whether an island is nearer to the camera than the ship, where the two could overlap on the screen: compared at
-   * the island's cliff line on the side facing the ship, so a ship close to an island sorts right whichever side it is
-   */
-  private islandInFront(island: Island, painter: Painter3D) {
-    const { ship } = this.state;
-    const dx = ship.x - island.x;
-    const dy = ship.y - island.y;
-    const distance = Math.hypot(dx, dy);
-    const angle = (Math.atan2(dy, dx) + Math.PI * 2) % (Math.PI * 2);
-    const segments = island.shape.length;
-    const k = island.shape[Math.round((angle / (Math.PI * 2)) * segments) % segments];
-    const t = distance > 0 ? Math.min(distance, island.radius * k * ISLAND_CLIFF_SHARE) / distance : 0;
-    const near = painter.depth([island.x + dx * t, island.y + dy * t, 0]);
-    return near < painter.depth([ship.x, ship.y, 0]);
-  }
-
-  /** Which look the islands have: 0 the low-poly one, 1… a textured one (ISLAND_LOOKS) */
-  get islandLook() {
-    return this.islandLookIndex;
-  }
-
-  setIslandLook(index: number) {
-    if (index < 0 || index > ISLAND_LOOKS.length) return;
-    this.islandLookIndex = index;
-    this.islandSprites.setLook(index > 0 ? ISLAND_LOOKS[index - 1].id : null);
-  }
-
-  /** Index of the sea's look in SEA_STYLES */
-  get seaStyle() {
-    return this.seaStyleIndex;
-  }
-
-  setSeaStyle(index: number) {
-    const style = SEA_STYLES[index];
-    if (!style) return;
-    this.seaStyleIndex = index;
-    // The whole screen behind the scene is open sea: its flat color shows where the surface isn't drawn
-    this.app.renderer.background.color = style.color;
-    setSeaLook(this.seaSurface, style.surface);
-  }
-
   /** Which debug drawings are shown */
   get debugShown(): Readonly<Record<NavDebug, boolean>> {
     return this.debug;
@@ -447,8 +424,8 @@ export class SceneView {
     const { ship } = this.state;
     let best: Unit | null = null;
     let bestScore = Infinity;
-    const units: Unit[] = [...this.state.targets, ...this.state.ships.filter((other) => other !== ship)];
-    for (const unit of units) {
+    for (const unit of this.state.ships) {
+      if (unit === ship) continue;
       if (!isAfloat(unit) || !ship.canSee(unit.x, unit.y)) continue;
       const s = this.camera.project(unit.x, unit.y, unit.height / 2);
       const reach = Math.max(PICK_RADIUS, unit.radius * 1.4 * this.camera.zoom);
@@ -475,12 +452,12 @@ export class SceneView {
     for (const u of units) {
       const share = u.hp / u.maxHp;
       // Over the top of a ship's mast
-      const top = isShip(u) ? (botShipTop(u.shipClass.id) ?? u.height) : u.height;
+      const top = botShipTop(u.shipClass.id) ?? u.height;
       const s = this.camera.project(u.x, u.y, top);
       const x = s.x - width / 2;
       const y = s.y - lift - height;
       const color = share > 0.5 ? HP_COLORS.high : share > 0.25 ? HP_COLORS.mid : HP_COLORS.low;
-      const hostile = isShip(u) && isHostile(u, this.state.ship.id);
+      const hostile = isHostile(u, this.state.ship.id);
       g.rect(x, y, width, height).fill({ color: HP_COLORS.back, alpha: 0.7 });
       g.rect(x, y, width * share, height).fill({ color });
       g.rect(x, y, width, height).stroke({

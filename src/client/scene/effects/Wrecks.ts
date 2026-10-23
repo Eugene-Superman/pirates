@@ -35,7 +35,7 @@ export class Wrecks {
   /** spine: the body of a serpent with this id as it was a moment ago */
   update(state: GameState, spine: (id: number) => readonly SpinePoint[] | null) {
     for (const event of state.events) {
-      if (event.type !== 'destroyed' || event.kind === 'barrel' || event.targetId === state.ship.id) continue;
+      if (event.type !== 'destroyed' || event.targetId === state.ship.id) continue;
       if (!state.ship.canSee(event.at.x, event.at.y)) continue;
       const shipClass = SHIP_CLASSES[event.kind];
       this.wrecks.push({
@@ -89,7 +89,7 @@ export class Wrecks {
             if (w.kind === 'seaSerpent') {
               if (w.spine) drawSerpent(painter, w.spine, time, 0, 0, sink);
             } else if (w.kind === 'seaTurtle') drawTurtle(painter, pose, time, 0, 0, sink);
-            else if (w.kind !== 'barrel') drawBotShip(painter, pose, w.kind, w.guns, time, 0, sink);
+            else drawBotShip(painter, pose, w.kind, w.guns, time, 0, sink);
           },
         };
       });

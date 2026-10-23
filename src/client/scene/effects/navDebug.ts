@@ -1,4 +1,4 @@
-import type { GameState, Ship, Target } from '../../../game';
+import type { GameState, Ship } from '../../../game';
 import type { Vec3 } from '../../render/Camera3D';
 import type { Painter3D } from '../../render/Painter3D';
 
@@ -27,8 +27,7 @@ export function drawRoute(p: Painter3D, ship: Ship) {
 
 /** What collides: every hull's capsule (its two end circles and sides) and every island's coastline */
 export function drawHulls(p: Painter3D, state: GameState) {
-  const bodies: (Ship | Target)[] = [...state.ships, ...state.targets];
-  for (const body of bodies) {
+  for (const body of state.ships) {
     const { hull } = body;
     if (!p.isVisible(body.x, body.y, 0, Math.max(hull.bow, -hull.stern) + hull.halfBeam)) continue;
     const cos = Math.cos(body.heading);

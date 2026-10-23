@@ -1,5 +1,5 @@
 import { clamp } from '../lib/math';
-import { signedDistanceToPolygon, type Point } from '../lib/geometry';
+import type { Point } from '../lib/geometry';
 import { WORLD_HEIGHT, WORLD_WIDTH, type WorldData } from '../world/World';
 
 const CELL = 16; // world units per grid cell
@@ -51,19 +51,73 @@ export class NavGrid {
         this.clearance[row * this.cols + col] = Math.min(x, WORLD_WIDTH - x, y, WORLD_HEIGHT - y, CLEARANCE_CAP);
       }
     }
-    // Only cells near an island need the exact distance to its coast
-    for (const island of world.islands) {
-      const reach = island.reach + CLEARANCE_CAP;
-      const col0 = Math.max(0, Math.floor((island.x - reach) / CELL));
-      const col1 = Math.min(this.cols - 1, Math.floor((island.x + reach) / CELL));
-      const row0 = Math.max(0, Math.floor((island.y - reach) / CELL));
-      const row1 = Math.min(this.rows - 1, Math.floor((island.y + reach) / CELL));
-      for (let row = row0; row <= row1; row++) {
-        for (let col = col0; col <= col1; col++) {
-          const i = row * this.cols + col;
-          const d = signedDistanceToPolygon((col + 0.5) * CELL, (row + 0.5) * CELL, island.coast);
-          if (d < this.clearance[i]) this.clearance[i] = d;
+    for (const island of world.islands) this.addIsland(island.coast, island.x, island.y, island.reach);
+  }
+
+  /**
+   * Lowers the clearance of the cells round an island to their distance from its coast, negative on land. Only cells
+   * within CLEARANCE_CAP of a coast edge need it, so each edge measures the cells round it alone; which cells are on
+   * land comes from a scanline fill. Hundreds of islands take a few tens of milliseconds this way, where measuring
+   * every cell against the whole coast took a second
+   */
+  private addIsland(coast: readonly Point[], x: number, y: number, reach: number) {
+    const outer = reach + CLEARANCE_CAP;
+    const col0 = Math.max(0, Math.floor((x - outer) / CELL));
+    const col1 = Math.min(this.cols - 1, Math.floor((x + outer) / CELL));
+    const row0 = Math.max(0, Math.floor((y - outer) / CELL));
+    const row1 = Math.min(this.rows - 1, Math.floor((y + outer) / CELL));
+    const width = col1 - col0 + 1;
+    const height = row1 - row0 + 1;
+    // Squared distance to the nearest coast edge, capped; then which cells lie inside the coast
+    const distance = new Float32Array(width * height).fill(CLEARANCE_CAP * CLEARANCE_CAP);
+    for (let i = 0, j = coast.length - 1; i < coast.length; j = i++) {
+      const a = coast[j];
+      const b = coast[i];
+      const c0 = Math.max(col0, Math.floor((Math.min(a.x, b.x) - CLEARANCE_CAP) / CELL));
+      const c1 = Math.min(col1, Math.floor((Math.max(a.x, b.x) + CLEARANCE_CAP) / CELL));
+      const r0 = Math.max(row0, Math.floor((Math.min(a.y, b.y) - CLEARANCE_CAP) / CELL));
+      const r1 = Math.min(row1, Math.floor((Math.max(a.y, b.y) + CLEARANCE_CAP) / CELL));
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const length2 = dx * dx + dy * dy;
+      for (let row = r0; row <= r1; row++) {
+        const py = (row + 0.5) * CELL;
+        for (let col = c0; col <= c1; col++) {
+          const px = (col + 0.5) * CELL;
+          const t = length2 > 0 ? clamp(((px - a.x) * dx + (py - a.y) * dy) / length2, 0, 1) : 0;
+          const ex = a.x + dx * t - px;
+          const ey = a.y + dy * t - py;
+          const k = (row - row0) * width + (col - col0);
+          distance[k] = Math.min(distance[k], ex * ex + ey * ey);
         }
+      }
+    }
+    for (let k = 0; k < distance.length; k++) distance[k] = Math.sqrt(distance[k]);
+    const crossings: number[] = [];
+    for (let row = row0; row <= row1; row++) {
+      const py = (row + 0.5) * CELL;
+      crossings.length = 0;
+      for (let i = 0, j = coast.length - 1; i < coast.length; j = i++) {
+        const a = coast[j];
+        const b = coast[i];
+        if (a.y > py !== b.y > py) crossings.push(a.x + ((py - a.y) * (b.x - a.x)) / (b.y - a.y));
+      }
+      crossings.sort((p, q) => p - q);
+      for (let k = 0; k + 1 < crossings.length; k += 2) {
+        // Cells whose centres lie between an entry and an exit
+        const first = Math.max(col0, Math.ceil(crossings[k] / CELL - 0.5));
+        const last = Math.min(col1, Math.floor(crossings[k + 1] / CELL - 0.5));
+        for (let col = first; col <= last; col++) {
+          const k2 = (row - row0) * width + (col - col0);
+          distance[k2] = -distance[k2];
+        }
+      }
+    }
+    for (let row = row0; row <= row1; row++) {
+      for (let col = col0; col <= col1; col++) {
+        const i = row * this.cols + col;
+        const d = distance[(row - row0) * width + (col - col0)];
+        if (d < this.clearance[i]) this.clearance[i] = d;
       }
     }
   }

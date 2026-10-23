@@ -1,11 +1,10 @@
 import { Container, Text, type TextStyleOptions } from 'pixi.js';
 import { WEAPONS, WEAPON_IDS, type GameState, type WeaponId } from '../../game';
 import type { SoundSettings } from '../audio/Sounds';
+import type { GpuInfo } from '../render/gpu';
 import { CAMERA_MODES, type CameraMode } from '../scene/cameraControl';
 import { FOG_LAYERS, type FogLayer } from '../scene/effects/fogOfWar';
 import { NAV_DEBUG, type NavDebug } from '../scene/effects/navDebug';
-import { SEA_STYLES } from '../scene/effects/seaStyles';
-import { ISLAND_LOOKS } from '../scene/models/IslandSprites';
 import { ButtonRow } from './ButtonRow';
 import { Checkbox } from './Checkbox';
 import { DamagePanel, type DamageActions } from './DamagePanel';
@@ -30,9 +29,13 @@ const CAMERA_LABELS: Readonly<Record<CameraMode, string>> = {
 const FOG_LABELS: Readonly<Record<FogLayer, string>> = { mist: 'Mist', clouds: 'Clouds' };
 const DEBUG_LABELS: Readonly<Record<NavDebug, string>> = { route: 'Route', hulls: 'Hulls and coasts' };
 const HELP_WIDTH = 360; // pixels: the help wraps, so the column leaves room for the frames at the top
+const DEBUG_GOLD = 500; // gold the debug button gives
 const KNOT = 10; // world units per second: the HUD shows speed in knots, a tenth of the game's units
 const VIEW_STEP = 50; // world units, for the view range buttons
 const VALUE_GAP = 10; // pixels between a row's buttons and what comes after them
+const WARNING_COLOR = 0xffb347;
+const SOFTWARE_WARNING =
+  "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings";
 
 export interface HudActions extends DamageActions, LoadoutActions {
   /** Stops firing at the target */
@@ -51,10 +54,6 @@ export interface HudActions extends DamageActions, LoadoutActions {
   toggleZone: () => void;
   /** Shows or hides a part of the fog of war; the ship sees as far either way */
   toggleFog: (layer: FogLayer) => void;
-  /** Picks the look of the sea: an index in SEA_STYLES */
-  setSeaStyle: (index: number) => void;
-  /** Picks the look of the islands: 0 low-poly, 1… a textured one of ISLAND_LOOKS */
-  setIslandLook: (index: number) => void;
   /** Shows or hides a debug drawing of the navigation */
   toggleDebug: (kind: NavDebug) => void;
   /** Turns all sound on or off */
@@ -66,6 +65,10 @@ export interface HudActions extends DamageActions, LoadoutActions {
   changeMinSpeed: (delta: number) => void;
   /** Changes how far the ship sees (the fog of war's edge), world units. Tuning now, an upgrade later */
   changeViewRange: (delta: number) => void;
+  /** Gold for testing the shop */
+  addGold: (amount: number) => void;
+  /** Forgets everything kept in this browser and starts again */
+  newGame: () => void;
 }
 
 /** What the HUD shows of the view (not the game): set by SceneView */
@@ -77,10 +80,10 @@ export interface ViewStatus {
   /** The camera's zone on the screen, pixels; null when the camera mode has none */
   zoneBox: { x: number; y: number; width: number; height: number } | null;
   fog: Readonly<Record<FogLayer, boolean>>;
-  seaStyle: number;
-  islandLook: number;
   debug: Readonly<Record<NavDebug, boolean>>;
   sound: SoundSettings;
+  /** What draws the picture: the graphics card, or the processor in software */
+  renderer: GpuInfo;
 }
 
 /** Everything a HUD item may show in one frame */
@@ -148,10 +151,25 @@ function stepper(change: (delta: number) => void, step: number, value: (frame: H
   };
 }
 
+/** The frame rate, and under it a warning while the processor draws the game: the usual reason for a low one */
 function fps(): HudWidget {
+  const container = new Container();
   const text = new Text({ text: 'FPS: …', style: TEXT_STYLE });
+  const warning = new Text({
+    text: SOFTWARE_WARNING,
+    style: { ...TEXT_STYLE, fontSize: 13, fill: WARNING_COLOR, wordWrap: true, wordWrapWidth: HELP_WIDTH },
+  });
+  warning.y = text.height;
+  warning.visible = false;
+  container.addChild(text, warning);
   const meter = new FpsMeter(text);
-  return { container: text, update: ({ frameMs }) => meter.update(frameMs) };
+  return {
+    container,
+    update: ({ frameMs, view }) => {
+      meter.update(frameMs);
+      warning.visible = view.renderer.software;
+    },
+  };
 }
 
 /** Everything the HUD can show, in the order it is shown on the screen; the settings panel groups them */
@@ -166,7 +184,7 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       create: metric(
         { ...TEXT_STYLE, fontSize: 13, wordWrap: true, wordWrapWidth: HELP_WIDTH },
         () =>
-          'Click the sea to sail · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop',
+          'Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop',
       ),
     },
     {
@@ -192,6 +210,17 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       }),
     },
     { id: 'fps', group: 'Info', label: 'FPS', kind: 'metric', onScreen: true, create: fps },
+    {
+      id: 'gpu',
+      group: 'Info',
+      label: 'GPU',
+      kind: 'metric',
+      onScreen: false,
+      create: metric(
+        { ...TEXT_STYLE, fontSize: 13, wordWrap: true, wordWrapWidth: HELP_WIDTH },
+        ({ view: { renderer } }) => `GPU: ${renderer.name}${renderer.software ? ' (software)' : ''}`,
+      ),
+    },
     {
       id: 'sound',
       group: 'Sound',
@@ -243,49 +272,6 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
         return control(row, zone.container, ({ view }) => {
           row.setActive(view.cameraMode);
           zone.setChecked(view.zoneShown);
-        });
-      },
-    },
-    {
-      id: 'sea',
-      group: 'World',
-      label: 'Sea',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const row = new ButtonRow(
-          SEA_STYLES.map((_, index) => ({
-            label: `${index + 1}`,
-            key: index,
-            onTap: () => actions.setSeaStyle(index),
-          })),
-        );
-        const name = new Text({ text: ' ', style: LABEL_STYLE });
-        return control(row, name, ({ view }) => {
-          row.setActive(view.seaStyle);
-          show(name, SEA_STYLES[view.seaStyle]?.name ?? '');
-        });
-      },
-    },
-    {
-      id: 'islands',
-      group: 'World',
-      label: 'Islands',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const looks = ['Low poly', ...ISLAND_LOOKS.map((look) => look.name)];
-        const row = new ButtonRow(
-          looks.map((name, index) => ({
-            label: index === 0 ? name : `${index}`,
-            key: index,
-            onTap: () => actions.setIslandLook(index),
-          })),
-        );
-        const name = new Text({ text: ' ', style: LABEL_STYLE });
-        return control(row, name, ({ view }) => {
-          row.setActive(view.islandLook);
-          show(name, view.islandLook > 0 ? (looks[view.islandLook] ?? '') : '');
         });
       },
     },
@@ -371,6 +357,30 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
         VIEW_STEP,
         ({ state }) => `${Math.round(state.ship.viewRange)}, fog beyond`,
       ),
+    },
+    {
+      id: 'gold',
+      group: 'Debug',
+      label: 'Gold',
+      kind: 'control',
+      onScreen: false,
+      create: () => {
+        const text = new Text({ text: ' ', style: LABEL_STYLE });
+        const row = new ButtonRow([{ label: `+${DEBUG_GOLD}`, key: null, onTap: () => actions.addGold(DEBUG_GOLD) }]);
+        return control(row, text, ({ state }) => show(text, `${state.player.gold}, for testing the shop`));
+      },
+    },
+    {
+      id: 'newGame',
+      group: 'Debug',
+      label: 'Progress',
+      kind: 'control',
+      onScreen: false,
+      create: () => {
+        const text = new Text({ text: 'forgets the gold, guns, quests and settings', style: LABEL_STYLE });
+        const row = new ButtonRow([{ label: 'New game', key: null, onTap: actions.newGame }]);
+        return control(row, text, () => {});
+      },
     },
     {
       id: 'navDebug',

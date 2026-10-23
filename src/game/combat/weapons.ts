@@ -1,6 +1,6 @@
 export type WeaponId = 'cannon' | 'harpoon';
 
-/** What a target is: a creature (sea monsters, fish) or an object (ships, forts, barrels). Each weapon is made for one */
+/** What a target is: a creature (sea monsters, fish) or an object (ships, forts). Each weapon is made for one */
 export type TargetNature = 'creature' | 'object';
 
 /**
