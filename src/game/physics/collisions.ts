@@ -2,15 +2,14 @@ import { clamp } from '../lib/math';
 import { closestBetweenSegments, closestOnPolygon, insidePolygon, type Segment } from '../lib/geometry';
 import type { Ship } from '../ships/Ship';
 import { WORLD_HEIGHT, WORLD_WIDTH, type Island } from '../world/World';
-import { bodyAxis, hullMass, hullReach, type Body } from './hull';
+import { bodyAxis, hullMass, hullReach } from './hull';
 
 const PASSES = 3; // rounds of pushing apart: one push can shove a ship into something else
 const SKIN = 0.01; // world units pushed beyond touching, so the next check doesn't find the same contact
 
-/** What a ship can bump into. Islands and bodies (targets) stay put; ships push each other apart by their mass */
+/** What a ship can bump into. Islands stay put; ships push each other apart by their mass */
 export interface Obstacles {
   readonly islands: readonly Island[];
-  readonly bodies: readonly Body[];
   readonly ships: readonly Ship[];
 }
 
@@ -22,9 +21,8 @@ export function collideShip(ship: Ship, obstacles: Obstacles) {
   for (let pass = 0; pass < PASSES; pass++) {
     let touched = false;
     for (const island of obstacles.islands) touched = pushOutOfIsland(ship, island) || touched;
-    for (const body of obstacles.bodies) touched = pushApart(ship, body, null) || touched;
     for (const other of obstacles.ships) {
-      if (other !== ship) touched = pushApart(ship, other, other) || touched;
+      if (other !== ship) touched = pushApart(ship, other) || touched;
     }
     if (!touched) break;
   }
@@ -72,20 +70,16 @@ function pushOutOfIsland(ship: Ship, island: Island) {
   return true;
 }
 
-/** other: the same body as a ship that can be pushed too, or null for one that stays put */
-function pushApart(ship: Ship, body: Body, other: Ship | null) {
-  const reach = hullReach(ship.hull) + hullReach(body.hull);
-  if (Math.abs(ship.x - body.x) > reach || Math.abs(ship.y - body.y) > reach) return false;
-  const { p1, p2 } = closestBetweenSegments(bodyAxis(ship), bodyAxis(body));
+/** Two ships overlapping are pushed apart, each by the other's share of their mass */
+function pushApart(ship: Ship, other: Ship) {
+  const reach = hullReach(ship.hull) + hullReach(other.hull);
+  if (Math.abs(ship.x - other.x) > reach || Math.abs(ship.y - other.y) > reach) return false;
+  const { p1, p2 } = closestBetweenSegments(bodyAxis(ship), bodyAxis(other));
   const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
-  const overlap = ship.hull.halfBeam + body.hull.halfBeam - d;
+  const overlap = ship.hull.halfBeam + other.hull.halfBeam - d;
   if (overlap <= 0) return false;
   // Middle lines crossing: apart along the line between the two positions
-  const [nx, ny] = d > 1e-9 ? [(p1.x - p2.x) / d, (p1.y - p2.y) / d] : away(ship.x, ship.y, body.x, body.y);
-  if (!other) {
-    push(ship, nx, ny, overlap);
-    return true;
-  }
+  const [nx, ny] = d > 1e-9 ? [(p1.x - p2.x) / d, (p1.y - p2.y) / d] : away(ship.x, ship.y, other.x, other.y);
   const mine = hullMass(ship.hull);
   const theirs = hullMass(other.hull);
   push(ship, nx, ny, (overlap * theirs) / (mine + theirs));

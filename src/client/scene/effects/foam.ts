@@ -50,7 +50,7 @@ export function smoothstep(e0: number, e1: number, x: number) {
 
 /**
  * How much a point is open water: 0 on land, rising to 1 COAST_FADE out from the coast. Wakes and the water round a
- * wreck are drawn on the water above the islands' ground pictures, so they fade out with it
+ * wreck lie under the islands' see-through shallows, so they fade out towards the coast instead of showing through
  */
 export function waterShare(x: number, y: number, islands: readonly Island[]) {
   let share = 1;

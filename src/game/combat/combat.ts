@@ -2,9 +2,9 @@ import type { GameState } from '../GameState';
 import { closestOnSegment } from '../lib/geometry';
 import { clamp } from '../lib/math';
 import { bodyAxis } from '../physics/hull';
-import { Ship } from '../ships/Ship';
-import { AMMO, rollVolley, type Bite, type VolleyRoll } from './arsenal';
-import { RESPAWN_TIME } from './targets';
+import type { Ship } from '../ships/Ship';
+import { AMMO, rollVolley, type AmmoId, type Bite, type GunId } from './arsenal';
+import type { QuestId } from '../economy/quests';
 import { findUnit, isAfloat, unitKind, type Unit, type UnitKind } from './units';
 import { WEAPONS, WEAPON_IDS, damageShare, type HoldReason, type WeaponId } from './weapons';
 
@@ -16,6 +16,32 @@ export interface Point3 {
 
 /** What did the damage: a weapon's volley, or a sea monster's jaws */
 export type DamageSource = WeaponId | 'bite';
+
+/** One die of a volley in full: which gun rolled it (null: a monster's jaws), its sides, the face, what it did */
+export interface DieResult {
+  readonly gun: GunId | null;
+  readonly die: number;
+  readonly roll: number;
+  /** Before the weapon's share for the target; 0 for a miss */
+  readonly damage: number;
+}
+
+/**
+ * Who struck and with what, every die of it: rolled when a volley is fired (or a monster bites) and carried to the
+ * damage it does, so the combat log can show how it went even after the attacker is gone
+ */
+export interface Strike {
+  readonly attackerId: number;
+  readonly attackerKind: UnitKind;
+  readonly source: DamageSource;
+  /** The ammo fired; null for a bite */
+  readonly ammo: AmmoId | null;
+  /** Added to every die that hits: the ammo's, or the jaws' own */
+  readonly bonus: number;
+  /** Share of the dice's sum the target takes: 1, or OFF_TARGET_SHARE for a weapon not made for it */
+  readonly share: number;
+  readonly dice: readonly DieResult[];
+}
 
 /**
  * A volley in flight: the guns of one weapon that fired together at one target, as one cannonball or harpoon from the
@@ -43,6 +69,8 @@ export interface Projectile {
   readonly misses: number;
   /** Whether the weapon is made for this target (full damage) or not (OFF_TARGET_SHARE of it) */
   readonly full: boolean;
+  /** How it was rolled, die by die */
+  readonly strike: Strike;
   /** Seconds since it was fired */
   age: number;
 }
@@ -54,6 +82,8 @@ export type GameEvent =
       readonly type: 'shot';
       readonly weapon: WeaponId;
       readonly shooterId: number;
+      /** The ammo it fired, one shot per muzzle */
+      readonly ammo: AmmoId;
       /** Where its projectile starts: the middle of the guns that fired, in world coordinates */
       readonly at: Point3;
       /** The muzzle of every gun that fired */
@@ -84,6 +114,7 @@ export type GameEvent =
       /** A volley or a bite did its damage */
       readonly type: 'damage';
       readonly targetId: number;
+      readonly targetKind: UnitKind;
       readonly attackerId: number;
       readonly source: DamageSource;
       readonly amount: number;
@@ -93,12 +124,17 @@ export type GameEvent =
       readonly misses: number;
       readonly full: boolean;
       readonly at: Point3;
+      /** Every die of it, for the combat log */
+      readonly strike: Strike;
     }
   | {
-      /** A unit's hit points ran out: a target is gone until it respawns, a ship goes down */
+      /** A unit's hit points ran out: it goes down */
       readonly type: 'destroyed';
       readonly targetId: number;
       readonly kind: UnitKind;
+      /** Whose blow it was */
+      readonly attackerId: number;
+      readonly attackerKind: UnitKind;
       readonly at: Point3;
       /** Which way it faced, for the client's wreck */
       readonly heading: number;
@@ -108,6 +144,19 @@ export type GameEvent =
       readonly type: 'repair';
       readonly shipId: number;
       readonly amount: number;
+      readonly at: Point3;
+    }
+  | {
+      /** A player was paid (economy/): a bounty for a kill, a chest hauled aboard, a quest turned in */
+      readonly type: 'gold';
+      /** The player's ship */
+      readonly shipId: number;
+      readonly amount: number;
+      readonly reason: 'bounty' | 'chest' | 'quest';
+      /** What was sunk, for a bounty */
+      readonly kind: UnitKind | null;
+      /** Which quest, for a quest */
+      readonly quest: QuestId | null;
       readonly at: Point3;
     };
 
@@ -145,8 +194,8 @@ export function stepCombat(state: GameState, dt: number, random: () => number) {
     ship.biteReload = Math.max(0, ship.biteReload - dt);
     if (ship.attackTarget === null) continue;
     const target = findUnit(state, ship.attackTarget);
-    // Destroyed, or gone: nothing left to fire at
-    if (!target || !isAfloat(target) || ship.isSinking) {
+    // Destroyed, gone, or in port (out of the fight): nothing left to fire at
+    if (!target || !isAfloat(target) || target.docked || ship.isSinking) {
       ship.ceaseFire();
       continue;
     }
@@ -164,8 +213,8 @@ export function stepCombat(state: GameState, dt: number, random: () => number) {
   for (let i = state.projectiles.length - 1; i >= 0; i--) {
     const p = state.projectiles[i];
     const target = findUnit(state, p.targetId);
-    // Its target was destroyed by another volley first: the shot falls into the sea
-    if (!target || !isAfloat(target)) {
+    // Its target was destroyed by another volley first, or made it into port: the shot falls into the sea
+    if (!target || !isAfloat(target) || target.docked) {
       state.projectiles.splice(i, 1);
       continue;
     }
@@ -182,7 +231,7 @@ export function stepCombat(state: GameState, dt: number, random: () => number) {
       dirY: (p.to.y - p.from.y) / length,
       targetId: target.id,
     });
-    hurt(state, target, p.shooterId, p.weapon, p, p.full, { x: target.x, y: target.y, z: target.height });
+    hurt(state, target, p.strike, p, { x: target.x, y: target.y, z: target.height });
   }
 }
 
@@ -216,6 +265,15 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
     share,
     random,
   );
+  const strike: Strike = {
+    attackerId: ship.id,
+    attackerKind: unitKind(ship),
+    source: weapon.id,
+    ammo: ammo.id,
+    bonus: ammo.bonus,
+    share,
+    dice: firing.map(({ gun }, i) => ({ gun: gun.id, die: gun.die, ...roll.rolls[i] })),
+  };
 
   const cos = Math.cos(ship.rotation);
   const sin = Math.sin(ship.rotation);
@@ -235,7 +293,10 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
   aimAt(to, target);
   const length = Math.hypot(to.x - from.x, to.y - from.y) || 1;
   state.projectiles.push({
-    ...roll,
+    damage: roll.damage,
+    crits: roll.crits,
+    misses: roll.misses,
+    strike,
     weapon: weapon.id,
     shooterId: ship.id,
     from,
@@ -251,6 +312,7 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
     type: 'shot',
     weapon: weapon.id,
     shooterId: ship.id,
+    ammo: ammo.id,
     at: from,
     muzzles,
     dirX: (to.x - from.x) / length,
@@ -258,7 +320,7 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
   });
   // Firing, or being fired at, is combat: no repairs for a while
   ship.enterCombat(state.time);
-  if (target instanceof Ship) target.enterCombat(state.time);
+  target.enterCombat(state.time);
 }
 
 /**
@@ -281,45 +343,58 @@ function bite(state: GameState, monster: Ship, jaws: Bite, target: Unit, random:
   const at = { x: target.x, y: target.y, z: target.height / 2 };
   state.events.push({ type: 'bite', attackerId: monster.id, targetId: target.id, from, at });
   monster.enterCombat(state.time);
-  if (target instanceof Ship) target.enterCombat(state.time);
-  hurt(state, target, monster.id, 'bite', { ...roll, guns: 1 }, true, { ...at, z: target.height });
+  target.enterCombat(state.time);
+  const strike: Strike = {
+    attackerId: monster.id,
+    attackerKind: unitKind(monster),
+    source: 'bite',
+    ammo: null,
+    bonus: jaws.bonus,
+    share: 1,
+    dice: [{ gun: null, die: jaws.die, ...roll.rolls[0] }],
+  };
+  hurt(state, target, strike, { ...roll, guns: 1 }, { ...at, z: target.height });
 }
 
 /**
- * Damage is done: the unit loses hit points, and remembers who hit it (a bot fights back). At 0 a target is destroyed
- * until it respawns, and a ship is wrecked: it goes down (a bot's is then taken out of the game, bots/spawner.ts)
+ * Damage is done: the unit loses hit points, and remembers who hit it (a bot fights back). At 0 it is wrecked: it goes
+ * down (a bot's is then taken out of the game, bots/spawner.ts)
  */
 function hurt(
   state: GameState,
   unit: Unit,
-  attackerId: number,
-  source: DamageSource,
-  roll: VolleyRoll & { readonly guns: number },
-  full: boolean,
+  strike: Strike,
+  roll: { readonly damage: number; readonly guns: number; readonly crits: number; readonly misses: number },
   at: Point3,
 ) {
   const { damage, guns, crits, misses } = roll;
+  const { attackerId, attackerKind, source } = strike;
   const afloat = isAfloat(unit);
-  if (unit instanceof Ship) {
-    unit.takeDamage(damage);
-    unit.lastHitBy = attackerId;
-    unit.enterCombat(state.time);
-  } else {
-    unit.hp = Math.max(0, unit.hp - damage);
-    if (unit.hp === 0) unit.respawnAt = state.time + RESPAWN_TIME;
-  }
+  unit.takeDamage(damage);
+  unit.lastHitBy = attackerId;
+  unit.enterCombat(state.time);
   state.events.push({
     type: 'damage',
     targetId: unit.id,
+    targetKind: unitKind(unit),
     attackerId,
     source,
     amount: damage,
     guns,
     crits,
     misses,
-    full,
+    full: strike.share === 1,
     at,
+    strike,
   });
   if (!afloat || isAfloat(unit)) return;
-  state.events.push({ type: 'destroyed', targetId: unit.id, kind: unitKind(unit), at, heading: unit.heading });
+  state.events.push({
+    type: 'destroyed',
+    targetId: unit.id,
+    kind: unitKind(unit),
+    attackerId,
+    attackerKind,
+    at,
+    heading: unit.heading,
+  });
 }

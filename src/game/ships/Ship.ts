@@ -24,7 +24,7 @@ const MAX_VIEW_RANGE = 2000;
  * a bot's decisions by bots/brain.ts
  */
 export class Ship implements Body {
-  /** Unique among the ships and targets of the game: what attacks and events refer to */
+  /** Unique among the ships of the game: what attacks and events refer to */
   readonly id: number;
   readonly shipClass: ShipClass;
   readonly nature: TargetNature;
@@ -85,6 +85,10 @@ export class Ship implements Body {
   repairClock = 0;
   /** Game time it was wrecked; null while afloat. A player's ship comes back some time after (Game) */
   wreckedAt: number | null = null;
+  /** In port (world/port.ts): stopped by the pier, out of the fight, its player in the port's menus */
+  docked = false;
+  /** False from leaving port till it has sailed out of the harbour: it doesn't dock again at once */
+  mayDock = true;
   /** How a bot thinks; null for a player's ship */
   bot: BotMind | null = null;
 
@@ -218,7 +222,7 @@ export class Ship implements Body {
 
   /** Fire at a target with the selected weapon, every time a gun is loaded, until ceaseFire or the target is gone */
   attack(targetId: number) {
-    if (this.isSinking || targetId === this.id) return;
+    if (this.isSinking || this.docked || targetId === this.id) return;
     this.attackTarget = targetId;
   }
 
@@ -264,7 +268,7 @@ export class Ship implements Body {
 
   /** Sends the ship somewhere; the pilot finds the way round islands and other ships */
   setTarget(x: number, y: number) {
-    if (this.isSinking) return;
+    if (this.isSinking || this.docked) return;
     const reach = hullReach(this.hull);
     this.target = { x: clamp(x, reach, WORLD_WIDTH - reach), y: clamp(y, reach, WORLD_HEIGHT - reach) };
   }
@@ -273,6 +277,20 @@ export class Ship implements Body {
   clearTarget() {
     this.target = null;
     this.route = [];
+  }
+
+  /** Comes into port: it stops where it is and stops firing (world/port.ts decides when) */
+  dock() {
+    this.docked = true;
+    this.clearTarget();
+    this.ceaseFire();
+    this.speed = 0;
+  }
+
+  /** Leaves port; it may not dock again till it has sailed out of the harbour */
+  undock() {
+    this.docked = false;
+    this.mayDock = false;
   }
 
   /** Back afloat, whole, at (x, y): a wrecked player's ship comes back. Guns and ammo are kept */
@@ -289,6 +307,8 @@ export class Ship implements Body {
     this.repairing = false;
     this.lastHitBy = null;
     this.wreckedAt = null;
+    this.docked = false;
+    this.mayDock = true;
   }
 
   /** Turns towards the helm's heading no faster than turnSpeed, speeds up or slows down towards its speed, and moves */

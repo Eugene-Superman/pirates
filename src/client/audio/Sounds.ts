@@ -1,4 +1,5 @@
 import type { GameEvent, Ship } from '../../game';
+import type { Slot } from '../storage/Store';
 
 // Shot sounds, made from free recordings (CC0) by blender-assets/sounds/build_sounds.py; sources in CREDITS.md there
 const SOUNDS_URL = `${import.meta.env.BASE_URL}sounds`;
@@ -19,8 +20,6 @@ const LAYER_GAIN = 0.55;
 const HEARING = { near: 300, far: 1000 } as const;
 const VOLUME_STEP = 0.1;
 const DEFAULTS: SoundSettings = { enabled: true, volume: 0.7 };
-// The player's choice, kept between visits. Only a convenience: without storage the defaults apply
-const STORAGE_KEY = 'pirate-game.sound';
 
 export interface SoundSettings {
   readonly enabled: boolean;
@@ -28,27 +27,15 @@ export interface SoundSettings {
   readonly volume: number;
 }
 
-function loadSettings(): SoundSettings {
-  try {
-    const saved: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (typeof saved === 'object' && saved !== null && 'enabled' in saved && 'volume' in saved) {
-      const { enabled, volume } = saved;
-      if (typeof enabled === 'boolean' && typeof volume === 'number') {
-        return { enabled, volume: Math.min(Math.max(volume, 0), 1) };
-      }
+/** The player's choice as kept between visits; the defaults when there is none, or it is broken */
+function readSettings(saved: unknown): SoundSettings {
+  if (typeof saved === 'object' && saved !== null && 'enabled' in saved && 'volume' in saved) {
+    const { enabled, volume } = saved;
+    if (typeof enabled === 'boolean' && typeof volume === 'number' && Number.isFinite(volume)) {
+      return { enabled, volume: Math.min(Math.max(volume, 0), 1) };
     }
-  } catch {
-    // Storage blocked or broken: the defaults
   }
   return DEFAULTS;
-}
-
-function saveSettings(settings: SoundSettings) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // Not kept for the next visit, that's all
-  }
 }
 
 /**
@@ -60,9 +47,13 @@ export class Sounds {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
   private readonly buffers = new Map<SoundName, AudioBuffer>();
-  private current = loadSettings();
+  private current: SoundSettings;
+  /** Where the player's choice is kept between visits */
+  private readonly kept: Slot;
 
-  constructor() {
+  constructor(kept: Slot) {
+    this.kept = kept;
+    this.current = readSettings(kept.get());
     const unlock = () => {
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('keydown', unlock);
@@ -106,7 +97,7 @@ export class Sounds {
 
   private apply(settings: SoundSettings) {
     this.current = settings;
-    saveSettings(settings);
+    this.kept.set(settings);
     if (this.master) this.master.gain.value = settings.enabled ? settings.volume : 0;
   }
 

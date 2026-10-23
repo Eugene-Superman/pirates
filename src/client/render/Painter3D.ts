@@ -158,6 +158,18 @@ export function shadowPoint(p: Vec3, groundZ = 0): Vec3 {
   return [p[0] - (LIGHT[0] / LIGHT[2]) * h, p[1] - (LIGHT[1] / LIGHT[2]) * h, groundZ];
 }
 
+/** A box's outline at height z: its four corners round (x, y), `along` by `across`, turned by `angle` (radians) */
+export function footprint(x: number, y: number, z: number, along: number, across: number, angle: number): Vec3[] {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [
+    [-along / 2, -across / 2],
+    [along / 2, -across / 2],
+    [along / 2, across / 2],
+    [-along / 2, across / 2],
+  ].map(([u, v]): Vec3 => [x + u * c - v * s, y + u * s + v * c, z]);
+}
+
 /** The color t of the way from a to b, t from 0 to 1 */
 export function mixColor(a: number, b: number, t: number) {
   const k = Math.min(Math.max(t, 0), 1);

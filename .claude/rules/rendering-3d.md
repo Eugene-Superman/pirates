@@ -8,18 +8,25 @@ paths:
 ## Folders
 
 - `render/` — the 3D engine (`Camera3D`, `Painter3D`). It knows nothing about ships or islands: no imports from `game/` or `scene/`.
+  `gpu.ts` asks, before the `Application` is made, whether the processor draws the game in software: then `main.ts`
+  turns smoothing off and lowers the resolution, and the HUD warns under the FPS.
 - `scene/models/` — how game objects look: `draw*(painter, object, time)` functions that only read game data.
-  `ShipSprite` and `IslandSprites` are the exceptions: Pixi `Sprite`s from pictures rendered in Blender (see "Ship sprite" below).
-  Only the player's ship has a sprite; the bots' ships (`botShip3d.ts`, a look per class) and the sea monsters
-  (`serpent3d.ts`, `turtle3d.ts`) are vector models.
-- `scene/effects/` — client-only decorations with their own state (foam, waves, target marker, ship fire and smoke,
+  `ShipSprite` is the exception: a Pixi `Sprite` from pictures rendered in Blender (see "Ship sprite" below).
+  Only the player's ship has a sprite; the bots' ships (`botShip3d.ts`, a look per class), the sea monsters
+  (`serpent3d.ts`, `turtle3d.ts`), the islands, the port (`port3d.ts`) and chests (`chest3d.ts`) are vector models.
+- `scene/effects/` — client-only decorations with their own state (foam, target marker, ship fire and smoke,
   the sinking animation, shot effects, the sea surface, the fog of war, bots' wrecks, serpents' trails, the repair).
   They may use `Math.random`.
 - `scene/cameraControl.ts` — how the camera keeps up with the ship (follow / dead zone / recenter), switched in the HUD.
 - `hud/` — screen-space Pixi `Text`/`Container`, not projected; `ui.ts` holds the shared colors, `Tile` (a clickable
   rectangle) and `show`/`tint` (change a `Text` only when the value changes). `input/` — turns pointer and key events
   into game method calls; the unit picked out with a click (`selection.ts`) is client state, which the game only hears
-  of when the player attacks it.
+  of when the player attacks it. The HUD windows that Escape closes (the loadout, the sea chart, the port) listen on
+  `window` in the order the HUD makes them, all before `keyboardInput` is bound; each calls `preventDefault` when it
+  acted, so Escape reaches the ship only when no window was open.
+- `storage/Store.ts` — the browser's memory until there is a server: the progress (`game.save()`), the settings and
+  the combat log, by key. IndexedDB, else localStorage, else memory alone; read once at the start, written a moment
+  after a change and at once when the page is hidden. A part that keeps one thing gets a `Slot`.
 - Game logic is imported only from `game/index.ts` (`'../../game'`); Oxlint rejects deep imports into `game/`.
 
 ## How it works
@@ -27,8 +34,8 @@ paths:
 - **`SceneView`** is the only scene: classic 2:1 isometric (parallel projection, pitch 30°, yaw 45°).
 - Immediate mode: `scene.clear()` and a full redraw every frame via `Painter3D`.
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
-  The exceptions are things projected elsewhere: the ship sprite and its water mask, the island pictures (`IslandSprites`)
-  and fog puffs (`FogClouds`), all rendered in Blender for this camera; the four shader meshes (`seaSurface.ts`,
+  The exceptions are things projected elsewhere: the ship sprite and its water mask and the fog puffs (`FogClouds`),
+  both rendered in Blender for this camera; the four shader meshes (`seaSurface.ts`,
   `fogOfWar.ts`, `Wake.ts`, the water round a wreck in `Sinking.ts`), whose vertices are projected with `Camera3D`
   every frame; and what stays the same size at every zoom, drawn in screen pixels at a projected point: the units'
   hit point bars (`SceneView.drawHpBars`) and the damage numbers (`DamageNumbers`).
@@ -54,31 +61,28 @@ paths:
 
 There is no z-buffer, so order is everything. In `SceneView.update`:
 
-1. Background: the renderer clears the screen to the sea style's flat `color` (`SceneView.setSeaStyle`); the sea surface
-   mesh covers it once its maps have loaded (the Classic style has no surface).
-2. Everything flat on the water (`z = 0`): wave strokes (only styles with `arcs`, in their own `sea` layer) → wakes and
-   the water round a wreck (shader meshes in layers of their own, over the island ground pictures) → island "ground"
-   (shallows, sand, cliff shadows; low-poly look) → world border → range rings (each weapon's longest reach) → units'
-   water (the barrel's foam, a serpent's body under the surface, a turtle's) → bubbles over bots' wrecks → repair rings
-   → the target lock ring, then the selection ring → shot ripples → projectile shadows → target marker.
+1. Background: the renderer clears the screen to the sea's flat `SEA_COLOR` (`seaLook.ts`); the sea surface mesh
+   covers it once both its wave maps have loaded.
+2. Everything flat on the water (`z = 0`): wakes and the water round a wreck (shader meshes in layers of their own,
+   under the islands' see-through shallows) → island "ground" (shallows, sand, cliff shadows) → world border → range
+   rings (each weapon's longest reach) → units' water (a serpent's body under the surface, a turtle's) → bubbles over
+   bots' wrecks → chests' foam rings → repair rings → the target lock ring, then the selection ring → shot ripples →
+   projectile shadows → target marker.
    There is no drawn ship shadow: it is baked into the sprite.
-3. Volumetric objects (low-poly islands, targets, bots' ships and monsters, bots' wrecks going down, projectiles) —
-   sorted by `painter.depth(...)` **from far to near**.
-   The ship sprite goes between them by `shipDepth`, a point `ship.radius` above the water. A textured island's raised
-   picture goes to the far or near island layer by `SceneView.islandInFront`.
+3. Volumetric objects (islands' hills and palms, bots' ships and monsters, bots' wrecks going down, chests, the port's
+   pier, houses and flag (`portPieces`), projectiles) — sorted by `painter.depth(...)` **from far to near**.
+   The ship sprite goes between them by `shipDepth`, a point `ship.radius` above the water.
 4. Parts within an object are also sorted by depth (island hill and palms).
 
 Add a new volumetric object to the `objects` array with `depth` and `draw(painter)`; don't draw it separately after sorting.
 
 A sprite can't go inside a `Graphics`, so the scene is layers in `container`, bottom to top:
-sea surface mesh → `sea` (wave strokes) → fog of war mesh (haze and mist) → fog puffs → island ground pictures →
-wake mesh → wreck water mesh → `scene` (flat things and objects farther than the ship) → far island pictures → ship
-sprite → its `waterMask` → `fireLayer` (flames, then smoke, then shot effects nearer than the ship, then the repair's
-crosses) → near island pictures → `front` (objects nearer than the ship, drawn with `frontPainter`; the navigation
-debug drawings last) → `hpBars` (the units' hit point bars, with a red border on a bot hostile to the player) → the
-damage numbers, over everything.
+sea surface mesh → fog of war mesh (haze and mist) → fog puffs → wake mesh → wreck water mesh → `scene` (flat things
+and objects farther than the ship) → ship sprite → its `waterMask` → `fireLayer` (flames, then smoke, then shot effects
+nearer than the ship, then the repair's crosses) → `front` (objects nearer than the ship, drawn with `frontPainter`;
+the navigation debug drawings last) → `hpBars` (the units' hit point bars, with a red border on a bot hostile to the
+player) → the damage numbers, over everything.
 The fog lies under the islands, so islands stay clear of it; units inside the fog are not drawn at all.
-Known limit: an object in `scene` stays under the far island pictures even where it is nearer than the island.
 `draw` receives the painter of its layer — draw with it, not with `this.painter`. Nothing is drawn for the ship until its
 `intact` atlas has loaded.
 
@@ -122,25 +126,22 @@ Known limit: an object in `scene` stays under the far island pictures even where
 - `line`, `curve`, `disc`, `ring` — width and radius are in world units.
 - `ball` — a circle around a projected point that looks the same from any side (smoke puff, flame); radius in world units.
 - Shadows: `shadowPoint(p, groundZ)` projects a point along `LIGHT` onto a plane; draw the shadow as a black `polygon` with `SHADOW_ALPHA`.
+- Boxes: `footprint(x, y, z, along, across, angle)` gives a turned rectangle's corners at height `z`, for `sides` and `top`.
 - Color: `shade(color, k)` changes brightness. The sun (`LIGHT`) shines from the west, from high above.
 
 ## Wakes (`effects/Wake.ts`, `effects/foam.ts`)
 
 - Owned and updated by `SceneView` (it is view state, not game state), before drawing. Everything that sails near
-  enough to be seen soon (the player's ship, other ships within its view range plus `NEAR_MARGIN`, targets afloat) is
+  enough to be seen soon (the player's ship, other ships within its view range plus `NEAR_MARGIN`) is
   a `Body` with a trail: a fixed ring of `TRAIL_POINTS` points where it has been. A body missing from the list passed
   to `update` is gone (or too far), and its wake fades where it was.
 - Drawn as ribbons of one mesh with its own shader: the wash behind the stern, and two bow waves running off at the
   Kelvin angle. The ribbons are rebuilt every frame by writing straight into typed arrays, with no objects per point,
   and only the part filled goes to the GPU. Widths are in the hull's half beam, so a wake fits every hull.
-- Wakes fade out into the fog beyond the ship's view range, and at the coasts (`waterShare`).
+- Wakes fade out into the fog beyond the ship's view range, and at the coasts (`waterShare`, given only the islands
+  on the screen: it is worked out per point).
 - `foam.ts` holds what the wake and the wreck's water share: the foam texture (`loadFoam`), its colors, the shader
   functions `fresnel`, `over` and `dissolve` (`FOAM_GLSL`), and `waterShare`.
-
-## Waves (`effects/waves.ts`)
-
-- 1200 waves generated once with `createRandom(1)`, so they are identical on every run. Culled with `isVisible` every frame.
-  Drawn only for sea styles with `arcs`, in that style's color.
 
 ## Sea and fog shaders (`effects/seaSurface.ts`, `effects/fogOfWar.ts`)
 
@@ -148,7 +149,7 @@ Known limit: an object in `scene` stays under the far island pictures even where
   position and their spot on the water, so the textures stay fixed to the water whatever the camera does.
 - Texture origins are moved by whole tiles to near the camera (sea) or the ship (fog): far from 0 a float can't tell
   the texture's pixels apart.
-- Sea looks are data in `seaStyles.ts`. The fog starts at `ship.viewRange`; hiding its layers in the HUD changes only
+- The sea's look is one set of numbers, `SEA_LOOK` in `seaLook.ts`, over two wave maps (`swell`, `ripples`). The fog starts at `ship.viewRange`; hiding its layers in the HUD changes only
   the picture, never what the ship can see or shoot (`ship.canSee` in the game).
 
 ## Shot effects (`effects/ShotEffects.ts`)
@@ -160,7 +161,8 @@ Known limit: an object in `scene` stays under the far island pictures even where
   going down is `Sinking`'s, not a splash here.
 - The `damage` and `repair` events are `DamageNumbers`': a number floating up over the unit, styled by how the volley
   or bite went (full, a critical hit, the wrong weapon for the target, a miss), red when the player's own ship is hit,
-  green for a repair step. A fixed pool of `Text` objects reused round-robin.
+  green for a repair step, gold for gold paid (a bounty over the wreck, a chest or a quest over the ship). A fixed
+  pool of `Text` objects reused round-robin.
 
 ## Bots, wrecks and the repair (`effects/Wrecks.ts`, `effects/Trails.ts`, `effects/RepairEffect.ts`)
 
@@ -176,6 +178,6 @@ Known limit: an object in `scene` stays under the far island pictures even where
 ## Performance
 
 - The HUD shows FPS and the longest frame over the last half second — use it after rendering changes.
-- Cull invisible things with `painter.isVisible(x, y, z, radius)` before drawing (as done for waves and islands).
+- Cull invisible things with `painter.isVisible(x, y, z, radius)` before drawing (as done for islands, chests and the port).
 - Shape count per frame is the main cost: don't raise model detail (coastline segments), particle pools and spawn rates
   (`ShipFire`, `ShotEffects`) or the wake's trail length (`Wake`) without need.

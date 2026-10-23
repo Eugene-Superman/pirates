@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
-import { WEAPONS, WRECK_TIME, findUnit, isHostile, isShip, type GameState, type Unit } from '../../game';
+import { WEAPONS, WRECK_TIME, findUnit, isHostile, type GameState } from '../../game';
 import type { Selection } from '../input/selection';
 import { Tile, UI, show, text, tint } from './ui';
 
@@ -62,11 +62,6 @@ class Frame {
   }
 }
 
-/** What a unit is called on the screen */
-function unitName(unit: Unit) {
-  return isShip(unit) ? unit.shipClass.name : 'Practice barrel';
-}
-
 /**
  * Two frames at the top of the screen: the player's ship (hull, and whether it is repairing, in combat or sunk) and
  * the unit they picked out with a click (its hull, whether it attacks them, what hurts it, and a button to fire at it)
@@ -107,6 +102,9 @@ export class UnitFrames {
       const back = Math.max(0, Math.ceil(WRECK_TIME - (time - (ship.wreckedAt ?? time))));
       status = `Sunk: back at the harbour in ${back} s`;
       statusColor = UI.bad;
+    } else if (ship.docked) {
+      status = 'In port';
+      statusColor = UI.active;
     } else if (ship.repairing) {
       status = 'Repairing';
       statusColor = UI.heal;
@@ -119,18 +117,19 @@ export class UnitFrames {
     const unit = selection.id === null ? undefined : findUnit(state, selection.id);
     this.target.container.visible = unit !== undefined;
     if (!unit) return;
-    let tag = 'Practice';
+    // Another player's ship: no bot's temper to show
+    let tag = 'Player';
     let tagColor: number = UI.dim;
     let border: number = UI.border;
-    if (isShip(unit) && unit.bot) {
+    if (unit.bot) {
       const hostile = isHostile(unit, ship.id);
       tag = unit.bot.foe === ship.id ? 'Attacking you' : hostile ? 'Aggressive' : 'Neutral';
       tagColor = hostile ? UI.hostile : UI.good;
       border = hostile ? UI.hostile : UI.border;
     }
-    this.target.set(unitName(unit), tag, tagColor, unit.hp, unit.maxHp, border);
+    this.target.set(unit.shipClass.name, tag, tagColor, unit.hp, unit.maxHp, border);
     const best = unit.nature === 'creature' ? WEAPONS.harpoon : WEAPONS.cannon;
-    const what = unit.nature === 'creature' ? 'Creature' : isShip(unit) ? 'Ship' : 'Object';
+    const what = unit.nature === 'creature' ? 'Creature' : 'Ship';
     show(this.target.note, `${what}: ${best.name.toLowerCase()} do full damage`);
     this.fire.setLook({ pressed: ship.attackTarget === unit.id });
     show(this.fireLabel, ship.attackTarget === unit.id ? 'Cease fire  (Esc)' : 'Fire  (Space)');

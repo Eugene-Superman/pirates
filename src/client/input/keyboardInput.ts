@@ -4,11 +4,15 @@ import type { Selection } from './selection';
 export interface KeyboardActions {
   /** Opens or closes the loadout window */
   toggleLoadout: () => void;
+  /** Opens or closes the combat log */
+  toggleLog: () => void;
+  /** Opens or closes the sea chart */
+  toggleMap: () => void;
 }
 
 // Keys, by their place on the keyboard (`code`), so they work in any layout, Ukrainian too:
 // Space fires at the unit picked out; Escape stops firing, or if the ship isn't firing lets go of the unit picked out
-// (unless it closed a window first); R starts the repair; L opens the loadout
+// (unless it closed a window first); R starts the repair; L opens the loadout; J opens the combat log; M the sea chart
 export function bindKeyboardInput(ship: Ship, selection: Selection, actions: KeyboardActions) {
   window.addEventListener('keydown', (e) => {
     if (e.defaultPrevented) return;
@@ -29,6 +33,12 @@ export function bindKeyboardInput(ship: Ship, selection: Selection, actions: Key
         break;
       case 'KeyL':
         actions.toggleLoadout();
+        break;
+      case 'KeyJ':
+        actions.toggleLog();
+        break;
+      case 'KeyM':
+        actions.toggleMap();
         break;
     }
   });

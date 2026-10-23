@@ -56,7 +56,7 @@ Report only real problems in the changed code. Keep it proportionate: no micro-o
 
 The hot path is everything that runs every frame: the `app.ticker` callback, `update(dt)` of `Game`, `SceneView` and effects, model and effect `draw*` functions, `Painter3D` methods.
 
-- Allocations inside large per-frame loops (there are 1200 waves): new arrays, objects or closures per item, `filter`/`map` chains on big arrays.
+- Allocations inside large per-frame loops (every ship at sea: about 145 on the 8 × 8 map): new arrays, objects or closures per item, `filter`/`map` chains on big arrays.
 - O(n²) loops, sorting more than needed, work that could be done once in a constructor or cached.
 - Drawing invisible things: big loops must cull with `painter.isVisible` first.
 - Shape count: model detail (coastline segments) or particle pools and spawn rates (`ShipFire`, `Wake`) raised without need.

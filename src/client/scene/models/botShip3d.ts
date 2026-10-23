@@ -91,7 +91,7 @@ export function botShipTop(classId: ShipClassId) {
 
 /**
  * A bot's ship: a hull with a painted stripe, a mast with its sail and flag, its guns run out over the rail and what
- * it carries on deck. Vector-drawn like the barrel, from its class's look. shake: 1 right after a hit, then 0; sink:
+ * it carries on deck. Vector-drawn from its class's look. shake: 1 right after a hit, then 0; sink:
  * world units a wreck has gone down (0 afloat): what is under the water is pressed flat onto it, then not drawn
  */
 export function drawBotShip(

@@ -1,9 +1,10 @@
 import { SHIP_CLASSES, projectilePosition, type GameEvent, type GameState, type WeaponId } from '../../../game';
 import type { Vec3 } from '../../render/Camera3D';
 import { mixColor, type Painter3D } from '../../render/Painter3D';
-import { SHAKE_TIME } from '../models/barrel3d';
 import { shipBob } from '../models/ShipSprite';
 import { WIND_X, WIND_Y } from './wind';
+
+const SHAKE_TIME = 0.8; // seconds a unit rocks after a hit (shake), dying out
 
 interface Particle {
   x: number;
@@ -211,12 +212,12 @@ export class ShotEffects {
 
   private start(event: GameEvent, state: GameState) {
     const { time } = state;
-    // The damage and repair numbers are DamageNumbers'
-    if (event.type === 'damage' || event.type === 'repair') return;
+    // The damage, repair and gold numbers are DamageNumbers'
+    if (event.type === 'damage' || event.type === 'repair' || event.type === 'gold') return;
     if (event.type === 'destroyed') {
       // The player's own ship has its sinking animation instead
       if (event.targetId === state.ship.id) return;
-      const creature = event.kind !== 'barrel' && SHIP_CLASSES[event.kind].nature === 'creature';
+      const creature = SHIP_CLASSES[event.kind].nature === 'creature';
       this.destroyed(event.at.x, event.at.y, creature);
       return;
     }

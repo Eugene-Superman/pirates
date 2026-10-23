@@ -214,6 +214,13 @@ export function averageDamage(die: DamageDie, bonus: number) {
   return sum / die.die;
 }
 
+/** One die of a volley: the face it came up on, and what that did before the weapon's share for the target */
+export interface DieRoll {
+  readonly roll: number;
+  /** 0 for a miss */
+  readonly damage: number;
+}
+
 /** A volley's damage, decided when it is fired and done when it lands */
 export interface VolleyRoll {
   /** Hit points it takes away: every die's damage, times the weapon's share for the target, rounded */
@@ -221,22 +228,27 @@ export interface VolleyRoll {
   /** How many dice rolled a critical hit and how many a miss */
   readonly crits: number;
   readonly misses: number;
+  /** Every die, in the order given: for the combat log */
+  readonly rolls: readonly DieRoll[];
 }
 
 /**
  * Rolls every die (a gun that fires, or a monster's jaws), adds them up with the bonus and scales the sum by `share`:
- * what this weapon does to this kind of target. One random number per die and no allocation but the result, so a
- * broadside of fifty guns of mixed kinds costs next to nothing
+ * what this weapon does to this kind of target. One random number and one small record per die, so a broadside of
+ * fifty guns of mixed kinds costs next to nothing
  */
 export function rollVolley(dice: readonly DamageDie[], bonus: number, share: number, random: () => number): VolleyRoll {
   let sum = 0;
   let crits = 0;
   let misses = 0;
+  const rolls: DieRoll[] = [];
   for (const die of dice) {
     const roll = 1 + Math.floor(random() * die.die);
     if (roll <= die.missOn) misses++;
     else if (roll >= die.critFrom) crits++;
-    sum += rollDamage(roll, die, bonus);
+    const damage = rollDamage(roll, die, bonus);
+    sum += damage;
+    rolls.push({ roll, damage });
   }
-  return { damage: Math.round(sum * share), crits, misses };
+  return { damage: Math.round(sum * share), crits, misses, rolls };
 }

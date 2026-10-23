@@ -25,10 +25,13 @@ const STYLES = {
   hurt: new TextStyle({ ...BASE, fontSize: 20, fill: 0xff5a4a, stroke: { color: 0x2a0500, width: 4 } }),
   /** A repair step mended the hull */
   heal: new TextStyle({ ...BASE, fontSize: 19, fill: 0x7dff8a, stroke: { color: 0x05300f, width: 4 } }),
+  /** Gold: a bounty, a chest, a quest */
+  gold: new TextStyle({ ...BASE, fontSize: 19, fill: 0xffcf3f, stroke: { color: 0x3a2400, width: 4 } }),
 };
 
 type DamageEvent = Extract<GameEvent, { type: 'damage' }>;
 type RepairEvent = Extract<GameEvent, { type: 'repair' }>;
+type GoldEvent = Extract<GameEvent, { type: 'gold' }>;
 
 interface Floater {
   readonly text: Text;
@@ -46,7 +49,8 @@ interface Floater {
 /**
  * How much a volley or a bite did, floating up over what it hit and fading out: white for full damage, gold with a "!"
  * when a die rolled a critical hit, pale blue when the weapon isn't made for the target, "Miss" when nothing got
- * through, and red when the player's own ship is hit. A repair step floats up green over the ship it mended.
+ * through, and red when the player's own ship is hit. A repair step floats up green over the ship it mended, gold
+ * the player earns in gold (a bounty over the wreck, a chest over the ship).
  * Screen-space text on the top layer, the same size at every zoom; a fixed pool of Text objects reused round-robin
  */
 export class DamageNumbers {
@@ -69,6 +73,7 @@ export class DamageNumbers {
     for (const event of state.events) {
       if (event.type === 'damage') this.damage(event, event.targetId === state.ship.id);
       else if (event.type === 'repair') this.repair(event);
+      else if (event.type === 'gold' && event.shipId === state.ship.id) this.gold(event);
     }
     for (const f of this.floaters) {
       if (f.age >= LIFE) continue;
@@ -107,6 +112,11 @@ export class DamageNumbers {
 
   private repair(event: RepairEvent) {
     this.spawn(STYLES.heal, `+${event.amount}`, event.shipId, event.at);
+  }
+
+  private gold(event: GoldEvent) {
+    // A bounty hangs over the wreck it was paid for; a chest's gold follows the ship that took it
+    this.spawn(STYLES.gold, `+${event.amount} gold`, event.reason === 'bounty' ? -1 : event.shipId, event.at);
   }
 
   private spawn(style: TextStyle, text: string, targetId: number, at: { x: number; y: number; z: number }) {
