@@ -79,4 +79,4 @@ export {
   type Palm,
 } from './world/World';
 export { coastAt } from './world/islandShape';
-export { DOCK_RADIUS, leavePort, onPort, type Port } from './world/port';
+export { WALL_THICKNESS, leavePort, onPort, type HarbourWall, type Port, type WallPiece } from './world/port';

@@ -24,7 +24,6 @@ export const CHART = {
 } as const;
 
 const LETTER_A = 65;
-const COAST_STEP = 2; // every second point of a coastline is enough at a map's scale
 
 /** The name of the square of the map a point is in: the column's letter (west to east), the row's number (north to south) */
 export function squareName(x: number, y: number) {
@@ -79,10 +78,8 @@ export class MapProjection {
 
 export function drawIsland(g: Graphics, island: Island, map: MapProjection, coastWidth: number) {
   const points: number[] = [];
-  for (let i = 0; i < island.coast.length; i += COAST_STEP) {
-    const p = island.coast[i];
-    points.push(map.x(p.x, p.y), map.y(p.x, p.y));
-  }
+  // Every point: the port's walls are a few points of its coast
+  for (const p of island.coast) points.push(map.x(p.x, p.y), map.y(p.x, p.y));
   g.poly(points).fill({ color: CHART.island });
   if (coastWidth > 0) g.poly(points).stroke({ width: coastWidth, color: CHART.coast, alpha: 0.8 });
 }

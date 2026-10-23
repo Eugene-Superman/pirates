@@ -169,7 +169,7 @@ export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean
     const { mooring } = state.world.port;
     ship.x = mooring.x;
     ship.y = mooring.y;
-    ship.dock();
+    ship.dock(mooring);
   }
   return true;
 }

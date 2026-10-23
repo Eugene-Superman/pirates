@@ -45,14 +45,15 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    (guns in the slots, ammo); J opens the combat log in the bottom-left corner (every blow dealt and taken with its
    dice, kills, repairs, totals). The minimap in the bottom-right corner shows the islands round you and everyone in
    sight; a click on it (or M) opens the sea chart: the whole sea, 8 × 8 squares from A1 to H8, with the islands
-   and your ship. The bar at the bottom picks the weapon and the ammo.
+   and your ship. The bar at the bottom picks the weapon (or Q for the cannons, E for the harpoons) and the ammo.
 
    Every kill pays gold (top right), and some leave a chest: sail over it for more. The port in the middle of the map
-   (click its island to sail in) has a tavern, where you take bounty quests ("hunt five turtles") and turn them in, and
-   a shop: guns (they go to the hold; fit them in the loadout, L), packs of ammo and the shipwright's repair. Leave port
-   with its button or Escape.
+   (sail in between its walls, or click its island) has a tavern, where you take bounty quests ("hunt five turtles")
+   and turn them in, and a shop: guns (they go to the hold; fit them in the loadout, L), packs of ammo and the
+   shipwright's repair. Leave port with its button or Escape.
 
-   Speed and FPS are in the top-left corner; the Settings button opens every other control (camera, fog, range rings,
+   Your ship's hull is in the top-left corner, speed and FPS under it; the button in the top-right corner puts the
+   game on the whole screen and back. The Settings button opens every other control (camera, fog, range rings,
    damage and speed tuning, gold for testing, navigation debug) and picks which of them also stay on the screen.
 
    Your progress (gold, guns, ammo, quests, where your ship is) and every setting are kept in the browser (IndexedDB)

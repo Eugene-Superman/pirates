@@ -16,6 +16,8 @@ import {
 } from '../game';
 import { Sounds } from './audio/Sounds';
 import { Hud } from './hud/Hud';
+import { bindCursor } from './input/cursor';
+import { Hover } from './input/hover';
 import { bindKeyboardInput } from './input/keyboardInput';
 import { bindPointerInput } from './input/pointerInput';
 import { Selection } from './input/selection';
@@ -38,6 +40,8 @@ export class GameClient {
   private readonly sounds: Sounds;
   /** The unit the player picked out: shown at the top, fired at with Space */
   private readonly selection = new Selection();
+  /** The unit under the mouse: the cursor shows it, a click takes it */
+  private readonly hover = new Hover();
   /** The browser's memory of the progress and the settings, until there is a server */
   private readonly store: Store;
   /** What draws the game: the HUD warns when it is the processor */
@@ -115,7 +119,8 @@ export class GameClient {
       { hud: store.slot('hud'), log: store.slot('log') },
     );
     app.stage.addChild(this.view.container, this.hud.container);
-    bindPointerInput(app, this.view, ship, this.selection, game.state.world.port);
+    bindPointerInput(app, this.view, ship, this.selection, this.hover, game.state.world.port);
+    bindCursor(app, this.view, ship, this.hover);
     bindKeyboardInput(ship, this.selection, {
       toggleLoadout: () => this.hud.toggleLoadout(),
       toggleLog: () => this.hud.toggleLog(),

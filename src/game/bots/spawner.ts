@@ -5,6 +5,7 @@ import type { NavGrid } from '../navigation/NavGrid';
 import { hullReach } from '../physics/hull';
 import { Ship } from '../ships/Ship';
 import { SHIP_CLASSES } from '../ships/shipClasses';
+import { nearHarbour } from '../world/port';
 import { MAP_SQUARES, START, WORLD_HEIGHT, WORLD_WIDTH } from '../world/World';
 import { BOT_KINDS, BOT_KIND_IDS, type BotKindId } from './botKinds';
 import { newBotMind } from './brain';
@@ -78,7 +79,7 @@ function spawn(
   const need = hullReach(shipClass.hull) + ROOM;
   for (let attempt = 0; attempt < SPAWN_TRIES; attempt++) {
     const { x, y } = near ? around(near, random) : anywhere(random);
-    if (nav.clearanceAt(x, y) < need) continue;
+    if (nav.clearanceAt(x, y) < need || nearHarbour(state.world.port, x, y)) continue;
     if (kind.behaviour === 'aggressive' && Math.hypot(x - START.x, y - START.y) < SAFE_RADIUS) continue;
     const crowded = state.ships.some((other) => {
       const distance = Math.hypot(other.x - x, other.y - y);

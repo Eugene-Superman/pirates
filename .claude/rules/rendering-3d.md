@@ -70,7 +70,8 @@ There is no z-buffer, so order is everything. In `SceneView.update`:
    projectile shadows → target marker.
    There is no drawn ship shadow: it is baked into the sprite.
 3. Volumetric objects (islands' hills and palms, bots' ships and monsters, bots' wrecks going down, chests, the port's
-   pier, houses and flag (`portPieces`), projectiles) — sorted by `painter.depth(...)` **from far to near**.
+   walls (in lengths of `WALL_STEP`), quay, houses, lighthouse and flag (`portPieces`), projectiles) — sorted by
+   `painter.depth(...)` **from far to near**.
    The ship sprite goes between them by `shipDepth`, a point `ship.radius` above the water.
 4. Parts within an object are also sorted by depth (island hill and palms).
 

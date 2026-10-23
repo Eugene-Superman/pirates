@@ -114,31 +114,6 @@ export class Painter3D {
     this.g.ellipse(e.x, e.y, e.rx, e.ry).stroke({ width: width * this.camera.zoom, color, alpha });
   }
 
-  /**
-   * Horizontal dashed circle: `dashes` dashes with equal gaps, turned by `offset` radians.
-   * All dashes are one path, stroked once
-   */
-  dashedRing(
-    x: number,
-    y: number,
-    z: number,
-    radius: number,
-    dashes: number,
-    offset: number,
-    width: number,
-    color: number,
-    alpha = 1,
-  ) {
-    const step = Math.PI / dashes;
-    for (let i = 0; i < dashes; i++) {
-      const a = offset + i * 2 * step;
-      const s0 = this.camera.project(x + Math.cos(a) * radius, y + Math.sin(a) * radius, z);
-      const s1 = this.camera.project(x + Math.cos(a + step) * radius, y + Math.sin(a + step) * radius, z);
-      this.g.moveTo(s0.x, s0.y).lineTo(s1.x, s1.y);
-    }
-    this.g.stroke({ width: width * this.camera.zoom, color, alpha });
-  }
-
   private ellipseAt(x: number, y: number, z: number, radius: number) {
     const center = this.camera.project(x, y, z);
     const side = this.camera.project(x + radius * this.camera.rightX, y + radius * this.camera.rightY, z);

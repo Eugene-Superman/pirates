@@ -6,6 +6,7 @@ import {
   isAfloat,
   isHostile,
   projectilePosition,
+  signedDistanceToPolygon,
   type GameState,
   type Ship,
   type Unit,
@@ -54,9 +55,10 @@ const ZOOM_SNAP = 0.001; // pixels per unit: close enough to stop easing
 
 // Range rings, one color per weapon
 const RANGE_COLORS: Readonly<Record<WeaponId, number>> = { cannon: 0xffb347, harpoon: 0x7fe3ff };
-// A small boat is a few pixels across at a low zoom, so a click this close to a unit on screen counts as a click on
-// it; a big unit counts out to its size
-const PICK_RADIUS = 22; // screen pixels
+// A unit is easier to pick than it looks: its hull's line, standing from the water up to its hit point bar, with `pad`
+// screen pixels round it; the unit under the mouse last frame keeps `sticky` times that, so one the camera or its own
+// speed carries along doesn't slip out from under the mouse
+const PICK = { pad: 20, sticky: 1.7, far: 400 }; // screen pixels, a share, screen pixels beyond which none is looked at
 // Ships and monsters this far beyond the ship's view range already leave a wake and lay a trail (a serpent's body), so
 // both are there when they come into sight
 const NEAR_MARGIN = 300; // world units
@@ -86,6 +88,11 @@ function head(serpent: Ship) {
     x: serpent.x + Math.cos(serpent.rotation) * serpent.hull.bow,
     y: serpent.y + Math.sin(serpent.rotation) * serpent.hull.bow,
   };
+}
+
+/** How high a unit stands, world units: the top of a ship's mast, a monster's height. Its hit point bar is over it */
+function unitTop(unit: Unit) {
+  return botShipTop(unit.shipClass.id) ?? unit.height;
 }
 
 // Pseudo-3D: the world has height and the camera looks at it at an angle.
@@ -224,7 +231,7 @@ export class SceneView {
     this.sinking.drawWater(camera, ship, islands);
     for (const id of WEAPON_IDS) {
       const range = ship.range(id);
-      if (this.ranges[id] && range > 0) drawRangeRing(painter, ship, range, RANGE_COLORS[id], time);
+      if (this.ranges[id] && range > 0) drawRangeRing(painter, ship, range, RANGE_COLORS[id]);
     }
     // Units in the fog of war are not drawn at all, nor wrecks. The serpent is long: it is culled by its body
     const others = near.filter(
@@ -257,7 +264,7 @@ export class SceneView {
     const locked = units.find((u) => u.id === ship.attackTarget);
     if (locked) drawTargetLock(painter, locked, time, ship.holdReason !== null);
     const selected = units.find((u) => u.id === this.selection.id);
-    if (selected && selected !== locked) drawSelection(painter, selected, time);
+    if (selected && selected !== locked) drawSelection(painter, selected);
     this.shots.drawWater(painter);
     for (const projectile of this.state.projectiles) drawProjectileShadow(painter, projectile);
     // No ship shadow here: it is baked into the ship's sprite
@@ -417,20 +424,32 @@ export class SceneView {
   }
 
   /**
-   * The unit under a screen point, if any: the one nearest to it within PICK_RADIUS pixels, or within its own size on
-   * the screen for a big one. Only what the player can see, and never their own ship
+   * The unit under a screen point, if any: the nearest whose target (PICK) the point is in, `held` (the unit under the
+   * mouse last frame) winning a tie. Only what the player can see, and never their own ship
    */
-  pickUnit(x: number, y: number): Unit | null {
+  pickUnit(x: number, y: number, held: number | null = null): Unit | null {
     const { ship } = this.state;
+    const { camera } = this;
     let best: Unit | null = null;
     let bestScore = Infinity;
     for (const unit of this.state.ships) {
       if (unit === ship) continue;
       if (!isAfloat(unit) || !ship.canSee(unit.x, unit.y)) continue;
-      const s = this.camera.project(unit.x, unit.y, unit.height / 2);
-      const reach = Math.max(PICK_RADIUS, unit.radius * 1.4 * this.camera.zoom);
-      const score = Math.hypot(s.x - x, s.y - y) / reach;
-      if (score < 1 && score < bestScore) {
+      const water = camera.project(unit.x, unit.y, 0);
+      if (Math.abs(water.x - x) > PICK.far || Math.abs(water.y - y) > PICK.far) continue;
+      // The hull's line on the water, stern to bow, and the same line raised to the top of its hit point bar
+      const cos = Math.cos(unit.rotation);
+      const sin = Math.sin(unit.rotation);
+      const { bow, stern, halfBeam } = unit.hull;
+      const front = camera.project(unit.x + cos * bow, unit.y + sin * bow, 0);
+      const back = camera.project(unit.x + cos * stern, unit.y + sin * stern, 0);
+      const rise = water.y - camera.project(unit.x, unit.y, unitTop(unit)).y + HP_BAR.lift + HP_BAR.height;
+      const outline = [back, front, { x: front.x, y: front.y - rise }, { x: back.x, y: back.y - rise }];
+      const distance = Math.max(0, signedDistanceToPolygon(x, y, outline));
+      const reach = (halfBeam * camera.zoom + PICK.pad) * (unit.id === held ? PICK.sticky : 1);
+      const score = distance / reach;
+      if (score >= 1) continue;
+      if (score < bestScore || (score === bestScore && unit.id === held)) {
         best = unit;
         bestScore = score;
       }
@@ -451,9 +470,7 @@ export class SceneView {
     const { width, height, lift } = HP_BAR;
     for (const u of units) {
       const share = u.hp / u.maxHp;
-      // Over the top of a ship's mast
-      const top = botShipTop(u.shipClass.id) ?? u.height;
-      const s = this.camera.project(u.x, u.y, top);
+      const s = this.camera.project(u.x, u.y, unitTop(u));
       const x = s.x - width / 2;
       const y = s.y - lift - height;
       const color = share > 0.5 ? HP_COLORS.high : share > 0.25 ? HP_COLORS.mid : HP_COLORS.low;
