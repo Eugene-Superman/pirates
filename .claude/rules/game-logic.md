@@ -14,9 +14,11 @@ paths:
 - `index.ts` is the public API. Inside `game/` import modules directly (`./ships/Ship`), never through `index.ts` (avoids import cycles).
   When the client needs something new, export it from `index.ts`.
 - `Game.update(dt)` is the only place that steps the simulation and fixes the order of updates. New systems are stepped from there.
-  The order: clear `state.events` → move the targets → for each ship, the pilot picks a helm, then the ship steers and
-  collides in sub-steps of at most `MAX_STEP` world units → combat (reloads, fire orders, projectiles).
-- `state.events` (shots, impacts, held fire) live for one update: the client reads them in `view.update` right after it.
+  The order: clear `state.events` → bring back destroyed targets whose time is up, move the targets → for each ship,
+  the pilot picks a helm, then the ship steers and collides in sub-steps of at most `MAX_STEP` world units (round
+  targets that are afloat only) → combat (reloads, volleys at attack targets, projectiles landing).
+- `state.events` (shots, impacts, damage, destroyed targets) live for one update: the client reads them in
+  `view.update` right after it.
 
 ## Units and coordinates
 
@@ -61,16 +63,31 @@ paths:
 
 ## Combat (`combat/`)
 
-- Clicking a target calls `ship.orderFire`; the order fires as soon as the selected weapon is loaded, or the ship holds
-  fire (a `holdFire` event) when the target is out of range or hidden in the fog of war (`ship.canSee`).
-- Projectiles always hit: they home in on the target and land after `distance / weapon.speed` seconds. Hits are counted
-  on the target; nothing damages ships yet.
+- Clicking a target calls `ship.attack`: the ship fires a volley every time its selected weapon is loaded, until
+  `ceaseFire` (the target clicked again, Escape, the HUD's button) or the target is destroyed. While it can't fire,
+  combat sets `ship.holdReason` every update: no guns of the weapon fitted, out of the loaded ammo, the target hidden
+  in the fog of war (`ship.canSee`), or beyond the weapon's range. The HUD tells the player.
+- A ship class has gun `slots` per weapon; `ship.guns` holds the gun fitted in each (`fitGun`), one of `GUNS` in
+  `arsenal.ts`. A volley fires every fitted gun of the selected weapon that has a shot of the loaded ammo
+  (`loadAmmo`, `ship.ammo`), one projectile each. Cannons fire from the side facing the target.
+- Damage is rolled when a volley is fired (`rollVolley`), with the game's own seeded generator (`COMBAT_SEED` in
+  `Game`, so shooting never shifts the map's random numbers): each gun rolls 1…its die, a 1 misses, the top is a
+  critical hit (twice the die plus the ammo's bonus), anything else is the roll plus the bonus. A weapon does full
+  damage to what it is made for (`against`: cannons objects, harpoons creatures) and `OFF_TARGET_SHARE` to the rest.
+- Projectiles always hit: they home in on the target, and a volley's all land together after `distance / weapon.speed`.
+  The first to land does the volley's damage (a `damage` event). A target at 0 hit points is destroyed (a `destroyed`
+  event): it can't be seen, shot at or bumped into, shots still flying at it fall into the sea, and after
+  `RESPAWN_TIME` it comes back whole.
+- Targets (`targets.ts`) follow fixed paths computed from the game time alone (`pathPoint`: a circle or a figure of
+  eight), so the server and clients agree on where they are. Nothing damages ships yet.
 
 ## Hull health (`ships/damage.ts`)
 
-- `health` is hull integrity in percent, `0`–`MAX_HEALTH` (100), changed only through `ship.setHealth` (clamped).
-  For now only the HUD's debug buttons call it; combat will.
+- A ship has hull points: `hp`, whole, out of `maxHp` (its class's `hp`). They change only through `ship.setHealth`
+  (in percent, for the HUD's debug buttons) and `ship.takeDamage` (for combat, once something hits ships), both clamped.
+- `health` is derived from them: hull integrity in percent, `0`–`MAX_HEALTH` (100). Damage stages and speed go by it.
 - `damageStage(health)` maps it to one of `DAMAGE_STAGES`: `intact` → `minor` → `heavy` → `burning` → `sinking`.
   The order matters: the client falls back along it when a stage has no sprite.
-- At 0 the ship is sinking (`isSinking`): `setHealth` clears its target, `setTarget` is ignored, and it coasts to a stop.
+- At 0 the ship is sinking (`isSinking`): its target and attack target are cleared, `setTarget` and `attack` are
+  ignored, and it coasts to a stop.
   How it goes down and disappears is a client animation for now; nothing in the game removes a sunk ship yet.

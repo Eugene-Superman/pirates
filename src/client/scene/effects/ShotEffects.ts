@@ -196,7 +196,12 @@ export class ShotEffects {
   }
 
   private start(event: CombatEvent, time: number) {
-    if (event.type === 'holdFire') return;
+    // The damage numbers are DamageNumbers'
+    if (event.type === 'damage') return;
+    if (event.type === 'destroyed') {
+      this.destroyed(event.at.x, event.at.y, event.kind === 'serpent');
+      return;
+    }
     const [x, y, z] = [event.at.x, event.at.y, event.at.z];
     const { dirX, dirY, weapon } = event;
     if (event.type === 'shot') {
@@ -221,6 +226,14 @@ export class ShotEffects {
     this.flash(at, dirX, dirY, cannon ? 'cannon' : 'harpoon');
     if (cannon) this.burst(at, 6, (p) => smoke(p, -dirX, -dirY));
     this.ripple(x, y, 2, cannon ? 9 : 6, 1.2, 0.6, 0);
+  }
+
+  /** A target's hit points ran out: a big splash where it was, wood flying from a hull, and rings spreading wide */
+  private destroyed(x: number, y: number, creature: boolean) {
+    this.burst([x, y, 0], creature ? 40 : 28, (p) => spray(p, creature ? 1.4 : 1.1));
+    if (!creature) this.burst([x, y, 2], 26, (p) => splinter(p, between(-1, 1), between(-1, 1)));
+    this.ripple(x, y, 4, 22, 1.8, 0.7, 0);
+    this.ripple(x, y, 3, 16, 1.5, 0.5, 0.35);
   }
 
   private burst(at: Vec3, count: number, init: (p: Particle) => void) {

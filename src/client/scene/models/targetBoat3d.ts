@@ -9,7 +9,6 @@ const COLORS = {
   mast: 0x5e4126,
   boardWhite: 0xf4efe3,
   boardRed: 0xd23a2c,
-  foam: 0xffffff,
 };
 // prettier-ignore
 // Deck outline seen from above, boat coordinates (x to the bow, y to starboard), world units: about 19 long
@@ -26,19 +25,6 @@ const BOARD_RINGS = [3.4, 2.55, 1.7, 0.85]; // radii, alternating white and red 
 const ROCK = 0.05; // radians it rolls on the waves
 const SHAKE = 0.3; // radians it rolls when hit, dying out over the shake
 const BOB = 0.35; // world units
-
-/** Bow wave and a short wake on the water. Drawn with the sea */
-export function drawTargetBoatWater(p: Painter3D, target: Target) {
-  const { x, y, heading } = target;
-  const cos = Math.cos(heading);
-  const sin = Math.sin(heading);
-  const at = (lx: number, ly: number): Vec3 => [x + lx * cos - ly * sin, y + lx * sin + ly * cos, 0];
-  // Two foam lines spreading back from the stern corners, and a bow wave
-  p.line(at(-8, 2.8), at(-18, 6.5), 0.9, COLORS.foam, 0.25);
-  p.line(at(-8, -2.8), at(-18, -6.5), 0.9, COLORS.foam, 0.25);
-  p.line(at(10, 0), at(6.5, 4), 0.8, COLORS.foam, 0.45);
-  p.line(at(10, 0), at(6.5, -4), 0.8, COLORS.foam, 0.45);
-}
 
 /** A small boat with a round target board on its mast. shake: 1 right after a hit, then 0 */
 export function drawTargetBoat(p: Painter3D, target: Target, time: number, shake: number) {
