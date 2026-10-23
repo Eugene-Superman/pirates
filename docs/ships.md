@@ -59,3 +59,11 @@ Only `intact` is required; a missing stage shows the nearest one before it.
    in the model's coordinates with y negated).
 5. Run `npm run format` and `npm run check`, look at every damage stage with the HUD's debug buttons, and commit the atlases
    together with the code.
+
+## Bots' hulls
+
+The bots (`src/game/bots/botKinds.ts`) sail hulls of their own, in `SHIP_CLASSES` too: the lines `bots` (fishing boat,
+merchant sloop, smuggler sloop) and `monsters` (giant turtle, sea serpent — creatures, with `bite` jaws instead of gun
+slots). They have no Blender model or atlases: the client draws them as vector models (`client/scene/models/botShip3d.ts`,
+a look per class in `LOOKS`; `turtle3d.ts`, `serpent3d.ts`), so `ATLAS_STAGES` and `EMITTERS` leave them out. A
+bot's `hull` matches its model's deck outline. To add a bot: a class here, a look there, and a kind in `BOT_KINDS`.

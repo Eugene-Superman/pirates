@@ -1,5 +1,5 @@
 import { Container, Text, TextStyle } from 'pixi.js';
-import { isAlive, type CombatEvent, type GameState } from '../../../game';
+import { findUnit, isAfloat, type GameEvent, type GameState } from '../../../game';
 import type { Camera3D } from '../../render/Camera3D';
 
 const POOL = 24; // numbers on the screen at once at most; the oldest is reused
@@ -21,9 +21,14 @@ const STYLES = {
   weak: new TextStyle({ ...BASE, fontSize: 17, fill: 0xa9c9d9 }),
   /** Every gun rolled a 1 */
   miss: new TextStyle({ ...BASE, fontSize: 16, fill: 0xd0d6da, fontStyle: 'italic' }),
+  /** The player's own ship was hit */
+  hurt: new TextStyle({ ...BASE, fontSize: 20, fill: 0xff5a4a, stroke: { color: 0x2a0500, width: 4 } }),
+  /** A repair step mended the hull */
+  heal: new TextStyle({ ...BASE, fontSize: 19, fill: 0x7dff8a, stroke: { color: 0x05300f, width: 4 } }),
 };
 
-type DamageEvent = Extract<CombatEvent, { type: 'damage' }>;
+type DamageEvent = Extract<GameEvent, { type: 'damage' }>;
+type RepairEvent = Extract<GameEvent, { type: 'repair' }>;
 
 interface Floater {
   readonly text: Text;
@@ -39,8 +44,9 @@ interface Floater {
 }
 
 /**
- * How much a volley did, floating up over the target and fading out: white for full damage, gold with a "!" when a gun
- * rolled a critical hit, pale blue when the weapon isn't made for the target, "Miss" when nothing got through.
+ * How much a volley or a bite did, floating up over what it hit and fading out: white for full damage, gold with a "!"
+ * when a die rolled a critical hit, pale blue when the weapon isn't made for the target, "Miss" when nothing got
+ * through, and red when the player's own ship is hit. A repair step floats up green over the ship it mended.
  * Screen-space text on the top layer, the same size at every zoom; a fixed pool of Text objects reused round-robin
  */
 export class DamageNumbers {
@@ -60,7 +66,10 @@ export class DamageNumbers {
 
   /** Starts a number for every volley that landed in this update and moves the rest; the camera must be set */
   update(dt: number, state: GameState, camera: Camera3D) {
-    for (const event of state.events) if (event.type === 'damage') this.spawn(event);
+    for (const event of state.events) {
+      if (event.type === 'damage') this.damage(event, event.targetId === state.ship.id);
+      else if (event.type === 'repair') this.repair(event);
+    }
     for (const f of this.floaters) {
       if (f.age >= LIFE) continue;
       f.age += dt;
@@ -68,8 +77,8 @@ export class DamageNumbers {
         f.text.visible = false;
         continue;
       }
-      const target = state.targets.find((t) => t.id === f.targetId);
-      if (target && isAlive(target)) {
+      const target = findUnit(state, f.targetId);
+      if (target && isAfloat(target)) {
         f.x = target.x;
         f.y = target.y;
       }
@@ -81,17 +90,35 @@ export class DamageNumbers {
     }
   }
 
-  private spawn(event: DamageEvent) {
+  private damage(event: DamageEvent, own: boolean) {
+    const miss = event.amount === 0;
+    const style = miss
+      ? STYLES.miss
+      : own
+        ? STYLES.hurt
+        : event.crits > 0
+          ? STYLES.crit
+          : event.full
+            ? STYLES.hit
+            : STYLES.weak;
+    const text = miss ? 'Miss' : own ? `−${event.amount}` : event.crits > 0 ? `${event.amount}!` : `${event.amount}`;
+    this.spawn(style, text, event.targetId, event.at);
+  }
+
+  private repair(event: RepairEvent) {
+    this.spawn(STYLES.heal, `+${event.amount}`, event.shipId, event.at);
+  }
+
+  private spawn(style: TextStyle, text: string, targetId: number, at: { x: number; y: number; z: number }) {
     const f = this.floaters[this.next];
     this.next = (this.next + 1) % POOL;
-    const miss = event.amount === 0;
-    f.text.style = miss ? STYLES.miss : event.crits > 0 ? STYLES.crit : event.full ? STYLES.hit : STYLES.weak;
-    f.text.text = miss ? 'Miss' : event.crits > 0 ? `${event.amount}!` : `${event.amount}`;
+    f.text.style = style;
+    f.text.text = text;
     f.text.visible = true;
-    f.targetId = event.targetId;
-    f.x = event.at.x;
-    f.y = event.at.y;
-    f.z = event.at.z;
+    f.targetId = targetId;
+    f.x = at.x;
+    f.y = at.y;
+    f.z = at.z;
     f.age = 0;
     // Cosmetic, so Math.random is fine here
     f.drift = (Math.random() - 0.5) * 2 * SPREAD;

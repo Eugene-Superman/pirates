@@ -1,4 +1,4 @@
-import { projectilePosition, type CombatEvent, type GameState, type WeaponId } from '../../../game';
+import { SHIP_CLASSES, projectilePosition, type GameEvent, type GameState, type WeaponId } from '../../../game';
 import type { Vec3 } from '../../render/Camera3D';
 import { mixColor, type Painter3D } from '../../render/Painter3D';
 import { SHAKE_TIME } from '../models/barrel3d';
@@ -51,6 +51,7 @@ interface Flash {
 }
 
 const PARTICLES = 320;
+const MAX_MUZZLES = 8; // guns of one volley shown firing, at most
 const RIPPLES = 24;
 const FLASHES = 12;
 
@@ -60,6 +61,7 @@ const FLAME_LENGTH = 8; // world units, the tongue of fire out of the muzzle
 const FLAME_WIDTH = 2.2;
 const FLASH_CORE = 3.2; // world units, the radius of the bright ball at the muzzle
 const TRAIL_INTERVAL = 0.035; // seconds between the puffs a cannonball leaves behind
+const LUNGE_TIME = 0.45; // seconds a monster's head stays darted forward after a bite
 
 const COLORS = {
   flashCore: 0xffe9a8,
@@ -126,12 +128,16 @@ export class ShotEffects {
   private nextParticle = 0;
   private nextRipple = 0;
   private nextFlash = 0;
-  /** When each target was last hit, game time */
+  /** When each target was last hit, and each monster last bit, game time */
   private readonly hitTimes = new Map<number, number>();
+  private readonly biteTimes = new Map<number, number>();
   private trailClock = 0;
 
   update(dt: number, state: GameState) {
-    for (const event of state.events) this.start(event, state.time);
+    for (const event of state.events) this.start(event, state);
+    // Settled hits and finished bites are forgotten: bots come and go, each with an id of its own
+    for (const [id, at] of this.hitTimes) if (state.time - at > SHAKE_TIME) this.hitTimes.delete(id);
+    for (const [id, at] of this.biteTimes) if (state.time - at > LUNGE_TIME) this.biteTimes.delete(id);
 
     // A thin smoke trail behind every cannonball, so its arc can be followed
     this.trailClock += dt;
@@ -167,6 +173,14 @@ export class ShotEffects {
     return hit === undefined ? 0 : Math.max(0, 1 - (time - hit) / SHAKE_TIME);
   }
 
+  /** How far a monster's head is still darted forward from its last bite: 1 as it bites, 0 once back */
+  lunge(monsterId: number, time: number) {
+    const bite = this.biteTimes.get(monsterId);
+    if (bite === undefined) return 0;
+    const t = (time - bite) / LUNGE_TIME;
+    return t >= 1 ? 0 : Math.sin(Math.PI * Math.min(1, t * 1.6)) * (1 - t * 0.3);
+  }
+
   /** Ripples on the water. Drawn with the sea */
   drawWater(p: Painter3D) {
     for (const r of this.ripples) {
@@ -195,24 +209,41 @@ export class ShotEffects {
     }
   }
 
-  private start(event: CombatEvent, time: number) {
-    // The damage numbers are DamageNumbers'
-    if (event.type === 'damage') return;
+  private start(event: GameEvent, state: GameState) {
+    const { time } = state;
+    // The damage and repair numbers are DamageNumbers'
+    if (event.type === 'damage' || event.type === 'repair') return;
     if (event.type === 'destroyed') {
-      this.destroyed(event.at.x, event.at.y, event.kind === 'serpent');
+      // The player's own ship has its sinking animation instead
+      if (event.targetId === state.ship.id) return;
+      const creature = event.kind !== 'barrel' && SHIP_CLASSES[event.kind].nature === 'creature';
+      this.destroyed(event.at.x, event.at.y, creature);
+      return;
+    }
+    if (event.type === 'bite') {
+      this.biteTimes.set(event.attackerId, time);
+      this.hitTimes.set(event.targetId, time);
+      this.bitten(event.at.x, event.at.y, event.from.x - event.at.x, event.from.y - event.at.y);
       return;
     }
     const [x, y, z] = [event.at.x, event.at.y, event.at.z];
     const { dirX, dirY, weapon } = event;
     if (event.type === 'shot') {
-      // The ship bobs on the waves; the muzzle goes with it
-      const at: Vec3 = [x, y, z + shipBob(time)];
-      this.flash(at, dirX, dirY, weapon);
-      if (weapon === 'cannon') {
-        this.burst(at, 14, (p) => smoke(p, dirX, dirY));
-        this.burst(at, 8, (p) => spark(p, dirX, dirY));
-      } else {
-        this.burst(at, 4, (p) => puff(p, dirX, dirY));
+      // Fire and smoke at every gun of the volley (its one projectile flies from their middle). A broadside of many
+      // guns shows MAX_MUZZLES of them, spread along it: more would only fill the pools
+      const { muzzles } = event;
+      const shown = Math.min(muzzles.length, MAX_MUZZLES);
+      for (let k = 0; k < shown; k++) {
+        const m = muzzles[Math.floor((k * muzzles.length) / shown)];
+        // The ship bobs on the waves; the muzzle goes with it
+        const at: Vec3 = [m.x, m.y, m.z + shipBob(time)];
+        this.flash(at, dirX, dirY, weapon);
+        if (weapon === 'cannon') {
+          this.burst(at, 14, (p) => smoke(p, dirX, dirY));
+          this.burst(at, 8, (p) => spark(p, dirX, dirY));
+        } else {
+          this.burst(at, 4, (p) => puff(p, dirX, dirY));
+        }
       }
       return;
     }
@@ -226,6 +257,14 @@ export class ShotEffects {
     this.flash(at, dirX, dirY, cannon ? 'cannon' : 'harpoon');
     if (cannon) this.burst(at, 6, (p) => smoke(p, -dirX, -dirY));
     this.ripple(x, y, 2, cannon ? 9 : 6, 1.2, 0.6, 0);
+  }
+
+  /** Jaws closing on a hull: water thrown up between them, splinters bitten off, a ring on the water */
+  private bitten(x: number, y: number, towardsX: number, towardsY: number) {
+    const d = Math.hypot(towardsX, towardsY) || 1;
+    this.burst([x, y, 0], 12, (p) => spray(p, 0.8));
+    this.burst([x, y, 3], 10, (p) => splinter(p, -towardsX / d, -towardsY / d));
+    this.ripple(x, y, 3, 12, 1.2, 0.6, 0);
   }
 
   /** A target's hit points ran out: a big splash where it was, wood flying from a hull, and rings spreading wide */

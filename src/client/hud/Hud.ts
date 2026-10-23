@@ -1,8 +1,12 @@
 import { Container, Graphics, type Rectangle, Text } from 'pixi.js';
 import type { GameState, ShipClass } from '../../game';
+import type { Selection } from '../input/selection';
 import { ButtonRow } from './ButtonRow';
 import { LABEL_STYLE, hudItems, type HudActions, type HudItem, type HudWidget, type ViewStatus } from './hudItems';
+import { LoadoutPanel } from './LoadoutPanel';
 import { SettingsPanel } from './SettingsPanel';
+import { SkillBar } from './SkillBar';
+import { UnitFrames } from './UnitFrames';
 
 export type { HudActions, ViewStatus } from './hudItems';
 
@@ -10,6 +14,7 @@ const MARGIN = 16; // pixels from the screen's edge
 const METRIC_GAP = 6; // pixels under a line of text
 const ROW_GAP = 8; // pixels between the button rows
 const LABEL_WIDTH = 84; // pixels: the button rows start after their labels, lined up
+const FRAMES_GAP = 24; // pixels between the column and the frames at the top
 const ZONE_COLOR = 0xffffff;
 const ZONE_ALPHA = 0.55;
 const ZONE_WIDTH = 2; // pixels
@@ -54,7 +59,11 @@ function saveShown(items: readonly HudItem[], ids: ReadonlySet<string>) {
   }
 }
 
-// Screen-space overlay in the top left corner: the items picked in the settings panel, stacked under its button
+/**
+ * Screen-space overlay: in the top left corner the items picked in the settings panel, stacked under its button; at
+ * the top the frames of the player's ship and the unit they picked out; at the bottom the skill bar; and the loadout
+ * window over everything when it is open
+ */
 export class Hud {
   readonly container = new Container();
   private readonly items: readonly HudItem[];
@@ -66,10 +75,17 @@ export class Hud {
   private readonly settings: SettingsPanel;
   /** The camera's zone, outlined across the screen behind the HUD's buttons */
   private readonly zoneOutline = new Graphics();
+  private readonly frames: UnitFrames;
+  private readonly skills: SkillBar;
+  private readonly loadout: LoadoutPanel;
+  private readonly screen: Rectangle;
+  /** Height of the shown items when last laid out */
+  private columnHeight = 0;
 
   /** shipClass: the player's ship's, for its gun slots */
   constructor(actions: HudActions, screen: Rectangle, shipClass: ShipClass) {
-    this.items = hudItems(actions, shipClass);
+    this.screen = screen;
+    this.items = hudItems(actions);
     this.shownIds = loadShown(this.items);
     this.settings = new SettingsPanel(
       this.items,
@@ -79,14 +95,48 @@ export class Hud {
     );
     this.settingsButton = new ButtonRow([{ label: 'Settings', key: null, onTap: () => this.settings.toggle() }]);
     this.settingsButton.container.position.set(MARGIN, MARGIN);
-    this.container.addChild(this.zoneOutline, this.column, this.settingsButton.container, this.settings.container);
+    this.frames = new UnitFrames(actions.toggleFire);
+    this.loadout = new LoadoutPanel(actions, screen, shipClass);
+    this.skills = new SkillBar({
+      repair: actions.repair,
+      setWeapon: actions.setWeapon,
+      loadAmmo: actions.loadAmmo,
+      toggleLoadout: () => this.toggleLoadout(),
+    });
+    this.container.addChild(
+      this.zoneOutline,
+      this.column,
+      this.frames.container,
+      this.skills.container,
+      this.settingsButton.container,
+      this.settings.container,
+      this.loadout.container,
+    );
     this.layout();
   }
 
-  update(state: GameState, frameMs: number, view: ViewStatus) {
+  /** Opens or closes the loadout window */
+  toggleLoadout() {
+    this.loadout.toggle();
+  }
+
+  update(state: GameState, frameMs: number, view: ViewStatus, selection: Selection) {
+    const { screen } = this;
+    this.frames.layout(screen.width, MARGIN + this.column.width + FRAMES_GAP, MARGIN);
+    this.frames.update(state, selection);
+    this.skills.update(state, screen.width, screen.height);
+    this.loadout.update(state.ship);
     const frame = { state, view, frameMs };
+    let column = 0;
     for (const [id, { widget }] of this.onScreen) {
-      if (this.shownIds.has(id)) widget.update(frame);
+      if (!this.shownIds.has(id)) continue;
+      widget.update(frame);
+      column += widget.container.height;
+    }
+    // A text that grew a line (or lost one) moves what is under it
+    if (column !== this.columnHeight) {
+      this.columnHeight = column;
+      this.layout();
     }
     this.settings.update(frame);
 

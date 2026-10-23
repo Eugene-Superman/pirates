@@ -1,23 +1,6 @@
-import { Container, Text } from 'pixi.js';
-import {
-  AMMO,
-  AMMO_IDS,
-  GUNS,
-  GUN_IDS,
-  OFF_TARGET_SHARE,
-  WEAPONS,
-  WEAPON_IDS,
-  gunDamage,
-  type AmmoId,
-  type GameState,
-  type GunId,
-  type HoldReason,
-  type Ship,
-  type ShipClass,
-  type Target,
-  type TargetKind,
-  type WeaponId,
-} from '../../game';
+import { Container, Text, type TextStyleOptions } from 'pixi.js';
+import { WEAPONS, WEAPON_IDS, type GameState, type WeaponId } from '../../game';
+import type { SoundSettings } from '../audio/Sounds';
 import { CAMERA_MODES, type CameraMode } from '../scene/cameraControl';
 import { FOG_LAYERS, type FogLayer } from '../scene/effects/fogOfWar';
 import { NAV_DEBUG, type NavDebug } from '../scene/effects/navDebug';
@@ -27,6 +10,8 @@ import { ButtonRow } from './ButtonRow';
 import { Checkbox } from './Checkbox';
 import { DamagePanel, type DamageActions } from './DamagePanel';
 import { FpsMeter } from './FpsMeter';
+import type { LoadoutActions } from './LoadoutPanel';
+import { show } from './ui';
 
 export const TEXT_STYLE = {
   fontFamily: 'Arial',
@@ -35,8 +20,6 @@ export const TEXT_STYLE = {
   stroke: { color: 0x000000, width: 3 },
 };
 export const LABEL_STYLE = { ...TEXT_STYLE, fontSize: 14 };
-const ALERT_STYLE = { ...LABEL_STYLE, fill: 0xffb347 };
-const NOTE_STYLE = { ...LABEL_STYLE, fill: 0xb8dcef };
 // Camera zoom levels, as multiples of the default zoom
 const ZOOM_LEVELS: readonly number[] = [1, 1.5, 2, 3];
 const CAMERA_LABELS: Readonly<Record<CameraMode, string>> = {
@@ -46,27 +29,18 @@ const CAMERA_LABELS: Readonly<Record<CameraMode, string>> = {
 };
 const FOG_LABELS: Readonly<Record<FogLayer, string>> = { mist: 'Mist', clouds: 'Clouds' };
 const DEBUG_LABELS: Readonly<Record<NavDebug, string>> = { route: 'Route', hulls: 'Hulls and coasts' };
-const TARGET_NAMES: Readonly<Record<TargetKind, string>> = { barrel: 'Barrel', boat: 'Boat', serpent: 'Sea serpent' };
-// Gun and ammo levels on the loadout buttons
-const LEVELS = ['I', 'II', 'III', 'IV', 'V'];
-const AMMO_STEP = 10; // shots the loadout's + button puts in the hold
-const SLOT_NAMES: Readonly<Record<WeaponId, string>> = { cannon: 'Cannon', harpoon: 'Harpoon gun' };
-const AMMO_NAMES: Readonly<Record<WeaponId, string>> = { cannon: 'Cannonballs', harpoon: 'Harpoons' };
-const KIND_NAMES: Readonly<Record<WeaponId, string>> = { cannon: 'cannon', harpoon: 'harpoon' };
-const NATURE_NAMES = { creature: 'creatures', object: 'ships and objects' } as const;
+const HELP_WIDTH = 360; // pixels: the help wraps, so the column leaves room for the frames at the top
 const KNOT = 10; // world units per second: the HUD shows speed in knots, a tenth of the game's units
 const VIEW_STEP = 50; // world units, for the view range buttons
 const VALUE_GAP = 10; // pixels between a row's buttons and what comes after them
 
-export interface HudActions extends DamageActions {
+export interface HudActions extends DamageActions, LoadoutActions {
   /** Stops firing at the target */
   ceaseFire: () => void;
-  /** Fits a gun into one of its weapon's slots, or empties the slot (null). For testing; bought later */
-  fitGun: (weapon: WeaponId, slot: number, gun: GunId | null) => void;
-  /** Picks the ammo its weapon fires */
-  loadAmmo: (ammo: AmmoId) => void;
-  /** Puts ammo in the hold. For testing; bought later */
-  addAmmo: (ammo: AmmoId, count: number) => void;
+  /** Fires at the unit the player picked out, or stops if the ship already does */
+  toggleFire: () => void;
+  /** Starts the repair skill */
+  repair: () => void;
   /** Camera zoom as a multiple of the default one */
   setZoom: (level: number) => void;
   setCameraMode: (mode: CameraMode) => void;
@@ -83,6 +57,10 @@ export interface HudActions extends DamageActions {
   setIslandLook: (index: number) => void;
   /** Shows or hides a debug drawing of the navigation */
   toggleDebug: (kind: NavDebug) => void;
+  /** Turns all sound on or off */
+  toggleSound: () => void;
+  /** Changes the volume by steps (−1 one step down, +1 one up) */
+  changeVolume: (steps: number) => void;
   /** Changes the ship's top speed when intact / when nearly wrecked, world units per second. Tuning, like the damage buttons */
   changeMaxSpeed: (delta: number) => void;
   changeMinSpeed: (delta: number) => void;
@@ -102,6 +80,7 @@ export interface ViewStatus {
   seaStyle: number;
   islandLook: number;
   debug: Readonly<Record<NavDebug, boolean>>;
+  sound: SoundSettings;
 }
 
 /** Everything a HUD item may show in one frame */
@@ -117,7 +96,7 @@ export interface HudWidget {
   update(frame: HudFrame): void;
 }
 
-export const HUD_GROUPS = ['Info', 'Camera', 'World', 'Combat', 'Loadout', 'Ship tuning', 'Debug'] as const;
+export const HUD_GROUPS = ['Info', 'Sound', 'Camera', 'World', 'Combat', 'Ship tuning', 'Debug'] as const;
 export type HudGroup = (typeof HUD_GROUPS)[number];
 
 /**
@@ -134,16 +113,11 @@ export interface HudItem {
   readonly create: () => HudWidget;
 }
 
-/** Assigning Text.text re-renders its texture, so only on change */
-function show(text: Text, value: string) {
-  if (text.text !== value) text.text = value;
-}
-
 function knots(speed: number) {
   return (speed / KNOT).toFixed(1).replace(/\.0$/, '');
 }
 
-function metric(style: typeof TEXT_STYLE, value: (frame: HudFrame) => string): () => HudWidget {
+function metric(style: TextStyleOptions, value: (frame: HudFrame) => string): () => HudWidget {
   return () => {
     const text = new Text({ text: '', style });
     return { container: text, update: (frame) => show(text, value(frame)) };
@@ -174,117 +148,6 @@ function stepper(change: (delta: number) => void, step: number, value: (frame: H
   };
 }
 
-/** What the player is told when the ship holds fire, and what to do about it */
-const HOLD_MESSAGES: Readonly<Record<HoldReason, (ship: Ship) => string>> = {
-  noGuns: (ship) => `No ${WEAPONS[ship.weapon].name.toLowerCase()} fitted: fit some in Settings → Loadout`,
-  noAmmo: (ship) => `Out of ${AMMO[ship.loaded[ship.weapon]].name}: load other ammo or add some in Settings → Loadout`,
-  sight: () => 'Target hidden in the fog: sail closer',
-  range: (ship) => `Target beyond ${KIND_NAMES[ship.weapon]} range: sail closer`,
-};
-
-function attacked(state: GameState): Target | undefined {
-  const { ship } = state;
-  return ship.attackTarget === null ? undefined : state.targets.find((t) => t.id === ship.attackTarget);
-}
-
-/** The selected weapon's guns, ammo and reload; why the ship isn't firing, or that it does little to this target */
-function weaponStatus(): HudWidget {
-  const container = new Container();
-  const status = new Text({ text: '', style: LABEL_STYLE });
-  const alert = new Text({ text: '', style: ALERT_STYLE });
-  const note = new Text({ text: '', style: NOTE_STYLE });
-  alert.y = 22;
-  note.y = 22;
-  container.addChild(status, alert, note);
-  return {
-    container,
-    update: ({ state }) => {
-      const { ship } = state;
-      const weapon = WEAPONS[ship.weapon];
-      const guns = ship.guns[ship.weapon].filter((gun) => gun !== null).length;
-      const ammo = AMMO[ship.loaded[ship.weapon]];
-      const reload = ship.reloads[ship.weapon];
-      const loaded = reload > 0 ? `reloading ${reload.toFixed(1)} s` : 'ready';
-      const target = attacked(state);
-      const aim = target ? `   Firing at: ${TARGET_NAMES[target.kind]} ${target.hp}/${target.maxHp}` : '';
-      show(status, `${weapon.name} ×${guns}, ${ammo.name} ×${ship.ammo[ammo.id]}: ${loaded}${aim}`);
-      show(alert, target && ship.holdReason ? HOLD_MESSAGES[ship.holdReason](ship) : '');
-      // Firing, but with the wrong weapon for it: the player should know it does a fraction of the damage
-      const weak = target && !ship.holdReason && weapon.against !== target.nature;
-      const better = WEAPON_IDS.find((id) => target && WEAPONS[id].against === target.nature);
-      show(
-        note,
-        weak && better
-          ? `${weapon.name} do ${OFF_TARGET_SHARE * 100}% to ${NATURE_NAMES[target.nature]}: ${WEAPONS[better].name} do it all`
-          : '',
-      );
-    },
-  };
-}
-
-/** What one gun does a shot with this ammo: nothing on a 1, roll + bonus, or a critical hit on the die's top */
-function gunSpread(gun: GunId, ammo: AmmoId) {
-  const { die } = GUNS[gun];
-  const { bonus } = AMMO[ammo];
-  return `0 · ${gunDamage(2, die, bonus)}–${gunDamage(die - 1, die, bonus)} · crit ${gunDamage(die, die, bonus)}`;
-}
-
-/** The loadout's controls for one weapon: a row per slot (with what its gun does a shot), then the ammo */
-function loadoutItems(actions: HudActions, shipClass: ShipClass): HudItem[] {
-  return WEAPON_IDS.flatMap((weapon): HudItem[] => {
-    const slots = shipClass.slots[weapon].map((_, slot): HudItem => ({
-      id: `slot-${weapon}-${slot}`,
-      group: 'Loadout',
-      label: `${SLOT_NAMES[weapon]} ${slot + 1}`,
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const row = new ButtonRow<GunId | 'empty'>([
-          { label: 'Empty', key: 'empty', onTap: () => actions.fitGun(weapon, slot, null) },
-          ...GUN_IDS[weapon].map((gun) => ({
-            label: LEVELS[GUNS[gun].level - 1],
-            key: gun,
-            onTap: () => actions.fitGun(weapon, slot, gun),
-          })),
-        ]);
-        const name = new Text({ text: ' ', style: LABEL_STYLE });
-        return control(row, name, ({ state: { ship } }) => {
-          const gun = ship.guns[weapon][slot] ?? null;
-          row.setActive(gun ?? 'empty');
-          show(name, gun ? `${GUNS[gun].name} (1–${GUNS[gun].die}): ${gunSpread(gun, ship.loaded[weapon])}` : 'empty');
-        });
-      },
-    }));
-    const ammo: HudItem = {
-      id: `ammo-${weapon}`,
-      group: 'Loadout',
-      label: AMMO_NAMES[weapon],
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        // Holds the loaded ammo's id for the + button, set every frame from the ship
-        let current: AmmoId = AMMO_IDS[weapon][0];
-        const row = new ButtonRow<AmmoId>([
-          ...AMMO_IDS[weapon].map((id) => ({
-            label: LEVELS[AMMO[id].level - 1],
-            key: id,
-            onTap: () => actions.loadAmmo(id),
-          })),
-          { label: `+${AMMO_STEP}`, key: null, onTap: () => actions.addAmmo(current, AMMO_STEP) },
-        ]);
-        const stock = new Text({ text: ' ', style: LABEL_STYLE });
-        return control(row, stock, ({ state: { ship } }) => {
-          current = ship.loaded[weapon];
-          row.setActive(current);
-          const counts = AMMO_IDS[weapon].map((id) => `${LEVELS[AMMO[id].level - 1]} ×${ship.ammo[id]}`);
-          show(stock, `${counts.join('  ')}   (+${AMMO[current].bonus} each)`);
-        });
-      },
-    };
-    return [...slots, ammo];
-  });
-}
-
 function fps(): HudWidget {
   const text = new Text({ text: 'FPS: …', style: TEXT_STYLE });
   const meter = new FpsMeter(text);
@@ -292,7 +155,7 @@ function fps(): HudWidget {
 }
 
 /** Everything the HUD can show, in the order it is shown on the screen; the settings panel groups them */
-export function hudItems(actions: HudActions, shipClass: ShipClass): readonly HudItem[] {
+export function hudItems(actions: HudActions): readonly HudItem[] {
   return [
     {
       id: 'help',
@@ -301,8 +164,9 @@ export function hudItems(actions: HudActions, shipClass: ShipClass): readonly Hu
       kind: 'metric',
       onScreen: true,
       create: metric(
-        { ...TEXT_STYLE, fontSize: 13 },
-        () => 'Click on the sea to sail. Click a target to fire at it; click it again or press Esc to stop',
+        { ...TEXT_STYLE, fontSize: 13, wordWrap: true, wordWrapWidth: HELP_WIDTH },
+        () =>
+          'Click the sea to sail · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop',
       ),
     },
     {
@@ -321,12 +185,33 @@ export function hudItems(actions: HudActions, shipClass: ShipClass): readonly Hu
       group: 'Info',
       label: 'Hull',
       kind: 'metric',
-      onScreen: true,
+      // The frame at the top shows it
+      onScreen: false,
       create: metric(TEXT_STYLE, ({ state: { ship } }) => {
         return `Hull: ${ship.hp}/${ship.maxHp} (${Math.round(ship.health)}%, ${ship.damageStage})`;
       }),
     },
     { id: 'fps', group: 'Info', label: 'FPS', kind: 'metric', onScreen: true, create: fps },
+    {
+      id: 'sound',
+      group: 'Sound',
+      label: 'Sound',
+      kind: 'control',
+      onScreen: true,
+      // On/off (lit while on), then the volume down and up
+      create: () => {
+        const row = new ButtonRow<'on'>([
+          { label: 'On', key: 'on', onTap: actions.toggleSound },
+          { label: '−', key: null, onTap: () => actions.changeVolume(-1) },
+          { label: '+', key: null, onTap: () => actions.changeVolume(1) },
+        ]);
+        const volume = new Text({ text: ' ', style: LABEL_STYLE });
+        return control(row, volume, ({ view: { sound } }) => {
+          row.setActive(sound.enabled ? 'on' : null);
+          show(volume, sound.enabled ? `Volume ${Math.round(sound.volume * 100)}%` : 'Muted');
+        });
+      },
+    },
     {
       id: 'zoom',
       group: 'Camera',
@@ -422,7 +307,8 @@ export function hudItems(actions: HudActions, shipClass: ShipClass): readonly Hu
       group: 'Combat',
       label: 'Weapon',
       kind: 'control',
-      onScreen: true,
+      // The skill bar picks the weapon too
+      onScreen: false,
       // The weapon to fire, and a button to stop firing (lit while the ship has a target)
       create: () => {
         const row = new ButtonRow<WeaponId | 'fire'>([
@@ -447,7 +333,6 @@ export function hudItems(actions: HudActions, shipClass: ShipClass): readonly Hu
         return control(row, null, ({ view }) => row.setPressed((id) => view.ranges[id]));
       },
     },
-    ...loadoutItems(actions, shipClass),
     {
       id: 'damage',
       group: 'Ship tuning',
@@ -499,15 +384,6 @@ export function hudItems(actions: HudActions, shipClass: ShipClass): readonly Hu
         );
         return control(row, null, ({ view }) => row.setPressed((kind) => view.debug[kind]));
       },
-    },
-    // Last on the screen: under the controls, where the warning about held fire shows
-    {
-      id: 'weaponStatus',
-      group: 'Info',
-      label: 'Weapon status',
-      kind: 'metric',
-      onScreen: true,
-      create: weaponStatus,
     },
   ];
 }

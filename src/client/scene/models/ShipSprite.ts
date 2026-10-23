@@ -29,7 +29,8 @@ interface FrameSet {
 const DEG = Math.PI / 180;
 // Atlases are public/sprites/ships/<line>/<id>/<stage>.{webp,json}, mirroring blender-assets/ships/<line>/<id>/.
 // The damage stages each class has art for; any other stage shows the nearest one before it
-const ATLAS_STAGES: Readonly<Record<ShipClassId, readonly DamageStage[]>> = {
+// (the bots' classes have none: they are vector-drawn, models/botShip3d.ts)
+const ATLAS_STAGES: Readonly<Partial<Record<ShipClassId, readonly DamageStage[]>>> = {
   sloop: DAMAGE_STAGES,
 };
 const SPRITES = `${import.meta.env.BASE_URL}sprites/ships`;
@@ -73,7 +74,7 @@ export class ShipSprite {
   constructor(shipClass: ShipClass) {
     this.sprite.visible = false;
     const folder = `${SPRITES}/${shipClass.line}/${shipClass.id}`;
-    for (const stage of ATLAS_STAGES[shipClass.id]) {
+    for (const stage of ATLAS_STAGES[shipClass.id] ?? []) {
       const url = `${folder}/${stage}.json`;
       // Every atlas names its frames ship_00…ship_63, so each needs its own prefix in Pixi's texture cache
       Assets.load<Spritesheet>({ src: url, data: { cachePrefix: `${url}#` } })

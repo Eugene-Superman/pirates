@@ -4,6 +4,8 @@ import ISLAND_SHAPES from './islandShapes.json';
 
 export const WORLD_WIDTH = 4000;
 export const WORLD_HEIGHT = 4000;
+/** Where a player's ship comes into the game, and comes back after it was sunk: the middle of the world */
+export const START: Point = { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 };
 
 export interface Palm {
   x: number;
@@ -28,7 +30,7 @@ export const ISLAND_SHAPE_LIST: readonly IslandShape[] = ISLAND_SHAPES;
 
 const ISLAND_COUNT = 25;
 const ISLAND_SCALE = [0.85, 1.15] as const; // how much an island may differ in size from its shape
-const SPAWN_CLEARANCE = 400; // world units of open water round the ship's start beyond an island's reach
+const START_CLEARANCE = 400; // world units of open water round the start beyond an island's reach
 const ISLAND_GAP = 150; // world units between two islands' reach at least
 
 export interface Island {
@@ -75,8 +77,6 @@ function coastline(x: number, y: number, radius: number, shape: readonly number[
 
 function createIslands(count: number, random: () => number): Island[] {
   const islands: Island[] = [];
-  const spawnX = WORLD_WIDTH / 2;
-  const spawnY = WORLD_HEIGHT / 2;
   // The shapes take turns in a shuffled order, so each of them is on the map two or three times
   const order = ISLAND_SHAPE_LIST.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
@@ -92,7 +92,7 @@ function createIslands(count: number, random: () => number): Island[] {
     const x = reach + 100 + random() * (WORLD_WIDTH - 2 * (reach + 100));
     const y = reach + 100 + random() * (WORLD_HEIGHT - 2 * (reach + 100));
 
-    if (Math.hypot(x - spawnX, y - spawnY) < reach + SPAWN_CLEARANCE) continue;
+    if (Math.hypot(x - START.x, y - START.y) < reach + START_CLEARANCE) continue;
     if (islands.some((o) => Math.hypot(x - o.x, y - o.y) < reach + o.reach + ISLAND_GAP)) continue;
 
     const height = template.height * scale;

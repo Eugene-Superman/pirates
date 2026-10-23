@@ -174,7 +174,11 @@ export class NavGrid {
     return row * this.cols + col;
   }
 
-  /** A* over the cells with enough clearance (the start cell may lack it: a ship scraping a coast). Cells start → goal */
+  /**
+   * A* over the cells with enough clearance. The start and goal cells may lack it at their centres: a ship scraping a
+   * coast, a goal that fits where it is (nearestOpen blends the clearance) but not in its cell's middle. Cells start →
+   * goal
+   */
   private searchCells(start: number, goal: number, need: number): number[] | null {
     const stampId = ++this.search;
     const { cols, clearance, stamp, cost, from, closed } = this;
@@ -211,7 +215,7 @@ export class NavGrid {
         const r = row + dy;
         if (c < 0 || r < 0 || c >= cols || r >= this.rows) continue;
         const next = r * cols + c;
-        if (clearance[next] < need) continue;
+        if (clearance[next] < need && next !== goal) continue;
         // No cutting a corner of land diagonally
         if (dx !== 0 && dy !== 0 && (clearance[row * cols + c] < need || clearance[r * cols + col] < need)) continue;
         const g = cost[current] + step;

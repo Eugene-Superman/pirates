@@ -1,7 +1,8 @@
 # Pirate Game
 
 Frontend of a browser naval game in the style of _Pirate Storm: Death or Glory_.
-Click on the sea and the ship sails there, steering around islands.
+Click on the sea and the ship sails there, steering around islands. Bots (ships and sea monsters, neutral or
+aggressive) roam the sea; the player fights them with cannons and harpoons and repairs between fights.
 Camera: classic 2:1 isometric pseudo-3D (no perspective) — the target look of the game.
 
 Stack: TypeScript 7 (strict) + Pixi.js v8 + Vite 8, Prettier + Oxlint. No backend yet, no tests.
@@ -41,43 +42,60 @@ src/
     index.ts           public API: everything outside game/ imports it only from here
     Game.ts            owns GameState, update(dt) advances the simulation in a fixed order
     GameState.ts       everything the client reads and draws
-    world/World.ts     world size, islands placed from a fixed seed, each one of ten shapes (islandShapes.json,
-                       written by blender-assets/islands/build_islands.py with their pictures), islandOutline
-    ships/Ship.ts      a ship's state: target and route, steering, hull points, guns in slots, ammo, fire lock
-    ships/shipClasses.ts  ship catalog: lines and classes with size and handling; STARTER_SHIP (the starter sloop)
+    world/World.ts     world size, START (where a player's ship comes in), islands placed from a fixed seed, each one
+                       of ten shapes (islandShapes.json, written by blender-assets/islands/build_islands.py with their
+                       pictures), islandOutline
+    ships/Ship.ts      anything that sails under a pilot (the player's ship, bots' ships, sea monsters): target and
+                       route, steering, hull points, guns in slots, ammo, fire lock, combat time, repairs
+    ships/shipClasses.ts  ship catalog: lines and classes with size, handling, gun slots (or a monster's jaws);
+                       the bots' hulls too; STARTER_SHIP (the starter sloop)
     ships/damage.ts    hull health scale (0–100 %) and the damage stages derived from it
-    combat/            weapons.ts (cannons, harpoons: range, speed, reload, what each is made for), arsenal.ts
-                       (guns and ammo by level, the damage dice), targets.ts (practice targets with hit points: a
-                       barrel, a boat and a sea serpent), combat.ts (fire locks, volleys, homing projectiles, damage)
+    ships/repair.ts    the repair skill: 2 % of the hull a second out of combat
+    combat/            weapons.ts (cannons, harpoons: how shots fly, what each is made for), arsenal.ts (20 guns and
+                       14 ammo from the balance table, each gun with its own reach and reload; the damage dice),
+                       targets.ts (the practice barrel), units.ts (anything that can be fired at, by id: ships and
+                       targets), combat.ts (fire locks, volleys of the guns loaded and in reach, homing projectiles,
+                       monsters' bites, damage)
+    bots/              botKinds.ts (kinds of bots: hull, neutral or aggressive, how many, respawn time), brain.ts
+                       (what a bot does: wander, attack, fight back or run, give up), spawner.ts (the first bots, and
+                       sunk ones replaced where no player sees)
     navigation/        NavGrid.ts (open water as a grid with clearance from land; routes round islands, A*),
                        pilot.ts (steers each ship along its route, slows for turns, swerves round ships and targets)
     physics/           hull.ts (hulls as capsules, the Body interface), collisions.ts (ships pushed out of coasts,
                        targets and each other, sliding instead of stopping)
     lib/               math.ts (clamp, normalizeAngle), geometry.ts (points, segments, polygons), random.ts (seeded createRandom)
   client/              BROWSER: Pixi, DOM, input. Reads GameState, never mutates it except through game methods
-    GameClient.ts      wires Game + SceneView + Hud + input, runs the frame loop
-    input/             pointerInput.ts: mouse/touch → ship.setTarget, or ship.attack / ceaseFire on a target;
-                       keyboardInput.ts: Escape → ceaseFire
-    hud/               Hud.ts (screen-space overlay: the items picked in the settings, a Settings button),
-                       hudItems.ts (every metric and control the HUD can show, grouped; Loadout is the test menu for
-                       guns and ammo), SettingsPanel.ts (dev settings:
-                       all controls, and checkboxes for what is also on the screen), FpsMeter.ts,
-                       ButtonRow.ts (a row of HUD buttons), Checkbox.ts, DamagePanel.ts (debug buttons that set hull health)
+    GameClient.ts      wires Game + SceneView + Hud + Sounds + input, runs the frame loop
+    audio/             Sounds.ts: the game's sounds (Web Audio), shots by the game's events, volume and mute
+    input/             pointerInput.ts: mouse/touch → ship.setTarget; a click picks a unit out (selection.ts,
+                       client state), a double click attacks it; keyboardInput.ts (by key code, any layout): Space
+                       attacks the unit picked out, Escape stops firing or lets go of it, R repairs, L the loadout
+    hud/               Hud.ts (screen-space overlay: the items picked in the settings, a Settings button, and these:)
+                       UnitFrames.ts (the hull of the player's ship and of the unit picked out, at the top),
+                       SkillBar.ts (at the bottom: the repair skill, each weapon with its ammo, the loadout button),
+                       LoadoutPanel.ts (the loadout window: guns in the slots, ammo; a testing tool for now),
+                       hudItems.ts (every metric and control the settings can show, grouped), SettingsPanel.ts (dev
+                       settings: all controls, and checkboxes for what is also on the screen), ui.ts (the HUD's
+                       colors, clickable tiles, icons), FpsMeter.ts, ButtonRow.ts (a row of HUD buttons),
+                       Checkbox.ts, DamagePanel.ts (debug buttons that set hull health)
     render/            3D engine with no game knowledge
       Camera3D.ts      parallel projection world → camera → screen and back (screenToGround)
       Painter3D.ts     3D primitives on top of Pixi Graphics: projection, lighting, shadows
     scene/
       SceneView.ts     isometric scene: draw order, redraws every frame
       cameraControl.ts how the camera keeps up with the ship: follow / dead zone / recenter
-      models/          island3d.ts (low-poly islands), barrel3d.ts, targetBoat3d.ts, serpent3d.ts (the sea
-                       serpent), projectile3d.ts (cannonball, harpoon) — 3D models; IslandSprites.ts — textured islands from their Blender pictures;
-                       ShipSprite.ts — ships from their Blender atlases
+      models/          island3d.ts (low-poly islands), barrel3d.ts, botShip3d.ts (the bots' ships), serpent3d.ts and
+                       turtle3d.ts (sea monsters), projectile3d.ts (cannonball, harpoon) — 3D models;
+                       IslandSprites.ts — textured islands from their Blender pictures;
+                       ShipSprite.ts — the player's ship from its Blender atlases
       effects/         client-only decorations with their own state: Wake.ts (wakes of everything that sails, one
                        shader), foam.ts (what the wakes and the wreck's water share), waves.ts, targetMarker.ts,
                        ShipFire.ts (fire and smoke of a damaged ship), Sinking.ts
                        (the sinking animation, and the water round the wreck: churn, ring waves, bubbles),
-                       ShotEffects.ts (muzzle flashes, smoke, splashes, splinters), DamageNumbers.ts (damage
-                       floating up over a target), targetLock.ts (the ring round the target fired at), rangeRings.ts, wind.ts,
+                       ShotEffects.ts (muzzle flashes, smoke, splashes, splinters, bites), DamageNumbers.ts (damage
+                       and repairs floating up), Wrecks.ts (sunk bots going down), RepairEffect.ts (a ship under
+                       repair), Trails.ts (where each serpent swam, for its body), targetLock.ts (the rings round
+                       the target fired at and the unit picked out), rangeRings.ts, wind.ts,
                        fogOfWar.ts (haze and mist beyond the ship's view range, one shader), FogClouds.ts (its puffs),
                        seaSurface.ts (the sea's surface, one shader), seaStyles.ts (its looks, switched by the HUD)
 public/sprites/ships/  ship atlases: <line>/<id>/<damage stage>.{webp,json}, rendered in Blender from a source
@@ -85,12 +103,15 @@ public/sprites/ships/  ship atlases: <line>/<id>/<damage stage>.{webp,json}, ren
 public/sprites/fog/    fog of war textures (puffs.webp/json, wisps.webp), made by blender-assets/effects/fog/build_fog.py
 public/sprites/sea/    sea wave maps and caustics, made by blender-assets/effects/sea/build_sea.py
 public/sprites/foam/   foam for the wakes and the water round a wreck, made by blender-assets/effects/foam/build_foam.py
+public/sounds/         shot sounds (cannon.mp3, harpoon.mp3) made from CC0 recordings by blender-assets/sounds/build_sounds.py;
+                       their sources are in CREDITS.md there
 public/sprites/islands/ island pictures: <look>/<shape>_ground|_raised.webp + islands.json, made by build_islands.py
 docs/ships.md          ship lines (planned factions and tiers), where a ship's files live, how to add a ship
 ```
 
-Frame flow (`GameClient`): `game.update(dt)` → `view.update(dt)` (updates the wake and effects, reading the game's
-`state.events` of this update, then draws) → `hud.update(...)`.
+Frame flow (`GameClient`): `game.update(dt)` → the selection is let go of if its unit sank or went into the fog →
+`view.update(dt)` (updates the wake and effects, reading the game's `state.events` of this update, then draws) →
+`sounds.update(...)` (plays the same events) → `hud.update(...)`.
 `dt` is in seconds, capped at 0.05.
 
 Core rule: **`game/` knows nothing about the client; the client changes game state only through game methods.**
@@ -143,7 +164,8 @@ The project uses **Pixi v8**. Do not use v7 API (`beginFill`, `drawCircle`, `lin
 
 Separate files in `.claude/rules/` are loaded when working on the matching part of the code:
 
-- [.claude/rules/game-logic.md](.claude/rules/game-logic.md) — `src/game/**`: units, map determinism, ship physics
+- [.claude/rules/game-logic.md](.claude/rules/game-logic.md) — `src/game/**`: units, map determinism, ship physics,
+  combat, bots, repairs
 - [.claude/rules/rendering-3d.md](.claude/rules/rendering-3d.md) — `src/client/**`: coordinate systems, draw order, effects, performance
 
 ## Git
