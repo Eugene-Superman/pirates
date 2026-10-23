@@ -1,6 +1,7 @@
 import type { Application } from 'pixi.js';
 import type { Game } from '../game';
 import { Hud } from './hud/Hud';
+import { bindKeyboardInput } from './input/keyboardInput';
 import { bindPointerInput } from './input/pointerInput';
 import { SceneView } from './scene/SceneView';
 
@@ -34,14 +35,21 @@ export class GameClient {
         setIslandLook: (index) => this.view.setIslandLook(index),
         toggleDebug: (kind) => this.view.toggleDebug(kind),
         setWeapon: (weapon) => ship.setWeapon(weapon),
+        ceaseFire: () => ship.ceaseFire(),
+        // The loadout: a testing tool for now, a shipyard and a shop later
+        fitGun: (weapon, slot, gun) => ship.fitGun(weapon, slot, gun),
+        loadAmmo: (ammo) => ship.loadAmmo(ammo),
+        addAmmo: (ammo, count) => ship.addAmmo(ammo, count),
         changeMaxSpeed: (delta) => ship.setSpeeds(ship.maxSpeed + delta, ship.minSpeed),
         changeMinSpeed: (delta) => ship.setSpeeds(ship.maxSpeed, ship.minSpeed + delta),
         changeViewRange: (delta) => ship.setViewRange(ship.viewRange + delta),
       },
       app.screen,
+      ship.shipClass,
     );
     app.stage.addChild(this.view.container, this.hud.container);
     bindPointerInput(app, this.view, game.state.ship);
+    bindKeyboardInput(game.state.ship);
   }
 
   start() {

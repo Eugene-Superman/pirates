@@ -43,11 +43,12 @@ src/
     GameState.ts       everything the client reads and draws
     world/World.ts     world size, islands placed from a fixed seed, each one of ten shapes (islandShapes.json,
                        written by blender-assets/islands/build_islands.py with their pictures), islandOutline
-    ships/Ship.ts      a ship's state: target and route, steering, hull, weapons
+    ships/Ship.ts      a ship's state: target and route, steering, hull points, guns in slots, ammo, fire lock
     ships/shipClasses.ts  ship catalog: lines and classes with size and handling; STARTER_SHIP (the starter sloop)
     ships/damage.ts    hull health scale (0–100 %) and the damage stages derived from it
-    combat/            weapons.ts (cannon, harpoon: range, speed, reload), targets.ts (practice targets: a barrel
-                       and a boat sailing in circles), combat.ts (firing, homing projectiles, hits, events)
+    combat/            weapons.ts (cannons, harpoons: range, speed, reload, what each is made for), arsenal.ts
+                       (guns and ammo by level, the damage dice), targets.ts (practice targets with hit points: a
+                       barrel, a boat and a sea serpent), combat.ts (fire locks, volleys, homing projectiles, damage)
     navigation/        NavGrid.ts (open water as a grid with clearance from land; routes round islands, A*),
                        pilot.ts (steers each ship along its route, slows for turns, swerves round ships and targets)
     physics/           hull.ts (hulls as capsules, the Body interface), collisions.ts (ships pushed out of coasts,
@@ -55,9 +56,11 @@ src/
     lib/               math.ts (clamp, normalizeAngle), geometry.ts (points, segments, polygons), random.ts (seeded createRandom)
   client/              BROWSER: Pixi, DOM, input. Reads GameState, never mutates it except through game methods
     GameClient.ts      wires Game + SceneView + Hud + input, runs the frame loop
-    input/             pointerInput.ts: mouse/touch → ship.setTarget, or ship.orderFire on a target
+    input/             pointerInput.ts: mouse/touch → ship.setTarget, or ship.attack / ceaseFire on a target;
+                       keyboardInput.ts: Escape → ceaseFire
     hud/               Hud.ts (screen-space overlay: the items picked in the settings, a Settings button),
-                       hudItems.ts (every metric and control the HUD can show, grouped), SettingsPanel.ts (dev settings:
+                       hudItems.ts (every metric and control the HUD can show, grouped; Loadout is the test menu for
+                       guns and ammo), SettingsPanel.ts (dev settings:
                        all controls, and checkboxes for what is also on the screen), FpsMeter.ts,
                        ButtonRow.ts (a row of HUD buttons), Checkbox.ts, DamagePanel.ts (debug buttons that set hull health)
     render/            3D engine with no game knowledge
@@ -66,18 +69,22 @@ src/
     scene/
       SceneView.ts     isometric scene: draw order, redraws every frame
       cameraControl.ts how the camera keeps up with the ship: follow / dead zone / recenter
-      models/          island3d.ts (low-poly islands), barrel3d.ts, targetBoat3d.ts, projectile3d.ts (cannonball,
-                       harpoon) — 3D models; IslandSprites.ts — textured islands from their Blender pictures;
+      models/          island3d.ts (low-poly islands), barrel3d.ts, targetBoat3d.ts, serpent3d.ts (the sea
+                       serpent), projectile3d.ts (cannonball, harpoon) — 3D models; IslandSprites.ts — textured islands from their Blender pictures;
                        ShipSprite.ts — ships from their Blender atlases
-      effects/         client-only decorations with their own state: Wake.ts (foam), waves.ts, targetMarker.ts,
-                       ShipFire.ts (fire and smoke of a damaged ship), Sinking.ts (the sinking animation),
-                       ShotEffects.ts (muzzle flashes, smoke, splashes, splinters), rangeRings.ts, wind.ts,
+      effects/         client-only decorations with their own state: Wake.ts (wakes of everything that sails, one
+                       shader), foam.ts (what the wakes and the wreck's water share), waves.ts, targetMarker.ts,
+                       ShipFire.ts (fire and smoke of a damaged ship), Sinking.ts
+                       (the sinking animation, and the water round the wreck: churn, ring waves, bubbles),
+                       ShotEffects.ts (muzzle flashes, smoke, splashes, splinters), DamageNumbers.ts (damage
+                       floating up over a target), targetLock.ts (the ring round the target fired at), rangeRings.ts, wind.ts,
                        fogOfWar.ts (haze and mist beyond the ship's view range, one shader), FogClouds.ts (its puffs),
                        seaSurface.ts (the sea's surface, one shader), seaStyles.ts (its looks, switched by the HUD)
 public/sprites/ships/  ship atlases: <line>/<id>/<damage stage>.{webp,json}, rendered in Blender from a source
                        outside this repo — don't edit by hand
 public/sprites/fog/    fog of war textures (puffs.webp/json, wisps.webp), made by blender-assets/effects/fog/build_fog.py
 public/sprites/sea/    sea wave maps and caustics, made by blender-assets/effects/sea/build_sea.py
+public/sprites/foam/   foam for the wakes and the water round a wreck, made by blender-assets/effects/foam/build_foam.py
 public/sprites/islands/ island pictures: <look>/<shape>_ground|_raised.webp + islands.json, made by build_islands.py
 docs/ships.md          ship lines (planned factions and tiers), where a ship's files live, how to add a ship
 ```

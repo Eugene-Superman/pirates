@@ -1,5 +1,6 @@
+import { AMMO, AMMO_IDS, GUNS, STARTING_AMMO, type AmmoId, type Gun, type GunId } from '../combat/arsenal';
+import type { HoldReason, WeaponId } from '../combat/weapons';
 import { clamp, normalizeAngle } from '../lib/math';
-import type { WeaponId } from '../combat/weapons';
 import type { Point } from '../lib/geometry';
 import { newPilotMemory, type Helm } from '../navigation/pilot';
 import { hullReach, type Body, type Hull } from '../physics/hull';
@@ -36,20 +37,29 @@ export class Ship implements Body {
   /** Rough size for effects and the view; collisions use the hull */
   readonly radius: number;
   readonly hull: Hull;
-  /** Hull integrity, percent of MAX_HEALTH */
-  health = MAX_HEALTH;
+  /** Hull points of the ship when new; `hp` is what is left. Damage takes hull points away */
+  readonly maxHp: number;
+  hp: number;
   /** Where the player sent the ship; null when it is not going anywhere */
   target: Point | null = null;
   /** Waypoints to the target round islands, planned by the pilot; the last one is where the ship stops */
   route: Point[] = [];
   /** What the pilot remembers between updates */
   readonly pilot = newPilotMemory();
-  /** The weapon the next shot uses */
+  /** The weapon the ship fires: all its guns together, a volley */
   weapon: WeaponId = 'cannon';
   /** Seconds until each weapon can fire again */
   readonly reloads: Record<WeaponId, number> = { cannon: 0, harpoon: 0 };
-  /** The target the player wants to shoot at; fired as soon as the selected weapon is loaded */
-  fireOrder: number | null = null;
+  /** The gun in each of the class's slots, by weapon; null for an empty slot */
+  readonly guns: Record<WeaponId, (GunId | null)[]>;
+  /** Cannonballs and harpoons in the hold */
+  readonly ammo: Record<AmmoId, number> = { ...STARTING_AMMO };
+  /** The ammo each weapon fires */
+  readonly loaded: Record<WeaponId, AmmoId> = { cannon: AMMO_IDS.cannon[0], harpoon: AMMO_IDS.harpoon[0] };
+  /** The target the ship fires at, volley after volley, until told to stop or the target is gone; null for none */
+  attackTarget: number | null = null;
+  /** Why it isn't firing at its target right now (set by combat every update); null when it is, or has no target */
+  holdReason: HoldReason | null = null;
 
   constructor(shipClass: ShipClass) {
     this.shipClass = shipClass;
@@ -61,6 +71,9 @@ export class Ship implements Body {
     this.hull = shipClass.hull;
     this.minSpeed = shipClass.minSpeed;
     this.viewRange = shipClass.viewRange;
+    this.maxHp = shipClass.hp;
+    this.hp = shipClass.hp;
+    this.guns = { cannon: [...shipClass.startingGuns.cannon], harpoon: [...shipClass.startingGuns.harpoon] };
   }
 
   get heading() {
@@ -96,22 +109,36 @@ export class Ship implements Body {
     this.minSpeed = clamp(min, 0, this.maxSpeed);
   }
 
+  /** Hull integrity in percent of MAX_HEALTH: what the damage stages and the speed go by */
+  get health() {
+    return (this.hp / this.maxHp) * MAX_HEALTH;
+  }
+
   get damageStage(): DamageStage {
     return damageStage(this.health);
   }
 
   /** A sinking ship can't be steered any more */
   get isSinking() {
-    return this.health <= 0;
+    return this.hp <= 0;
   }
 
-  /** Sets hull integrity directly, in percent. For now only the debug buttons use it; later combat will */
+  /** Sets hull integrity directly, in percent. For the debug buttons */
   setHealth(health: number) {
-    this.health = clamp(health, 0, MAX_HEALTH);
+    this.setHp((clamp(health, 0, MAX_HEALTH) / MAX_HEALTH) * this.maxHp);
+  }
+
+  /** Takes hull points away: what a hit does */
+  takeDamage(amount: number) {
+    this.setHp(this.hp - amount);
+  }
+
+  private setHp(hp: number) {
+    this.hp = Math.round(clamp(hp, 0, this.maxHp));
     if (this.isSinking) {
       this.target = null;
       this.route = [];
-      this.fireOrder = null;
+      this.attackTarget = null;
     }
   }
 
@@ -119,10 +146,41 @@ export class Ship implements Body {
     this.weapon = weapon;
   }
 
-  /** Shoot at a target with the selected weapon. If it is out of range when the weapon is loaded, the ship holds fire */
-  orderFire(targetId: number) {
+  /** Fire at a target with the selected weapon, every time it is loaded, until ceaseFire or the target is gone */
+  attack(targetId: number) {
     if (this.isSinking) return;
-    this.fireOrder = targetId;
+    this.attackTarget = targetId;
+  }
+
+  ceaseFire() {
+    this.attackTarget = null;
+    this.holdReason = null;
+  }
+
+  /** Fits a gun of its weapon into a slot, or empties the slot (null). Anything else is ignored */
+  fitGun(weapon: WeaponId, slot: number, gun: GunId | null) {
+    if (slot < 0 || slot >= this.guns[weapon].length) return;
+    if (gun !== null && GUNS[gun].weapon !== weapon) return;
+    this.guns[weapon][slot] = gun;
+  }
+
+  /** The fitted guns of a weapon with their slots, in slot order */
+  fittedGuns(weapon: WeaponId) {
+    const fitted: { gun: Gun; slot: number }[] = [];
+    this.guns[weapon].forEach((id, slot) => {
+      if (id !== null) fitted.push({ gun: GUNS[id], slot });
+    });
+    return fitted;
+  }
+
+  /** Picks the ammo its weapon fires from now on */
+  loadAmmo(ammo: AmmoId) {
+    this.loaded[AMMO[ammo].weapon] = ammo;
+  }
+
+  /** Puts ammo in the hold (or takes it out, for a negative count). For testing now; bought later */
+  addAmmo(ammo: AmmoId, count: number) {
+    this.ammo[ammo] = Math.max(0, this.ammo[ammo] + count);
   }
 
   /** Sends the ship somewhere; the pilot finds the way round islands and other ships */

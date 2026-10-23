@@ -1,5 +1,5 @@
 import { Container, Graphics, type Rectangle, Text } from 'pixi.js';
-import type { GameState } from '../../game';
+import type { GameState, ShipClass } from '../../game';
 import { ButtonRow } from './ButtonRow';
 import { LABEL_STYLE, hudItems, type HudActions, type HudItem, type HudWidget, type ViewStatus } from './hudItems';
 import { SettingsPanel } from './SettingsPanel';
@@ -21,19 +21,34 @@ interface Shown {
   readonly label: Text | null;
 }
 
+function strings(value: unknown) {
+  return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : null;
+}
+
+/**
+ * The items on the screen as last saved, plus items added to the game since (not among the saved `known` ones) that
+ * are on the screen by default. An old save is a bare list of the shown ones
+ */
 function loadShown(items: readonly HudItem[]) {
+  const defaults = items.filter((item) => item.onScreen).map((item) => item.id);
   try {
     const saved: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (Array.isArray(saved)) return new Set(saved.filter((id): id is string => typeof id === 'string'));
+    const old = strings(saved);
+    if (old) return new Set(old);
+    if (typeof saved === 'object' && saved !== null && 'shown' in saved && 'known' in saved) {
+      const shown = strings(saved.shown) ?? [];
+      const known = new Set(strings(saved.known) ?? []);
+      return new Set([...shown, ...defaults.filter((id) => !known.has(id))]);
+    }
   } catch {
     // Storage blocked or broken: the defaults
   }
-  return new Set(items.filter((item) => item.onScreen).map((item) => item.id));
+  return new Set(defaults);
 }
 
-function saveShown(ids: ReadonlySet<string>) {
+function saveShown(items: readonly HudItem[], ids: ReadonlySet<string>) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ shown: [...ids], known: items.map((item) => item.id) }));
   } catch {
     // Not kept for the next reload, that's all
   }
@@ -52,8 +67,9 @@ export class Hud {
   /** The camera's zone, outlined across the screen behind the HUD's buttons */
   private readonly zoneOutline = new Graphics();
 
-  constructor(actions: HudActions, screen: Rectangle) {
-    this.items = hudItems(actions);
+  /** shipClass: the player's ship's, for its gun slots */
+  constructor(actions: HudActions, screen: Rectangle, shipClass: ShipClass) {
+    this.items = hudItems(actions, shipClass);
     this.shownIds = loadShown(this.items);
     this.settings = new SettingsPanel(
       this.items,
@@ -83,7 +99,7 @@ export class Hud {
 
   private toggle(id: string) {
     if (!this.shownIds.delete(id)) this.shownIds.add(id);
-    saveShown(this.shownIds);
+    saveShown(this.items, this.shownIds);
     this.layout();
   }
 

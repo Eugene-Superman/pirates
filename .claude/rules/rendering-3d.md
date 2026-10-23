@@ -22,8 +22,10 @@ paths:
 - Immediate mode: `scene.clear()` and a full redraw every frame via `Painter3D`.
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
   The exceptions are things projected elsewhere: the ship sprite and its water mask, the island pictures (`IslandSprites`)
-  and fog puffs (`FogClouds`), all rendered in Blender for this camera, and the two shader meshes (`seaSurface.ts`,
-  `fogOfWar.ts`), whose vertices are projected with `Camera3D` every frame.
+  and fog puffs (`FogClouds`), all rendered in Blender for this camera; the four shader meshes (`seaSurface.ts`,
+  `fogOfWar.ts`, `Wake.ts`, the water round a wreck in `Sinking.ts`), whose vertices are projected with `Camera3D`
+  every frame; and what stays the same size at every zoom, drawn in screen pixels at a projected point: the targets'
+  hit point bars (`SceneView.drawHpBars`) and the damage numbers (`DamageNumbers`).
 - No perspective: sizes don't depend on distance, line widths are `width * camera.zoom`.
 - `camera.zoom` changes at runtime: the HUD's zoom buttons call `SceneView.setZoom`, and `update` eases the camera towards it.
   Read `camera.zoom` every frame; never cache it or anything derived from it.
@@ -48,9 +50,10 @@ There is no z-buffer, so order is everything. In `SceneView.update`:
 
 1. Background: the renderer clears the screen to the sea style's flat `color` (`SceneView.setSeaStyle`); the sea surface
    mesh covers it once its maps have loaded (the Classic style has no surface).
-2. Everything flat on the water (`z = 0`): wave strokes (only styles with `arcs`, in their own `sea` layer) → island
-   "ground" (shallows, sand, cliff shadows; low-poly look) → world border → wake foam → sinking foam → range rings →
-   targets' foam → shot ripples → projectile shadows → target marker.
+2. Everything flat on the water (`z = 0`): wave strokes (only styles with `arcs`, in their own `sea` layer) → wakes and
+   the water round a wreck (shader meshes in layers of their own, over the island ground pictures) → island "ground"
+   (shallows, sand, cliff shadows; low-poly look) → world border → range rings → targets' water (the barrel's foam, the
+   serpent's body under the surface) → the target lock ring → shot ripples → projectile shadows → target marker.
    There is no drawn ship shadow: it is baked into the sprite.
 3. Volumetric objects (low-poly islands, targets, projectiles) — sorted by `painter.depth(...)` **from far to near**.
    The ship sprite goes between them by `shipDepth`, a point `ship.radius` above the water. A textured island's raised
@@ -61,9 +64,10 @@ Add a new volumetric object to the `objects` array with `depth` and `draw(painte
 
 A sprite can't go inside a `Graphics`, so the scene is layers in `container`, bottom to top:
 sea surface mesh → `sea` (wave strokes) → fog of war mesh (haze and mist) → fog puffs → island ground pictures →
-`scene` (flat things and objects farther than the ship) → far island pictures → ship sprite → its `waterMask` →
-`fireLayer` (flames, then smoke, then shot effects nearer than the ship) → near island pictures → `front` (objects
-nearer than the ship, drawn with `frontPainter`; the navigation debug drawings last, over everything).
+wake mesh → wreck water mesh → `scene` (flat things and objects farther than the ship) → far island pictures → ship
+sprite → its `waterMask` → `fireLayer` (flames, then smoke, then shot effects nearer than the ship) → near island
+pictures → `front` (objects nearer than the ship, drawn with `frontPainter`; the navigation debug drawings last) →
+`hpBars` (the targets' hit point bars) → the damage numbers, over everything.
 The fog lies under the islands, so islands stay clear of it; targets inside the fog are not drawn at all.
 Known limit: an object in `scene` stays under the far island pictures even where it is nearer than the island.
 `draw` receives the painter of its layer — draw with it, not with `this.painter`. Nothing is drawn for the ship until its
@@ -92,8 +96,11 @@ Known limit: an object in `scene` stays under the far island pictures even where
   sprite down, and `ShipSprite.waterMask` hides the part below the near half of the hull's waterline.
   The mask must stay in the display list and visible (Pixi skips an invisible mask, which hides the whole sprite),
   and is detached and cleared while the ship is afloat, or it would draw as a plain white shape.
+- `Sinking.water` is the water round the wreck: a grid on the water round the ship whose shader works out the churn,
+  the ring waves the hull sends out and the bubbles from each pixel's place relative to the hull. It fades out at the
+  coasts like the wake (`waterShare`) and lasts `WATER_TIME` after the ship is gone.
 - `ShipFire`: smoke from `heavy`, flames and smoke at `burning` and `sinking`, spawned at the class's `EMITTERS`.
-  Fixed particle pools reused round-robin, like the wake. Normal blending, not additive: additive light over the pale sail
+  Fixed particle pools reused round-robin. Normal blending, not additive: additive light over the pale sail
   and the blue sea turns white and cyan.
 
 ## `Painter3D` primitives
@@ -107,12 +114,17 @@ Known limit: an object in `scene` stays under the far island pictures even where
 - Shadows: `shadowPoint(p, groundZ)` projects a point along `LIGHT` onto a plane; draw the shadow as a black `polygon` with `SHADOW_ALPHA`.
 - Color: `shade(color, k)` changes brightness. The sun (`LIGHT`) shines from the west, from high above.
 
-## Foam wake (`effects/Wake.ts`)
+## Wakes (`effects/Wake.ts`, `effects/foam.ts`)
 
-- Owned and updated by `SceneView` (it is view state, not game state), before drawing.
-- Fixed pool of `POOL_SIZE` particles reused round-robin. No new objects are created during gameplay.
-- A particle is "dead" when `life >= WAKE_LIFETIME`; animation progress is `foamProgress(p)` from 0 to 1.
-- Offsets and foam size are in ship radii, so the wake fits ships of every size.
+- Owned and updated by `SceneView` (it is view state, not game state), before drawing. Everything that sails (ships,
+  targets afloat) is a `Body` with a trail: a fixed ring of `TRAIL_POINTS` points where it has been. A body missing
+  from the list passed to `update` is gone, and its wake fades where it was.
+- Drawn as ribbons of one mesh with its own shader: the wash behind the stern, and two bow waves running off at the
+  Kelvin angle. The ribbons are rebuilt every frame by writing straight into typed arrays, with no objects per point,
+  and only the part filled goes to the GPU. Widths are in the hull's half beam, so a wake fits every hull.
+- Wakes fade out into the fog beyond the ship's view range, and at the coasts (`waterShare`).
+- `foam.ts` holds what the wake and the wreck's water share: the foam texture (`loadFoam`), its colors, the shader
+  functions `fresnel`, `over` and `dissolve` (`FOAM_GLSL`), and `waterShare`.
 
 ## Waves (`effects/waves.ts`)
 
@@ -130,12 +142,14 @@ Known limit: an object in `scene` stays under the far island pictures even where
 
 ## Shot effects (`effects/ShotEffects.ts`)
 
-- Animates the game's `state.events` (shots, impacts) and cannonball trails. Fixed pools reused round-robin, like the
-  wake. Effects farther than the ship go to `scene`, nearer ones to `fireLayer`.
+- Animates the game's `state.events` (shots, impacts, destroyed targets) and cannonball trails. Fixed pools reused
+  round-robin. Effects farther than the ship go to `scene`, nearer ones to `fireLayer`.
+- The `damage` events are `DamageNumbers`': a number floating up over the target, styled by how the volley went (full,
+  a critical hit, the wrong weapon for the target, a miss). A fixed pool of `Text` objects reused round-robin.
 
 ## Performance
 
 - The HUD shows FPS and the longest frame over the last half second — use it after rendering changes.
 - Cull invisible things with `painter.isVisible(x, y, z, radius)` before drawing (as done for waves and islands).
-- Shape count per frame is the main cost: don't raise model detail (coastline segments) or particle pools and spawn rates
-  (`ShipFire`, `Wake`) without need.
+- Shape count per frame is the main cost: don't raise model detail (coastline segments), particle pools and spawn rates
+  (`ShipFire`, `ShotEffects`) or the wake's trail length (`Wake`) without need.

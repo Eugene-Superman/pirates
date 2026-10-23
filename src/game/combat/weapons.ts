@@ -1,5 +1,8 @@
 export type WeaponId = 'cannon' | 'harpoon';
 
+/** What a target is: a creature (sea monsters, fish) or an object (ships, forts, barrels). Each weapon is made for one */
+export type TargetNature = 'creature' | 'object';
+
 export interface Weapon {
   readonly id: WeaponId;
   /** Shown to players */
@@ -10,15 +13,31 @@ export interface Weapon {
   readonly speed: number;
   /** Top of the flight arc above the straight line, as a share of the flight's length */
   readonly arc: number;
-  /** Seconds before the weapon can fire again */
+  /** Seconds before the weapon can fire again: every gun of it fires together, then they all reload */
   readonly reload: number;
+  /** What it is made for: it does full damage to these, OFF_TARGET_SHARE of it to the rest */
+  readonly against: TargetNature;
 }
 
+/** Share of the damage a weapon does to what it isn't made for: a cannonball to a sea monster, a harpoon to a hull */
+export const OFF_TARGET_SHARE = 0.3;
+
 export const WEAPONS: Readonly<Record<WeaponId, Weapon>> = {
-  // Cannonballs fly far in a high arc
-  cannon: { id: 'cannon', name: 'Cannons', range: 260, speed: 240, arc: 0.2, reload: 2 },
-  // A harpoon (for sea monsters) flies flat and fast but reaches less far
-  harpoon: { id: 'harpoon', name: 'Harpoon', range: 150, speed: 320, arc: 0.05, reload: 3 },
+  // Cannonballs fly far in a high arc, and smash hulls
+  cannon: { id: 'cannon', name: 'Cannons', range: 260, speed: 240, arc: 0.2, reload: 2, against: 'object' },
+  // Harpoons (for sea monsters) fly flat and fast but reach less far
+  harpoon: { id: 'harpoon', name: 'Harpoons', range: 150, speed: 320, arc: 0.05, reload: 3, against: 'creature' },
 };
 
 export const WEAPON_IDS: readonly WeaponId[] = ['cannon', 'harpoon'];
+
+/** What share of its damage a weapon does to a target of this nature */
+export function damageShare(weapon: WeaponId, nature: TargetNature) {
+  return WEAPONS[weapon].against === nature ? 1 : OFF_TARGET_SHARE;
+}
+
+/**
+ * Why a ship told to attack isn't firing: no guns of the selected weapon fitted, none of its ammo left, the target
+ * hidden in the fog of war, or beyond the weapon's range. The client tells the player
+ */
+export type HoldReason = 'noGuns' | 'noAmmo' | 'sight' | 'range';

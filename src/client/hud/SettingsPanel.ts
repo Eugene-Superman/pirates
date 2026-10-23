@@ -91,7 +91,10 @@ export class SettingsPanel {
     this.container.addChild(this.dim, this.panel);
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') this.hide();
+      if (e.key !== 'Escape' || !this.isOpen) return;
+      this.hide();
+      // Escape closed the panel; it shouldn't also stop the ship firing (keyboardInput)
+      e.preventDefault();
     });
   }
 
