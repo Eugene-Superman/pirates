@@ -13,6 +13,8 @@ export interface Hull {
 
 /** Anything that takes up room on the water and that ships must not sail through */
 export interface Body {
+  /** The unit's id, unique in the game */
+  readonly id: number;
   readonly x: number;
   readonly y: number;
   /** Radians, 0 = east */

@@ -39,10 +39,12 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    Code changes reload the page on save.
 
 4. Play: click (or tap) on the sea to set a course; the ship finds its way round islands. Hold the button and drag to
-   steer continuously. Click a practice target (the barrel or the boat) to fire the selected weapon at it.
-   Speed, hull integrity, FPS and the weapon's status are shown in the top-left corner. The Settings button opens
-   every other control (camera, sea and island looks, fog, range rings, damage and speed tuning, navigation debug)
-   and picks which of them also stay on the screen.
+   steer continuously. Bots sail the sea: fishing boats, merchants and turtles leave you alone, smugglers and sea
+   serpents attack when you come near. Click one to pick it out (its hull shows at the top), double-click it or press
+   Space to fire the selected weapon at it, Escape to stop. R repairs the hull out of combat; L opens the loadout
+   (guns in the slots, ammo). The bar at the bottom picks the weapon and the ammo. Speed and FPS are in the top-left
+   corner; the Settings button opens every other control (camera, sea and island looks, fog, range rings, damage and
+   speed tuning, navigation debug) and picks which of them also stay on the screen.
 
 ## Scripts
 

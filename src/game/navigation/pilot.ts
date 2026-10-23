@@ -107,8 +107,9 @@ export function pilot(ship: Ship, nav: NavGrid, others: readonly Body[], time: n
   const dy = next.y - ship.y;
   const distance = Math.hypot(dx, dy);
   const heading = Math.atan2(dy, dx);
-  let speed = ship.topSpeed;
-  if (route.length === 1) speed *= clamp(distance / SLOW_DOWN_DISTANCE, ARRIVE_SPEED, 1);
+  let speed = ship.topSpeed * ship.throttle;
+  // A bot after its foe doesn't ease off: its target moves on
+  if (route.length === 1 && !ship.pursuing) speed *= clamp(distance / SLOW_DOWN_DISTANCE, ARRIVE_SPEED, 1);
   // A point `distance` away and `off` radians off the bow is reached only if the turning circle (speed / turnSpeed)
   // is at most distance / (2 sin off): slower than that, or the ship circles round it
   const off = Math.min(Math.abs(normalizeAngle(heading - ship.rotation)), Math.PI / 2);
@@ -116,27 +117,45 @@ export function pilot(ship: Ship, nav: NavGrid, others: readonly Body[], time: n
     const turnable = (ship.turnSpeed * distance) / (2 * Math.sin(off));
     speed = Math.min(speed, Math.max(turnable, ship.topSpeed * SLOWEST_TURN));
   }
-  return avoid(ship, nav, others, heading, speed, need);
+  // A sea monster after its prey wants to touch its hull, not to keep clear of it
+  const prey = ship.shipClass.bite ? ship.attackTarget : null;
+  return avoid(ship, nav, others, heading, speed, need, prey);
 }
 
 function plan(ship: Ship, nav: NavGrid, need: number, time: number) {
   const target = ship.target;
   if (!target) return;
-  ship.route = nav.findRoute(ship.x, ship.y, target.x, target.y, need) ?? [target];
+  const route = nav.findRoute(ship.x, ship.y, target.x, target.y, need);
+  ship.route = route ?? [target];
   const memory = ship.pilot;
+  // A new target, or a new way to it, starts the count of progress afresh. No way found: the count goes on, so a ship
+  // that can't get there gives up after STUCK_TIME instead of searching again every REPLAN_INTERVAL forever
+  if (memory.plannedFor !== target || route) {
+    memory.closest = Infinity;
+    memory.closestAt = time;
+  }
   memory.plannedFor = target;
   memory.replanAfter = time + REPLAN_INTERVAL;
-  memory.closest = Infinity;
-  memory.closestAt = time;
 }
 
-/** The heading nearest the wanted one that keeps clear of every body near, and the speed to sail it at */
-function avoid(ship: Ship, nav: NavGrid, others: readonly Body[], heading: number, speed: number, need: number): Helm {
+/**
+ * The heading nearest the wanted one that keeps clear of every body near (but the one with id `prey`), and the speed
+ * to sail it at
+ */
+function avoid(
+  ship: Ship,
+  nav: NavGrid,
+  others: readonly Body[],
+  heading: number,
+  speed: number,
+  need: number,
+  prey: number | null,
+): Helm {
   const reach = hullReach(ship.hull);
   const pace = Math.max(speed, ship.speed);
   // Only bodies that could meet the ship within the horizon
   const near = others.filter((body) => {
-    if (body === ship) return false;
+    if (body === ship || body.id === prey) return false;
     const closing = (pace + Math.hypot(body.vx, body.vy)) * AVOID_HORIZON;
     const range = closing + reach + hullReach(body.hull) + AVOID_MARGIN;
     return Math.hypot(body.x - ship.x, body.y - ship.y) < range;

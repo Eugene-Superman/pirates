@@ -1,4 +1,3 @@
-import { pathPoint, type Target } from '../../../game';
 import type { Vec3 } from '../../render/Camera3D';
 import { LIGHT, type Painter3D } from '../../render/Painter3D';
 
@@ -23,6 +22,7 @@ const HEAD_HEIGHT = 7; // world units above the water
 const HEAD_SCALE = 1.35; // the head's parts, against the sizes they were drawn at
 const NECK = 0.22; // share of the body the neck rises over
 const SHAKE = 0.9; // world units it jerks aside when hit
+const LUNGE = 4; // world units the head darts forward (and up) when it bites
 const UNDERWATER_ALPHA = 0.3;
 
 interface Segment {
@@ -42,33 +42,50 @@ function thickness(u: number) {
   return 1 - ((u - 0.35) / 0.65) * 0.78;
 }
 
+/** A point of the serpent's spine on the water, from its head back to its tail */
+export interface SpinePoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** How many points the spine needs and how far apart, world units: the body is laid along them */
+export const SPINE = { points: SEGMENTS, spacing: SPACING } as const;
+
 /**
- * The body from head to tail. The serpent swims a fixed path, so its body lies along where it has just been: the
- * path a little before and after the game time, the target's position in the middle
+ * The body from head to tail, laid along the spine: where the head has just swum (effects/Trails.ts). shake: 1 right
+ * after a hit, then 0; lunge: 1 right after it bit, then 0; sink: world units it has gone down when killed
  */
-function body(target: Target, time: number, shake: number): Segment[] {
-  const path = target.path;
-  const speed = Math.max(Math.hypot(target.vx, target.vy), 1);
-  const step = SPACING / speed;
-  const half = (SEGMENTS - 1) / 2;
+function body(spine: readonly SpinePoint[], time: number, shake: number, lunge: number, sink: number): Segment[] {
   const jerk = SHAKE * shake * Math.sin(shake * 18);
-  return Array.from({ length: SEGMENTS }, (_, i) => {
-    const u = i / (SEGMENTS - 1);
-    const p = path ? pathPoint(path, time + (half - i) * step) : { x: target.x, y: target.y, vx: 1, vy: 0 };
-    const v = Math.hypot(p.vx, p.vy) || 1;
-    const ax = p.vx / v;
-    const ay = p.vy / v;
+  return spine.map((p, i) => {
+    const u = i / (spine.length - 1);
+    // Towards the head: from this point to the one before it, or for the head from the one behind it
+    const ahead = i > 0 ? spine[i - 1] : p;
+    const behind = i > 0 ? p : spine[1];
+    const dx = ahead.x - behind.x;
+    const dy = ahead.y - behind.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const ax = dx / d;
+    const ay = dy / d;
     const wave = Math.sin(2 * Math.PI * u * HUMPS - time * WAVE_SPEED) * HUMP_HEIGHT - SWIM_DEPTH;
-    // The neck rises out of the water to the head
+    // The neck rises out of the water to the head, higher still as it strikes
     const lift = u < NECK ? 1 - u / NECK : 0;
-    const z = wave * (1 - lift) + HEAD_HEIGHT * lift * lift * (3 - 2 * lift);
-    return { x: p.x - ay * jerk, y: p.y + ax * jerk, z, r: BODY_RADIUS * thickness(u), ax, ay };
+    const strike = lunge * lift * LUNGE;
+    const z = wave * (1 - lift) + (HEAD_HEIGHT + strike) * lift * lift * (3 - 2 * lift) - sink;
+    return {
+      x: p.x - ay * jerk + ax * strike,
+      y: p.y + ax * jerk + ay * strike,
+      z,
+      r: BODY_RADIUS * thickness(u),
+      ax,
+      ay,
+    };
   });
 }
 
 /** The body under the water, seen through it, and foam where it breaks the surface. Drawn with the sea */
-export function drawSerpentWater(p: Painter3D, target: Target, time: number) {
-  const segments = body(target, time, 0);
+export function drawSerpentWater(p: Painter3D, spine: readonly SpinePoint[], time: number) {
+  const segments = body(spine, time, 0, 0, 0);
   // One shape, so its overlapping parts don't darken each other
   const left: Vec3[] = [];
   const right: Vec3[] = [];
@@ -88,9 +105,16 @@ export function drawSerpentWater(p: Painter3D, target: Target, time: number) {
   }
 }
 
-/** The parts above the water: humps, neck and head, sorted far to near. shake: 1 right after a hit, then 0 */
-export function drawSerpent(p: Painter3D, target: Target, time: number, shake: number) {
-  const segments = body(target, time, shake);
+/** The parts above the water: humps, neck and head, sorted far to near */
+export function drawSerpent(
+  p: Painter3D,
+  spine: readonly SpinePoint[],
+  time: number,
+  shake: number,
+  lunge: number,
+  sink = 0,
+) {
+  const segments = body(spine, time, shake, lunge, sink);
   const parts: { depth: number; draw: () => void }[] = [];
   segments.forEach((s, i) => {
     // Only what shows above the water: a ball sunk deeper than half its size is under the surface
@@ -128,6 +152,8 @@ export function drawSerpent(p: Painter3D, target: Target, time: number, shake: n
 
 /** Skull, snout, eyes and a crest, at the front of the neck */
 function addHead(p: Painter3D, neck: Segment, parts: { depth: number; draw: () => void }[]) {
+  // Gone under with the rest of it
+  if (neck.z < -neck.r) return;
   const { ax, ay } = neck;
   const k = HEAD_SCALE;
   const at = (forward: number, side: number, z: number): Vec3 => [

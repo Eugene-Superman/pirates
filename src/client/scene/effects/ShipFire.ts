@@ -26,8 +26,9 @@ interface Particle {
   size: number;
 }
 
+// Ships with a sprite only: the bots' vector-drawn ships don't burn yet
 // prettier-ignore
-const EMITTERS: Readonly<Record<ShipClassId, { burning: Emitter[]; sinking: Emitter[] }>> = {
+const EMITTERS: Readonly<Partial<Record<ShipClassId, { burning: Emitter[]; sinking: Emitter[] }>>> = {
   // Matches the sloop model in blender-assets/ships/starter/sloop/build.py (its y points to port, so y is negated here)
   sloop: {
     burning: [
@@ -95,8 +96,9 @@ export class ShipFire {
     for (const p of this.flames) this.move(p, dt, FLAME_WIND);
     for (const p of this.smoke) this.move(p, dt, SMOKE_WIND);
 
-    const scale = ship.radius / REFERENCE_RADIUS;
     const emitters = EMITTERS[ship.shipClass.id];
+    if (!emitters) return;
+    const scale = ship.radius / REFERENCE_RADIUS;
     const drowning = Math.max(0, 1 - pose.depth / (FIRE_DROWN_DEPTH * scale));
     const afloat = pose.alpha > 0;
 

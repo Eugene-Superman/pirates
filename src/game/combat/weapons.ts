@@ -3,18 +3,18 @@ export type WeaponId = 'cannon' | 'harpoon';
 /** What a target is: a creature (sea monsters, fish) or an object (ships, forts, barrels). Each weapon is made for one */
 export type TargetNature = 'creature' | 'object';
 
+/**
+ * A kind of gun: cannons or harpoon launchers. How far each gun reaches and how fast it reloads is its own (`GUNS` in
+ * arsenal.ts); what they share is how their shots fly and what they are made for
+ */
 export interface Weapon {
   readonly id: WeaponId;
   /** Shown to players */
   readonly name: string;
-  /** Farthest a shot lands from the ship's centre, world units */
-  readonly range: number;
   /** Flight speed over the water, world units per second */
   readonly speed: number;
   /** Top of the flight arc above the straight line, as a share of the flight's length */
   readonly arc: number;
-  /** Seconds before the weapon can fire again: every gun of it fires together, then they all reload */
-  readonly reload: number;
   /** What it is made for: it does full damage to these, OFF_TARGET_SHARE of it to the rest */
   readonly against: TargetNature;
 }
@@ -23,10 +23,10 @@ export interface Weapon {
 export const OFF_TARGET_SHARE = 0.3;
 
 export const WEAPONS: Readonly<Record<WeaponId, Weapon>> = {
-  // Cannonballs fly far in a high arc, and smash hulls
-  cannon: { id: 'cannon', name: 'Cannons', range: 260, speed: 240, arc: 0.2, reload: 2, against: 'object' },
-  // Harpoons (for sea monsters) fly flat and fast but reach less far
-  harpoon: { id: 'harpoon', name: 'Harpoons', range: 150, speed: 320, arc: 0.05, reload: 3, against: 'creature' },
+  // Cannonballs fly in a high arc, and smash hulls
+  cannon: { id: 'cannon', name: 'Cannons', speed: 240, arc: 0.2, against: 'object' },
+  // Harpoons (for sea monsters) fly flat and fast
+  harpoon: { id: 'harpoon', name: 'Harpoons', speed: 320, arc: 0.05, against: 'creature' },
 };
 
 export const WEAPON_IDS: readonly WeaponId[] = ['cannon', 'harpoon'];
@@ -38,6 +38,6 @@ export function damageShare(weapon: WeaponId, nature: TargetNature) {
 
 /**
  * Why a ship told to attack isn't firing: no guns of the selected weapon fitted, none of its ammo left, the target
- * hidden in the fog of war, or beyond the weapon's range. The client tells the player
+ * hidden in the fog of war, or beyond every fitted gun's range. The client tells the player
  */
 export type HoldReason = 'noGuns' | 'noAmmo' | 'sight' | 'range';

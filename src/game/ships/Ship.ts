@@ -1,11 +1,13 @@
 import { AMMO, AMMO_IDS, GUNS, STARTING_AMMO, type AmmoId, type Gun, type GunId } from '../combat/arsenal';
-import type { HoldReason, WeaponId } from '../combat/weapons';
+import { WEAPON_IDS, type HoldReason, type TargetNature, type WeaponId } from '../combat/weapons';
+import type { BotMind } from '../bots/brain';
 import { clamp, normalizeAngle } from '../lib/math';
 import type { Point } from '../lib/geometry';
 import { newPilotMemory, type Helm } from '../navigation/pilot';
 import { hullReach, type Body, type Hull } from '../physics/hull';
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../world/World';
 import { MAX_HEALTH, damageStage, damagedSpeed, type DamageStage } from './damage';
+import { COMBAT_TIME } from './repair';
 import type { ShipClass } from './shipClasses';
 
 // Bounds for tuning the top speeds, world units per second (1 to 40 knots)
@@ -16,11 +18,18 @@ const MIN_VIEW_RANGE = 100;
 const MAX_VIEW_RANGE = 2000;
 
 /**
- * Movement, hull and weapon state. How the ship looks is up to the view; shots are run by combat/combat.ts, the way
- * to its target by navigation/pilot.ts, bumping into things by physics/collisions.ts
+ * Anything that sails under a pilot: the player's ship, the bots' ships, and sea monsters (a class of nature
+ * `creature`, with jaws instead of guns). Movement, hull, weapons and repairs. How it looks is up to the view; shots are
+ * run by combat/combat.ts, the way to its target by navigation/pilot.ts, bumping into things by physics/collisions.ts,
+ * a bot's decisions by bots/brain.ts
  */
 export class Ship implements Body {
+  /** Unique among the ships and targets of the game: what attacks and events refer to */
+  readonly id: number;
   readonly shipClass: ShipClass;
+  readonly nature: TargetNature;
+  /** How far it sticks out of the water, world units */
+  readonly height: number;
   x = 0;
   y = 0;
   rotation = 0;
@@ -29,6 +38,10 @@ export class Ship implements Body {
   maxSpeed: number;
   /** Top speed with the hull nearly gone, world units per second. Copied from the class like maxSpeed */
   minSpeed: number;
+  /** Share of its top speed the pilot sails at: bots cruise slower while nobody bothers them */
+  throttle = 1;
+  /** Chasing (or fleeing) something that moves: the pilot doesn't slow down on the way into its target */
+  pursuing = false;
   /** How far the crew sees, world units; beyond it is the fog of war. Copied from the class, changed by setViewRange */
   viewRange: number;
   readonly acceleration: number;
@@ -46,10 +59,12 @@ export class Ship implements Body {
   route: Point[] = [];
   /** What the pilot remembers between updates */
   readonly pilot = newPilotMemory();
-  /** The weapon the ship fires: all its guns together, a volley */
+  /** The weapon the ship fires: every gun of it that is loaded and in range, together, a volley */
   weapon: WeaponId = 'cannon';
-  /** Seconds until each weapon can fire again */
-  readonly reloads: Record<WeaponId, number> = { cannon: 0, harpoon: 0 };
+  /** Seconds until the gun in each slot can fire again, by weapon */
+  readonly reloads: Record<WeaponId, number[]>;
+  /** Seconds until a monster can bite again */
+  biteReload = 0;
   /** The gun in each of the class's slots, by weapon; null for an empty slot */
   readonly guns: Record<WeaponId, (GunId | null)[]>;
   /** Cannonballs and harpoons in the hold */
@@ -60,9 +75,24 @@ export class Ship implements Body {
   attackTarget: number | null = null;
   /** Why it isn't firing at its target right now (set by combat every update); null when it is, or has no target */
   holdReason: HoldReason | null = null;
+  /** Who hit it last and hasn't been dealt with yet: combat sets it, a bot's brain takes it to fight back */
+  lastHitBy: number | null = null;
+  /** Game time until which it is in combat: it fired, or was fired at, less than COMBAT_TIME ago. No repairs till then */
+  combatUntil = 0;
+  /** Whether the crew is repairing the hull (ships/repair.ts) */
+  repairing = false;
+  /** Seconds since the last repair step */
+  repairClock = 0;
+  /** Game time it was wrecked; null while afloat. A player's ship comes back some time after (Game) */
+  wreckedAt: number | null = null;
+  /** How a bot thinks; null for a player's ship */
+  bot: BotMind | null = null;
 
-  constructor(shipClass: ShipClass) {
+  constructor(shipClass: ShipClass, id: number) {
+    this.id = id;
     this.shipClass = shipClass;
+    this.nature = shipClass.nature;
+    this.height = shipClass.height;
     this.maxSpeed = shipClass.maxSpeed;
     this.acceleration = shipClass.acceleration;
     this.deceleration = shipClass.deceleration;
@@ -74,6 +104,11 @@ export class Ship implements Body {
     this.maxHp = shipClass.hp;
     this.hp = shipClass.hp;
     this.guns = { cannon: [...shipClass.startingGuns.cannon], harpoon: [...shipClass.startingGuns.harpoon] };
+    this.reloads = { cannon: this.guns.cannon.map(() => 0), harpoon: this.guns.harpoon.map(() => 0) };
+    // A ship with guns of one weapon only (a bot's) fires those
+    if (this.guns.cannon.every((gun) => gun === null) && this.guns.harpoon.some((gun) => gun !== null)) {
+      this.weapon = 'harpoon';
+    }
   }
 
   get heading() {
@@ -86,6 +121,11 @@ export class Ship implements Body {
 
   get vy() {
     return Math.sin(this.rotation) * this.speed;
+  }
+
+  /** Bots never run out of ammo: their holds aren't counted */
+  get infiniteAmmo() {
+    return this.bot !== null;
   }
 
   /** Whether a point is close enough to be seen, not hidden in the fog of war */
@@ -133,22 +173,52 @@ export class Ship implements Body {
     this.setHp(this.hp - amount);
   }
 
+  /** Gives hull points back: what a repair step does */
+  heal(amount: number) {
+    this.setHp(this.hp + amount);
+  }
+
   private setHp(hp: number) {
     this.hp = Math.round(clamp(hp, 0, this.maxHp));
+    // Afloat again (the debug buttons): no longer a wreck waiting to come back
+    if (!this.isSinking) this.wreckedAt = null;
     if (this.isSinking) {
       this.target = null;
       this.route = [];
       this.attackTarget = null;
+      this.repairing = false;
     }
+  }
+
+  /** Whether it fired or was fired at less than COMBAT_TIME ago */
+  inCombat(time: number) {
+    return time < this.combatUntil;
+  }
+
+  /** It fired, or was fired at: in combat for COMBAT_TIME from now, and any repair stops */
+  enterCombat(time: number) {
+    this.combatUntil = Math.max(this.combatUntil, time + COMBAT_TIME);
+    this.repairing = false;
+  }
+
+  /** Starts repairing the hull. Only out of combat (checked by ships/repair.ts every update) and with damage to mend */
+  startRepair() {
+    if (this.isSinking || this.hp >= this.maxHp || this.repairing) return;
+    this.repairing = true;
+    this.repairClock = 0;
+  }
+
+  stopRepair() {
+    this.repairing = false;
   }
 
   setWeapon(weapon: WeaponId) {
     this.weapon = weapon;
   }
 
-  /** Fire at a target with the selected weapon, every time it is loaded, until ceaseFire or the target is gone */
+  /** Fire at a target with the selected weapon, every time a gun is loaded, until ceaseFire or the target is gone */
   attack(targetId: number) {
-    if (this.isSinking) return;
+    if (this.isSinking || targetId === this.id) return;
     this.attackTarget = targetId;
   }
 
@@ -157,11 +227,15 @@ export class Ship implements Body {
     this.holdReason = null;
   }
 
-  /** Fits a gun of its weapon into a slot, or empties the slot (null). Anything else is ignored */
+  /**
+   * Fits a gun of its weapon into a slot, or empties the slot (null). Anything else is ignored. A new gun starts
+   * unloaded, so swapping guns mid-fight doesn't skip a reload
+   */
   fitGun(weapon: WeaponId, slot: number, gun: GunId | null) {
     if (slot < 0 || slot >= this.guns[weapon].length) return;
     if (gun !== null && GUNS[gun].weapon !== weapon) return;
     this.guns[weapon][slot] = gun;
+    this.reloads[weapon][slot] = gun === null ? 0 : GUNS[gun].reload;
   }
 
   /** The fitted guns of a weapon with their slots, in slot order */
@@ -171,6 +245,11 @@ export class Ship implements Body {
       if (id !== null) fitted.push({ gun: GUNS[id], slot });
     });
     return fitted;
+  }
+
+  /** How far the farthest-reaching fitted gun of a weapon reaches, world units; 0 with none fitted */
+  range(weapon: WeaponId = this.weapon) {
+    return this.fittedGuns(weapon).reduce((longest, { gun }) => Math.max(longest, gun.range), 0);
   }
 
   /** Picks the ammo its weapon fires from now on */
@@ -194,6 +273,22 @@ export class Ship implements Body {
   clearTarget() {
     this.target = null;
     this.route = [];
+  }
+
+  /** Back afloat, whole, at (x, y): a wrecked player's ship comes back. Guns and ammo are kept */
+  respawn(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+    this.rotation = 0;
+    this.speed = 0;
+    this.hp = this.maxHp;
+    this.clearTarget();
+    this.ceaseFire();
+    for (const weapon of WEAPON_IDS) this.reloads[weapon].fill(0);
+    this.combatUntil = 0;
+    this.repairing = false;
+    this.lastHitBy = null;
+    this.wreckedAt = null;
   }
 
   /** Turns towards the helm's heading no faster than turnSpeed, speeds up or slows down towards its speed, and moves */
