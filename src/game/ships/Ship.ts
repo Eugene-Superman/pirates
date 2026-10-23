@@ -279,12 +279,12 @@ export class Ship implements Body {
     this.route = [];
   }
 
-  /** Comes into port: it stops where it is and stops firing (world/port.ts decides when) */
-  dock() {
-    this.docked = true;
-    this.clearTarget();
+  /** Comes into port (world/port.ts decides when): it stops firing and sails on to its berth, where it lies */
+  dock(berth: Point) {
     this.ceaseFire();
-    this.speed = 0;
+    // Before it is docked: a docked ship takes no orders
+    this.setTarget(berth.x, berth.y);
+    this.docked = true;
   }
 
   /** Leaves port; it may not dock again till it has sailed out of the harbour */

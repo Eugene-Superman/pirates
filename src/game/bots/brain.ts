@@ -3,6 +3,7 @@ import type { Point } from '../lib/geometry';
 import type { NavGrid } from '../navigation/NavGrid';
 import { routeClearance } from '../navigation/pilot';
 import type { Ship } from '../ships/Ship';
+import { nearHarbour } from '../world/port';
 import { BOT_KINDS, type BotKindId } from './botKinds';
 
 const WANDER_RADIUS = 350; // world units round its home it wanders
@@ -75,7 +76,7 @@ export function thinkBots(
     if (!mind || ship.isSinking) continue;
     const foe = pickFoe(state, players, ship, mind);
     if (foe) fight(state.time, ship, mind, foe);
-    else wander(state.time, nav, ship, mind, random);
+    else wander(state, nav, ship, mind, random);
   }
 }
 
@@ -167,8 +168,9 @@ function steerTo(ship: Ship, x: number, y: number) {
   ship.setTarget(x, y);
 }
 
-/** Leg after leg to open water round its home, at cruising speed, with a pause in between */
-function wander(time: number, nav: NavGrid, ship: Ship, mind: BotMind, random: () => number) {
+/** Leg after leg to open water round its home (never into the harbour), at cruising speed, with a pause in between */
+function wander(state: GameState, nav: NavGrid, ship: Ship, mind: BotMind, random: () => number) {
+  const { time } = state;
   ship.throttle = BOT_KINDS[mind.kind].cruise;
   if (mind.wandering) {
     if (ship.target) return;
@@ -185,7 +187,7 @@ function wander(time: number, nav: NavGrid, ship: Ship, mind: BotMind, random: (
     mind.home.y + Math.sin(angle) * distance,
     routeClearance(ship),
   );
-  if (!spot) {
+  if (!spot || nearHarbour(state.world.port, spot.x, spot.y)) {
     mind.nextLegAt = time + PAUSE[0];
     return;
   }

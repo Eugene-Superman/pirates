@@ -19,8 +19,8 @@ paths:
   none and coasts), then the ship steers and collides in sub-steps of at most `MAX_STEP` world units (only islands and
   ships within `WAKE_RANGE + MEET_RANGE` of a player are looked at) → combat (reloads, volleys and bites at attack
   targets, projectiles landing) → loot (`stepLoot`: bounties, quest kills, chests dropped) → repairs → chests sunk or
-  hauled aboard (`stepChests`) → bots sunk this update taken out, due ones spawned (`stepSpawns`) → players' ships at
-  the mooring docked (`stepDocking`) → a player's wreck brought back once `WRECK_TIME` is up.
+  hauled aboard (`stepChests`) → bots sunk this update taken out, due ones spawned (`stepSpawns`) → players' ships in
+  the harbour's basin docked (`stepDocking`) → a player's wreck brought back once `WRECK_TIME` is up.
 - `state.events` (shots, impacts, bites, damage, destroyed units, repair steps, gold paid) live for one update: the
   client reads them in `view.update` right after it.
 - Every ship and chest has an `id`, unique in the game (`state.nextId` hands them out): attacks, events and the
@@ -138,9 +138,13 @@ paths:
 - `quests.ts`: the tavern's `QUESTS` (sink `count` of a hull class for a `reward`); at most `MAX_QUESTS` taken at once,
   taken and turned in only in port. `shop.ts`: guns into the hold, packs of `AMMO_PACK` shots, the shipwright's full
   repair, priced by tier, only in port. A gun is fitted from the hold anywhere (`fitFromHold`).
-- The port (`PORT`, made once, the same on every run): a player's ship within `DOCK_RADIUS` of its `mooring` docks
-  (`stepDocking`, `ship.dock`): stopped, `setTarget` and `attack` ignored, out of the fight. `leavePort` sails it out
-  to the `roadstead`; `mayDock` keeps it from docking again until it has sailed `UNDOCK_MARGIN` away.
+- The port (`PORT`, made once, the same on every run): two stone `walls` run out from a straightened stretch of its
+  island's coast, their heads turned in towards each other; the island's `coast` runs round them, so ships bump into
+  them and the pilot sails round them like any coast. A player's ship that sails into the `basin` between them docks
+  (`stepDocking`, `ship.dock`): out of the fight, `setTarget` and `attack` ignored, it sails on to the `mooring` and
+  lies there. `leavePort` sails it out through the entrance to the `roadstead`; `mayDock` keeps it from docking again
+  until it has sailed `UNDOCK_MARGIN` beyond the basin. No bot spawns or wanders within `HARBOUR_CLEAR` of the basin
+  (`nearHarbour`), so the way in stays clear.
 - `save.ts`: `saveGame` makes plain `SaveData` of a player's progress (the purse, the hold, quests, and the ship: its
   class, place, hull, guns, ammo, weapon, whether it is in port); `loadGame` checks every field and keeps only the
   valid ones (a ship on land or off the map comes back at `START`). No bots, chests or time: the sea is made afresh.

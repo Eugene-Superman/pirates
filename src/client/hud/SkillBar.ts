@@ -24,6 +24,8 @@ const PAD = 8; // inside the bar
 const BOTTOM = 14; // pixels between the bar and the screen's bottom
 const STATUS_GAP = 6; // between the status line and the bar
 const NATURE_NAMES = { creature: 'creatures', object: 'ships and objects' } as const;
+// The key that picks each weapon (keyboardInput.ts), shown on its header
+const WEAPON_KEYS: Readonly<Record<WeaponId, string>> = { cannon: 'Q', harpoon: 'E' };
 
 export interface SkillBarActions {
   repair: () => void;
@@ -47,6 +49,8 @@ interface Group {
   readonly container: Container;
   readonly header: Tile;
   readonly headerText: Text;
+  /** The key that picks it */
+  readonly keyText: Text;
   readonly reload: Graphics;
   readonly chips: Map<AmmoId, { tile: Tile; label: Text; count: Text }>;
   /** The ammo the chips were made for, to rebuild them only when it changes */
@@ -55,7 +59,7 @@ interface Group {
 
 /**
  * The bar at the bottom of the screen: the repair skill (R), then each weapon with the ammo in the hold (the loaded
- * one lit; a click loads another, a click on the weapon's name picks it), then the loadout (L). Over it, a line about
+ * one lit; a click loads another, a click on the weapon's name or its key, Q or E, picks it), then the loadout (L). Over it, a line about
  * what is going on: why the ship holds fire, that its weapon is the wrong one for the target, the repair
  */
 export class SkillBar {
@@ -93,9 +97,12 @@ export class SkillBar {
       const headerText = text(WEAPONS[weapon].name, 12, UI.text, { fontWeight: 'bold' });
       headerText.position.set(6, (HEADER.height - headerText.height) / 2 - 1);
       const reload = new Graphics();
-      header.content.addChild(headerText, reload);
+      const keyText = text(WEAPON_KEYS[weapon], 11, UI.dim, { fontWeight: 'bold' });
+      keyText.anchor.set(1, 0.5);
+      keyText.position.set(HEADER.width - 6, HEADER.height / 2 - 1);
+      header.content.addChild(headerText, keyText, reload);
       container.addChild(header.container);
-      return { weapon, container, header, headerText, reload, chips: new Map(), shown: '' };
+      return { weapon, container, header, headerText, keyText, reload, chips: new Map(), shown: '' };
     });
     this.container.addChild(
       this.background,
@@ -176,6 +183,7 @@ export class SkillBar {
     const selected = ship.weapon === weapon;
     group.header.setLook({ pressed: selected });
     tint(group.headerText, selected ? UI.darkText : UI.text);
+    tint(group.keyText, selected ? UI.darkText : UI.dim);
     show(group.headerText, `${WEAPONS[weapon].name} ×${fitted.length}`);
     // How far the soonest gun is reloaded: full and green when one is ready
     const reloads = ship.reloads[weapon];

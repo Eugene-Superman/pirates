@@ -1,14 +1,22 @@
 import type { Application, FederatedPointerEvent } from 'pixi.js';
 import { onPort, type Port, type Ship } from '../../game';
 import type { SceneView } from '../scene/SceneView';
+import type { Hover } from './hover';
 import type { Selection } from './selection';
 
 const DOUBLE_CLICK = 350; // milliseconds between the two clicks of a double click
 
 // Mouse and touch: click or hold the button / finger to steer the ship. Click a ship or a monster to pick it out (its
 // hit points show at the top); double-click it to fire at it until told to stop (Escape, keyboardInput). A click on
-// the port's island or by its pier sails the ship to the mooring: into port
-export function bindPointerInput(app: Application, view: SceneView, ship: Ship, selection: Selection, port: Port) {
+// the port's island, its walls or the water between them sails the ship into port, to the mooring
+export function bindPointerInput(
+  app: Application,
+  view: SceneView,
+  ship: Ship,
+  selection: Selection,
+  hover: Hover,
+  port: Port,
+) {
   let steering = false;
   let lastClick = { id: -1, at: -Infinity };
   const steerTo = (e: FederatedPointerEvent) => {
@@ -19,7 +27,8 @@ export function bindPointerInput(app: Application, view: SceneView, ship: Ship, 
   app.stage.eventMode = 'static';
   app.stage.hitArea = app.screen;
   app.stage.on('pointerdown', (e) => {
-    const unit = view.pickUnit(e.global.x, e.global.y);
+    // The unit the cursor shows keeps its bigger target: what it shows is what a click takes
+    const unit = view.pickUnit(e.global.x, e.global.y, hover.id);
     if (unit) {
       const now = performance.now();
       if (lastClick.id === unit.id && now - lastClick.at < DOUBLE_CLICK) ship.attack(unit.id);

@@ -2,13 +2,13 @@ import { Container, Graphics } from 'pixi.js';
 import { MAX_QUESTS, QUESTS, questDone, type Player } from '../../game';
 import { UI, drawCoin, show, text, tint } from './ui';
 
-const MARGIN = 16; // pixels from the screen's edges
+const MARGIN = 16; // pixels from the screen's top
 const WIDTH = 230;
 const PAD = 10;
 const LINE = 17; // pixels per quest line
 
 /**
- * The player's purse and quests in the top right corner: their gold, and every quest taken with how far it has got
+ * The player's purse and quests in the top right corner, beside the fullscreen button: their gold, and every quest taken with how far it has got
  * (a done one in green, to turn in at the tavern)
  */
 export class GoldPanel {
@@ -31,8 +31,9 @@ export class GoldPanel {
     this.container.on('pointerdown', (e) => e.stopPropagation());
   }
 
-  update(player: Player, screenWidth: number) {
-    this.container.position.set(screenWidth - MARGIN - WIDTH, MARGIN);
+  /** right: where its right edge goes, pixels */
+  update(player: Player, right: number) {
+    this.container.position.set(right - WIDTH, MARGIN);
     show(this.gold, `${player.gold} gold`);
     this.quests.forEach((line, i) => {
       const quest = player.quests[i];

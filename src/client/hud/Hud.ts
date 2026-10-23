@@ -5,6 +5,7 @@ import type { Slot } from '../storage/Store';
 import { ButtonRow } from './ButtonRow';
 import type { MapAxes } from './chart';
 import { CombatLogPanel } from './CombatLogPanel';
+import { FullscreenButton } from './FullscreenButton';
 import { GoldPanel } from './GoldPanel';
 import { LABEL_STYLE, hudItems, type HudActions, type HudItem, type HudWidget, type ViewStatus } from './hudItems';
 import { LoadoutPanel } from './LoadoutPanel';
@@ -23,8 +24,11 @@ const MARGIN = 16; // pixels from the screen's edge
 const METRIC_GAP = 6; // pixels under a line of text
 const ROW_GAP = 8; // pixels between the button rows
 const LABEL_WIDTH = 84; // pixels: the button rows start after their labels, lined up
-const FRAMES_GAP = 24; // pixels between the column and the frames at the top
+const FRAMES_GAP = 24; // pixels between the column and the target's frame at the top
 const FRAMES_HEIGHT = 80; // pixels: the frames at the top, the target's the taller
+// Pixels: the Settings button and the column of items under it go under the player's frame
+const COLUMN_TOP = MARGIN + UnitFrames.OWN_HEIGHT + ROW_GAP;
+const CORNER_GAP = 8; // pixels between the fullscreen button and the gold panel
 const ZONE_COLOR = 0xffffff;
 const ZONE_ALPHA = 0.55;
 const ZONE_WIDTH = 2; // pixels
@@ -59,9 +63,10 @@ function saveShown(items: readonly HudItem[], ids: ReadonlySet<string>, kept: Sl
 }
 
 /**
- * Screen-space overlay: in the top left corner the items picked in the settings panel, stacked under its button; at
- * the top the frames of the player's ship and the unit they picked out; at the bottom the skill bar, the combat log
- * on its left and the minimap on its right; and the loadout window or the sea chart over everything when open
+ * Screen-space overlay: in the top left corner the frame of the player's ship, and under it the items picked in the
+ * settings panel, stacked under its button; at the top the frame of the unit they picked out; in the top right corner
+ * the gold and quests, and the fullscreen button; at the bottom the skill bar, the combat log on its left and the
+ * minimap on its right; and the loadout window or the sea chart over everything when open
  */
 export class Hud {
   readonly container = new Container();
@@ -83,6 +88,7 @@ export class Hud {
   private readonly minimap: Minimap;
   private readonly chart: SeaChart;
   private readonly gold = new GoldPanel();
+  private readonly fullscreen = new FullscreenButton();
   private readonly port: PortScreen;
   private readonly screen: Rectangle;
   /** Height of the shown items when last laid out, and where the last of them ends on the screen */
@@ -113,7 +119,7 @@ export class Hud {
       screen,
     );
     this.settingsButton = new ButtonRow([{ label: 'Settings', key: null, onTap: () => this.settings.toggle() }]);
-    this.settingsButton.container.position.set(MARGIN, MARGIN);
+    this.settingsButton.container.position.set(MARGIN, COLUMN_TOP);
     this.frames = new UnitFrames(actions.toggleFire);
     this.loadout = new LoadoutPanel(actions, screen, shipClass);
     this.chart = new SeaChart(axes, screen);
@@ -134,6 +140,7 @@ export class Hud {
       this.log.container,
       this.minimap.container,
       this.gold.container,
+      this.fullscreen.container,
       this.settingsButton.container,
       this.settings.container,
       this.port.container,
@@ -165,14 +172,16 @@ export class Hud {
 
   update(state: GameState, frameMs: number, view: ViewStatus, selection: Selection) {
     const { screen } = this;
-    this.frames.layout(screen.width, MARGIN + this.column.width + FRAMES_GAP, MARGIN);
+    this.frames.layout(screen.width, MARGIN, MARGIN + Math.max(this.column.width, UnitFrames.WIDTH) + FRAMES_GAP);
     this.frames.update(state, selection);
     this.skills.update(state, screen.width, screen.height);
     // The open log stays under the column of items in the top left corner, and under the frames
     const top = Math.max(this.columnBottom, MARGIN + FRAMES_HEIGHT + ROW_GAP);
     this.log.update(state, screen.width, screen.height, this.skills.box, top);
     this.minimap.update(state, selection, screen.width, screen.height, this.skills.box);
-    this.gold.update(state.player, screen.width);
+    this.fullscreen.update(screen.width - MARGIN, MARGIN);
+    const corner = this.fullscreen.shown ? FullscreenButton.SIZE + CORNER_GAP : 0;
+    this.gold.update(state.player, screen.width - MARGIN - corner);
     this.port.update(state);
     this.loadout.update(state.ship, state.player);
     this.chart.update(state);
@@ -205,7 +214,7 @@ export class Hud {
 
   /** Stacks the shown items under the Settings button: texts as they are, controls after their labels */
   private layout() {
-    let y = MARGIN + ButtonRow.HEIGHT + ROW_GAP;
+    let y = COLUMN_TOP + ButtonRow.HEIGHT + ROW_GAP;
     for (const item of this.items) {
       const shown = this.shownIds.has(item.id);
       const existing = this.onScreen.get(item.id);

@@ -180,3 +180,28 @@ export function drawCoin(g: Graphics, radius: number) {
   g.circle(0, 0, radius).fill({ color: 0xe8b52e }).stroke({ width: 1, color: 0x7a5410 });
   g.circle(0, 0, radius * 0.62).stroke({ width: 1, color: 0xfff0a8, alpha: 0.8 });
 }
+
+/**
+ * Four corners of a square round (0, 0), `size` pixels across: pointing out to fill the screen, or in (`exit`) to
+ * leave it
+ */
+export function drawFullscreen(g: Graphics, size: number, color: number, exit: boolean) {
+  const h = size / 2;
+  const arm = size * 0.36;
+  for (const [sx, sy] of [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ] as const) {
+    // The corner's point: on the square's corner going out, a little inside it coming back
+    const cx = exit ? sx * (h - arm) : sx * h;
+    const cy = exit ? sy * (h - arm) : sy * h;
+    const dx = exit ? sx * arm : -sx * arm;
+    const dy = exit ? sy * arm : -sy * arm;
+    g.moveTo(cx + dx, cy)
+      .lineTo(cx, cy)
+      .lineTo(cx, cy + dy)
+      .stroke({ width: 2.5, color, cap: 'round', join: 'round' });
+  }
+}

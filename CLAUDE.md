@@ -49,7 +49,7 @@ src/
     world/World.ts     the world: the port's island and islands placed round it from a fixed seed, START (off the
                        port: where a player's ship comes in), islandOutline; map.ts (8 × 8 map squares of 1000
                        units: MAP_SQUARE, MAP_SQUARES, WORLD_WIDTH); islandShape.ts (every island's own shape, made
-                       up from the seeded generator); port.ts (the port: its island, pier and mooring; docking)
+                       up from the seeded generator); port.ts (the port: its island, the harbour walls and the basin between them; docking)
     ships/Ship.ts      anything that sails under a pilot (the player's ship, bots' ships, sea monsters): target and
                        route, steering, hull points, guns in slots, ammo, fire lock, combat time, repairs
     ships/shipClasses.ts  ship catalog: lines and classes with size, handling, gun slots (or a monster's jaws);
@@ -79,10 +79,14 @@ src/
     audio/             Sounds.ts: the game's sounds (Web Audio), shots by the game's events, volume and mute
     input/             pointerInput.ts: mouse/touch → ship.setTarget; a click picks a unit out (selection.ts,
                        client state), a double click attacks it; keyboardInput.ts (by key code, any layout): Space
-                       attacks the unit picked out, Escape stops firing or lets go of it, R repairs, L the loadout,
-                       J the combat log, M the sea chart; a click on the port sails into it
+                       attacks the unit picked out, Escape stops firing or lets go of it, Q and E pick the cannons
+                       or the harpoons, R repairs, L the loadout, J the combat log, M the sea chart; a click on the
+                       port sails into it; cursor.ts (the game's own mouse pointer: an orange arrow, with a ring over
+                       a neutral unit, a red sight over a hostile one, an orange hand over buttons); hover.ts (the unit
+                       under the mouse: the cursor shows it, a click takes it)
     hud/               Hud.ts (screen-space overlay: the items picked in the settings, a Settings button, and these:)
-                       UnitFrames.ts (the hull of the player's ship and of the unit picked out, at the top),
+                       UnitFrames.ts (the hull of the player's ship in the top left corner, and of the unit picked
+                       out at the top), FullscreenButton.ts (top right: the game on the whole screen and back),
                        SkillBar.ts (at the bottom: the repair skill, each weapon with its ammo, the loadout button),
                        LoadoutPanel.ts (the loadout window: guns from the hold into the slots, which ammo is loaded),
                        PortScreen.ts (in port: the tavern's quests, the shop, Leave port), GoldPanel.ts (top right:
@@ -104,7 +108,7 @@ src/
     scene/
       SceneView.ts     isometric scene: draw order, redraws every frame
       cameraControl.ts how the camera keeps up with the ship: follow / dead zone / recenter
-      models/          island3d.ts (low-poly islands), port3d.ts (the port's pier, houses and flag), botShip3d.ts
+      models/          island3d.ts (low-poly islands), port3d.ts (the port's walls, quay, houses, lighthouse and flag), botShip3d.ts
                        (the bots' ships), serpent3d.ts and turtle3d.ts (sea monsters), projectile3d.ts (cannonball,
                        harpoon), chest3d.ts (a floating chest) — 3D models;
                        ShipSprite.ts — the player's ship from its Blender atlases

@@ -4,7 +4,6 @@ import type { Selection } from '../input/selection';
 import { Tile, UI, show, text, tint } from './ui';
 
 const WIDTH = 270; // pixels, each frame
-const GAP = 12; // between the two frames
 const PAD = 10;
 const BAR_HEIGHT = 14;
 const OWN_HEIGHT = 56;
@@ -63,10 +62,14 @@ class Frame {
 }
 
 /**
- * Two frames at the top of the screen: the player's ship (hull, and whether it is repairing, in combat or sunk) and
- * the unit they picked out with a click (its hull, whether it attacks them, what hurts it, and a button to fire at it)
+ * Two frames: the player's ship in the top left corner (hull, and whether it is repairing, in combat or sunk), and at
+ * the top the unit they picked out with a click (its hull, whether it attacks them, what hurts it, and a button to
+ * fire at it)
  */
 export class UnitFrames {
+  static readonly WIDTH = WIDTH;
+  /** Pixels: the player's frame, which the HUD's column goes under */
+  static readonly OWN_HEIGHT = OWN_HEIGHT;
   readonly container = new Container();
   private readonly own = new Frame(OWN_HEIGHT);
   private readonly target = new Frame(TARGET_HEIGHT);
@@ -86,12 +89,13 @@ export class UnitFrames {
     this.container.addChild(this.own.container, this.target.container);
   }
 
-  /** Puts the frames at the top, centred, but clear of `left` pixels taken by the HUD's column */
-  layout(screenWidth: number, left: number, top: number) {
-    const total = WIDTH * 2 + GAP;
-    const x = Math.max(left, (screenWidth - total) / 2);
-    this.own.container.position.set(x, top);
-    this.target.container.position.set(x + WIDTH + GAP, top);
+  /**
+   * The player's frame in the top left corner, `margin` from the edges; the target's at the top, centred, but clear
+   * of `left` pixels taken by the player's frame and the HUD's column under it
+   */
+  layout(screenWidth: number, margin: number, left: number) {
+    this.own.container.position.set(margin, margin);
+    this.target.container.position.set(Math.max(left, (screenWidth - WIDTH) / 2), margin);
   }
 
   update(state: GameState, selection: Selection) {

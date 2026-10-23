@@ -12,7 +12,8 @@ export interface KeyboardActions {
 
 // Keys, by their place on the keyboard (`code`), so they work in any layout, Ukrainian too:
 // Space fires at the unit picked out; Escape stops firing, or if the ship isn't firing lets go of the unit picked out
-// (unless it closed a window first); R starts the repair; L opens the loadout; J opens the combat log; M the sea chart
+// (unless it closed a window first); Q picks the cannons, E the harpoons; R starts the repair; L opens the loadout;
+// J opens the combat log; M the sea chart
 export function bindKeyboardInput(ship: Ship, selection: Selection, actions: KeyboardActions) {
   window.addEventListener('keydown', (e) => {
     if (e.defaultPrevented) return;
@@ -27,6 +28,12 @@ export function bindKeyboardInput(ship: Ship, selection: Selection, actions: Key
         break;
       case 'Space':
         if (selection.id !== null) ship.attack(selection.id);
+        break;
+      case 'KeyQ':
+        ship.setWeapon('cannon');
+        break;
+      case 'KeyE':
+        ship.setWeapon('harpoon');
         break;
       case 'KeyR':
         ship.startRepair();
