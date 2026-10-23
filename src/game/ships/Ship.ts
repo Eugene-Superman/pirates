@@ -1,25 +1,55 @@
 import { clamp, normalizeAngle } from '../lib/math';
-import { WORLD_HEIGHT, WORLD_WIDTH, type Island } from '../world/World';
-import { MAX_HEALTH, damageStage, type DamageStage } from './damage';
+import type { WeaponId } from '../combat/weapons';
+import type { Point } from '../lib/geometry';
+import { newPilotMemory, type Helm } from '../navigation/pilot';
+import { hullReach, type Body, type Hull } from '../physics/hull';
+import { WORLD_HEIGHT, WORLD_WIDTH } from '../world/World';
+import { MAX_HEALTH, damageStage, damagedSpeed, type DamageStage } from './damage';
 import type { ShipClass } from './shipClasses';
 
-const ARRIVE_DISTANCE = 20;
+// Bounds for tuning the top speeds, world units per second (1 to 40 knots)
+const MIN_TOP_SPEED = 10;
+const MAX_TOP_SPEED = 400;
+// Bounds for the view range, world units
+const MIN_VIEW_RANGE = 100;
+const MAX_VIEW_RANGE = 2000;
 
-// Movement and hull state only. How the ship looks is up to the view.
-export class Ship {
+/**
+ * Movement, hull and weapon state. How the ship looks is up to the view; shots are run by combat/combat.ts, the way
+ * to its target by navigation/pilot.ts, bumping into things by physics/collisions.ts
+ */
+export class Ship implements Body {
   readonly shipClass: ShipClass;
   x = 0;
   y = 0;
   rotation = 0;
   speed = 0;
-  readonly maxSpeed: number; // world units per second
+  /** Top speed of the intact ship, world units per second. Copied from the class; only setSpeeds changes it (tuning) */
+  maxSpeed: number;
+  /** Top speed with the hull nearly gone, world units per second. Copied from the class like maxSpeed */
+  minSpeed: number;
+  /** How far the crew sees, world units; beyond it is the fog of war. Copied from the class, changed by setViewRange */
+  viewRange: number;
   readonly acceleration: number;
   readonly deceleration: number;
   readonly turnSpeed: number; // radians per second
-  readonly radius: number; // for collisions
+  /** Rough size for effects and the view; collisions use the hull */
+  readonly radius: number;
+  readonly hull: Hull;
   /** Hull integrity, percent of MAX_HEALTH */
   health = MAX_HEALTH;
-  target: { x: number; y: number } | null = null;
+  /** Where the player sent the ship; null when it is not going anywhere */
+  target: Point | null = null;
+  /** Waypoints to the target round islands, planned by the pilot; the last one is where the ship stops */
+  route: Point[] = [];
+  /** What the pilot remembers between updates */
+  readonly pilot = newPilotMemory();
+  /** The weapon the next shot uses */
+  weapon: WeaponId = 'cannon';
+  /** Seconds until each weapon can fire again */
+  readonly reloads: Record<WeaponId, number> = { cannon: 0, harpoon: 0 };
+  /** The target the player wants to shoot at; fired as soon as the selected weapon is loaded */
+  fireOrder: number | null = null;
 
   constructor(shipClass: ShipClass) {
     this.shipClass = shipClass;
@@ -28,6 +58,42 @@ export class Ship {
     this.deceleration = shipClass.deceleration;
     this.turnSpeed = shipClass.turnSpeed;
     this.radius = shipClass.radius;
+    this.hull = shipClass.hull;
+    this.minSpeed = shipClass.minSpeed;
+    this.viewRange = shipClass.viewRange;
+  }
+
+  get heading() {
+    return this.rotation;
+  }
+
+  get vx() {
+    return Math.cos(this.rotation) * this.speed;
+  }
+
+  get vy() {
+    return Math.sin(this.rotation) * this.speed;
+  }
+
+  /** Whether a point is close enough to be seen, not hidden in the fog of war */
+  canSee(x: number, y: number) {
+    return Math.hypot(x - this.x, y - this.y) <= this.viewRange;
+  }
+
+  /** For tuning with the debug buttons now, and for upgrades later */
+  setViewRange(range: number) {
+    this.viewRange = clamp(range, MIN_VIEW_RANGE, MAX_VIEW_RANGE);
+  }
+
+  /** The fastest the ship can go now: between maxSpeed and minSpeed, by how much hull is left */
+  get topSpeed() {
+    return damagedSpeed(this.health, this.maxSpeed, this.minSpeed);
+  }
+
+  /** Changes the top speeds, world units per second; min is kept between 0 and max. For tuning with the debug buttons */
+  setSpeeds(max: number, min: number) {
+    this.maxSpeed = clamp(max, MIN_TOP_SPEED, MAX_TOP_SPEED);
+    this.minSpeed = clamp(min, 0, this.maxSpeed);
   }
 
   get damageStage(): DamageStage {
@@ -42,64 +108,46 @@ export class Ship {
   /** Sets hull integrity directly, in percent. For now only the debug buttons use it; later combat will */
   setHealth(health: number) {
     this.health = clamp(health, 0, MAX_HEALTH);
-    if (this.isSinking) this.target = null;
+    if (this.isSinking) {
+      this.target = null;
+      this.route = [];
+      this.fireOrder = null;
+    }
   }
 
+  setWeapon(weapon: WeaponId) {
+    this.weapon = weapon;
+  }
+
+  /** Shoot at a target with the selected weapon. If it is out of range when the weapon is loaded, the ship holds fire */
+  orderFire(targetId: number) {
+    if (this.isSinking) return;
+    this.fireOrder = targetId;
+  }
+
+  /** Sends the ship somewhere; the pilot finds the way round islands and other ships */
   setTarget(x: number, y: number) {
     if (this.isSinking) return;
-    this.target = {
-      x: clamp(x, this.radius, WORLD_WIDTH - this.radius),
-      y: clamp(y, this.radius, WORLD_HEIGHT - this.radius),
-    };
+    const reach = hullReach(this.hull);
+    this.target = { x: clamp(x, reach, WORLD_WIDTH - reach), y: clamp(y, reach, WORLD_HEIGHT - reach) };
   }
 
-  update(dt: number, islands: readonly Island[]) {
-    let desiredSpeed = 0;
+  /** Stops going anywhere */
+  clearTarget() {
+    this.target = null;
+    this.route = [];
+  }
 
-    if (this.target) {
-      const dx = this.target.x - this.x;
-      const dy = this.target.y - this.y;
-      const dist = Math.hypot(dx, dy);
+  /** Turns towards the helm's heading no faster than turnSpeed, speeds up or slows down towards its speed, and moves */
+  steer(dt: number, helm: Helm) {
+    const angleDiff = normalizeAngle(helm.heading - this.rotation);
+    const maxTurn = this.turnSpeed * dt;
+    this.rotation = normalizeAngle(this.rotation + clamp(angleDiff, -maxTurn, maxTurn));
 
-      if (dist < ARRIVE_DISTANCE) {
-        this.target = null;
-      } else {
-        const angleDiff = normalizeAngle(Math.atan2(dy, dx) - this.rotation);
-        const maxTurn = this.turnSpeed * dt;
-        this.rotation = normalizeAngle(this.rotation + clamp(angleDiff, -maxTurn, maxTurn));
-
-        // Slow down near the target and on sharp turns
-        const arriveFactor = clamp(dist / 250, 0.15, 1);
-        const turnFactor = Math.abs(angleDiff) > Math.PI / 2 ? 0.35 : 1;
-        desiredSpeed = this.maxSpeed * arriveFactor * turnFactor;
-      }
-    }
-
-    const rate = desiredSpeed > this.speed ? this.acceleration : this.deceleration;
-    this.speed += clamp(desiredSpeed - this.speed, -rate * dt, rate * dt);
+    const rate = helm.speed > this.speed ? this.acceleration : this.deceleration;
+    this.speed += clamp(helm.speed - this.speed, -rate * dt, rate * dt);
 
     this.x += Math.cos(this.rotation) * this.speed * dt;
     this.y += Math.sin(this.rotation) * this.speed * dt;
-
-    this.resolveCollisions(islands);
-  }
-
-  private resolveCollisions(islands: readonly Island[]) {
-    for (const island of islands) {
-      const dx = this.x - island.x;
-      const dy = this.y - island.y;
-      const dist = Math.hypot(dx, dy);
-      const minDist = island.radius + this.radius;
-
-      if (dist > 0 && dist < minDist) {
-        // Push the ship out of the island and kill its speed
-        this.x = island.x + (dx / dist) * minDist;
-        this.y = island.y + (dy / dist) * minDist;
-        this.speed = Math.min(this.speed, this.maxSpeed * 0.25);
-      }
-    }
-
-    this.x = clamp(this.x, this.radius, WORLD_WIDTH - this.radius);
-    this.y = clamp(this.y, this.radius, WORLD_HEIGHT - this.radius);
   }
 }

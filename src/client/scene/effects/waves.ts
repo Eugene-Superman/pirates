@@ -3,7 +3,6 @@ import type { Painter3D } from '../../render/Painter3D';
 
 const WAVE_COUNT = 1200;
 const WAVE_SEED = 1;
-const WAVE_COLOR = 0x5fb3d6;
 
 export interface Wave {
   x: number;
@@ -23,10 +22,11 @@ export function createWaves(): Wave[] {
   }));
 }
 
-export function drawWaves(p: Painter3D, waves: readonly Wave[], time: number) {
+/** The little wave strokes: color and alpha come with the sea's style */
+export function drawWaves(p: Painter3D, waves: readonly Wave[], time: number, color: number, alpha: number) {
   for (const wave of waves) {
     const x = wave.x + Math.sin(time * 0.8 + wave.phase) * 4;
     if (!p.isVisible(x + wave.width / 2, wave.y, 0, wave.width)) continue;
-    p.curve([x, wave.y, 0], [x + wave.width / 2, wave.y - 5, 0], [x + wave.width, wave.y, 0], 2, WAVE_COLOR, 0.45);
+    p.curve([x, wave.y, 0], [x + wave.width / 2, wave.y - 5, 0], [x + wave.width, wave.y, 0], 2, color, alpha);
   }
 }

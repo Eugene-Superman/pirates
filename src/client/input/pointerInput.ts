@@ -2,7 +2,7 @@ import type { Application, FederatedPointerEvent } from 'pixi.js';
 import type { Ship } from '../../game';
 import type { SceneView } from '../scene/SceneView';
 
-// Mouse and touch: click or hold the button / finger to steer the ship
+// Mouse and touch: click or hold the button / finger to steer the ship; click a target to shoot at it
 export function bindPointerInput(app: Application, view: SceneView, ship: Ship) {
   let steering = false;
   const steerTo = (e: FederatedPointerEvent) => {
@@ -13,6 +13,11 @@ export function bindPointerInput(app: Application, view: SceneView, ship: Ship) 
   app.stage.eventMode = 'static';
   app.stage.hitArea = app.screen;
   app.stage.on('pointerdown', (e) => {
+    const target = view.pickTarget(e.global.x, e.global.y);
+    if (target) {
+      ship.orderFire(target.id);
+      return;
+    }
     steering = true;
     steerTo(e);
   });

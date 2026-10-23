@@ -2,6 +2,7 @@ import type { DamageStage, Ship, ShipClassId } from '../../../game';
 import type { Vec3 } from '../../render/Camera3D';
 import type { Painter3D } from '../../render/Painter3D';
 import { shipBob, type SinkPose } from '../models/ShipSprite';
+import { WIND_X, WIND_Y } from './wind';
 
 /** Where fire and smoke come from, in ship coordinates (x to the bow, y to starboard, z up), world units */
 interface Emitter {
@@ -57,9 +58,6 @@ const FLAME_SIZE = [0.7, 1.4] as const; // world units
 const SMOKE_SIZE = [1.2, 2] as const;
 const FLAME_RISE = 7; // world units per second
 const SMOKE_RISE = 5;
-// Wind carries smoke to the east and a little north, matching nothing in the game yet but steady on screen
-const WIND_X = 4;
-const WIND_Y = -2.5;
 // Flames die out as the burning deck goes under water, over this much of the sinking depth (world units)
 const FIRE_DROWN_DEPTH = 4;
 const SMOKE_GROWTH = 3; // a puff ends this many times bigger than it starts

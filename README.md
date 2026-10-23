@@ -38,9 +38,11 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    The game opens in your browser automatically at <http://localhost:5173>.
    Code changes reload the page on save.
 
-4. Play: click (or tap) on the sea to set a course. Hold the button and drag to steer continuously.
-   Speed, hull integrity and FPS are shown in the top-left corner, with debug buttons that set the ship's damage
-   and the camera zoom.
+4. Play: click (or tap) on the sea to set a course; the ship finds its way round islands. Hold the button and drag to
+   steer continuously. Click a practice target (the barrel or the boat) to fire the selected weapon at it.
+   Speed, hull integrity, FPS and the weapon's status are shown in the top-left corner. The Settings button opens
+   every other control (camera, sea and island looks, fog, range rings, damage and speed tuning, navigation debug)
+   and picks which of them also stay on the screen.
 
 ## Scripts
 

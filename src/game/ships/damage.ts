@@ -14,6 +14,15 @@ const HEAVY_BELOW = 50;
 const BURNING_BELOW = 25;
 
 /**
+ * Top speed with this much hull left: `max` when intact, falling in a straight line to `min` as the hull is nearly gone.
+ * World units per second
+ */
+export function damagedSpeed(health: number, max: number, min: number) {
+  const h = Math.min(Math.max(health / MAX_HEALTH, 0), 1);
+  return min + (max - min) * h;
+}
+
+/**
  * Stage for a health value:
  * 100–76 intact, 75–51 minor, 50–26 heavy, 25–1 burning, 0 sinking
  */
