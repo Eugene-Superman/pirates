@@ -2,20 +2,30 @@ import type { Application } from 'pixi.js';
 import {
   buyAmmo,
   buyGun,
+  buyOutfit,
+  buyShip,
   dropQuest,
   findUnit,
   fitFromHold,
+  fitOutfit,
   giveGold,
   isAfloat,
   leavePort,
+  orderRepair,
   repairInPort,
+  resetTalents,
+  sellCargo,
+  takeHelm,
   takeQuest,
+  takeTalent,
   turnInQuest,
+  useAbility,
   type Game,
   type WeaponId,
 } from '../game';
-import { Sounds } from './audio/Sounds';
+import { Sounds, type SoundName } from './audio/Sounds';
 import { Hud } from './hud/Hud';
+import { setTapSound } from './hud/ui';
 import { bindCursor } from './input/cursor';
 import { Hover } from './input/hover';
 import { bindKeyboardInput } from './input/keyboardInput';
@@ -25,6 +35,7 @@ import type { GpuInfo } from './render/gpu';
 import type { CameraMode } from './scene/cameraControl';
 import type { FogLayer } from './scene/effects/fogOfWar';
 import type { NavDebug } from './scene/effects/navDebug';
+import { setLang, startingLang, type Lang } from './i18n/i18n';
 import { SceneView } from './scene/SceneView';
 import type { Store } from './storage/Store';
 
@@ -56,7 +67,10 @@ export class GameClient {
     this.game = game;
     this.store = store;
     this.renderer = renderer;
+    // Before anything with text is made
+    setLang(startingLang(store.get('lang')));
     this.sounds = new Sounds(store.slot('sound'));
+    setTapSound(() => this.sounds.ui('click'));
     this.view = new SceneView(app, game.state, this.selection);
     this.view.applySettings(store.get('view'));
     // Kept the moment they change: settings change seldom
@@ -90,15 +104,20 @@ export class GameClient {
           if (ship.attackTarget === id) ship.ceaseFire();
           else ship.attack(id);
         },
-        repair: () => ship.startRepair(),
+        repair: () => this.cue(orderRepair(game.state, ship)),
         // The loadout: guns from the hold, bought in port
-        fitGun: (weapon, slot, gun) => fitFromHold(game.state.player, ship, weapon, slot, gun),
+        fitGun: (weapon, slot, gun) => this.cue(fitFromHold(game.state.player, ship, weapon, slot, gun), 'equip'),
         loadAmmo: (ammo) => ship.loadAmmo(ammo),
-        changeMaxSpeed: (delta) => ship.setSpeeds(ship.maxSpeed + delta, ship.minSpeed),
-        changeMinSpeed: (delta) => ship.setSpeeds(ship.maxSpeed, ship.minSpeed + delta),
-        changeViewRange: (delta) => ship.setViewRange(ship.viewRange + delta),
+        changeMaxSpeed: (delta) => ship.tuneSpeeds(delta, 0),
+        changeMinSpeed: (delta) => ship.tuneSpeeds(0, delta),
+        changeViewRange: (delta) => ship.tuneViewRange(delta),
         addGold: (amount) => giveGold(game.state.player, amount),
+        // Talents: picked anywhere, forgotten at the shipwright's
+        learnTalent: (id) => this.cue(takeTalent(game.state, ship, id), 'talent'),
+        resetTalents: () => this.cue(resetTalents(game.state, game.state.player), 'quest'),
+        useAbility: () => this.cue(useAbility(game.state, ship)),
         newGame: () => this.newGame(),
+        setLanguage: (lang) => this.setLanguage(lang),
       },
       app.screen,
       ship.shipClass,
@@ -108,12 +127,22 @@ export class GameClient {
         // In port: game methods like any player action, for the player of this client
         actions: {
           leavePort: () => leavePort(game.state, ship),
-          buyGun: (gun) => buyGun(game.state, game.state.player, gun),
-          buyAmmo: (ammo) => buyAmmo(game.state, game.state.player, ammo),
-          repairInPort: () => repairInPort(game.state, game.state.player),
-          takeQuest: (id) => takeQuest(game.state, game.state.player, id),
-          turnInQuest: (id) => turnInQuest(game.state, game.state.player, id),
-          dropQuest: (id) => dropQuest(game.state.player, id),
+          // What it sounds like: a purchase rings, a refusal thuds; gold paid out sounds from the game's events
+          buyGun: (gun) => this.cue(buyGun(game.state, game.state.player, gun), 'coins'),
+          buyAmmo: (ammo) => this.cue(buyAmmo(game.state, game.state.player, ammo), 'coinsSmall'),
+          repairInPort: () => this.cue(repairInPort(game.state, game.state.player), 'repair'),
+          buyOutfit: (id) => this.cue(buyOutfit(game.state, game.state.player, id), 'coins'),
+          fitOutfit: (slot, id) => this.cue(fitOutfit(game.state, game.state.player, slot, id), 'equip'),
+          takeQuest: (id) => this.cue(takeQuest(game.state, game.state.player, id), 'quest'),
+          turnInQuest: (id) => this.cue(turnInQuest(game.state, game.state.player, id)),
+          dropQuest: (id) => {
+            dropQuest(game.state.player, id);
+            this.sounds.ui('quest');
+          },
+          sellCargo: (good) => this.cue(sellCargo(game.state, game.state.player, good)),
+          // The HUD and the ship's sprite are made for one class of ship: a ship changed reloads the page with it
+          buyShip: () => this.reloadIf(buyShip(game.state, game.state.player)),
+          takeHelm: (index) => this.reloadIf(takeHelm(game.state, game.state.player, index)),
         },
       },
       { hud: store.slot('hud'), log: store.slot('log') },
@@ -125,6 +154,10 @@ export class GameClient {
       toggleLoadout: () => this.hud.toggleLoadout(),
       toggleLog: () => this.hud.toggleLog(),
       toggleMap: () => this.hud.toggleMap(),
+      toggleTalents: () => this.hud.toggleTalents(),
+      toggleStats: () => this.hud.toggleStats(),
+      useAbility: () => this.cue(useAbility(game.state, ship)),
+      repair: () => this.cue(orderRepair(game.state, ship)),
     });
   }
 
@@ -145,7 +178,7 @@ export class GameClient {
       if (this.sinceSave >= AUTOSAVE) this.save();
       this.forgetLostSelection();
       this.view.update(dt);
-      this.sounds.update(this.game.state.events, this.game.state.ship);
+      this.sounds.update(this.game.state);
       this.hud.update(
         this.game.state,
         ticker.elapsedMS,
@@ -165,6 +198,14 @@ export class GameClient {
     });
   }
 
+  /** What a player's action sounds like: `done` when it worked (or nothing: the game's events sound for it), the
+   * refusal's thud when it didn't. Returns whether it worked */
+  private cue(worked: boolean, done?: SoundName) {
+    if (!worked) this.sounds.ui('error');
+    else if (done) this.sounds.ui(done);
+    return worked;
+  }
+
   /** Keeps the progress and the combat log */
   private save() {
     if (this.forgetting) return;
@@ -173,11 +214,26 @@ export class GameClient {
     this.hud.keep();
   }
 
-  /** Forgets everything kept and starts again: the page reloads with a new player */
+  /** Forgets everything kept and starts again: the page reloads with a new player, once the store is written */
   private newGame() {
     this.forgetting = true;
     this.store.clear();
-    window.location.reload();
+    void this.store.written().then(() => window.location.reload());
+  }
+
+  /** If the game changed (a ship bought or changed), keeps the progress and reloads the page, which is made for it */
+  private reloadIf(changed: boolean) {
+    if (!changed) return false;
+    this.save();
+    this.store.flush();
+    void this.store.written().then(() => window.location.reload());
+    return true;
+  }
+
+  /** Keeps the language picked and the progress, and reloads the page in it: the HUD's texts are made once */
+  private setLanguage(lang: Lang) {
+    this.store.set('lang', lang);
+    this.reloadIf(true);
   }
 
   /** A unit picked out that sank, or went into the fog, is let go of */

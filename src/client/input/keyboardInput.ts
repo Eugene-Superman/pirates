@@ -8,12 +8,20 @@ export interface KeyboardActions {
   toggleLog: () => void;
   /** Opens or closes the sea chart */
   toggleMap: () => void;
+  /** Opens or closes the talent tree */
+  toggleTalents: () => void;
+  /** Opens or closes the statistics */
+  toggleStats: () => void;
+  /** Uses the ship's ability */
+  useAbility: () => void;
+  /** Orders the crew to repair, for gold */
+  repair: () => void;
 }
 
 // Keys, by their place on the keyboard (`code`), so they work in any layout, Ukrainian too:
 // Space fires at the unit picked out; Escape stops firing, or if the ship isn't firing lets go of the unit picked out
-// (unless it closed a window first); Q picks the cannons, E the harpoons; R starts the repair; L opens the loadout;
-// J opens the combat log; M the sea chart
+// (unless it closed a window first); Q picks the cannons, E the harpoons; R orders the repair; F uses the ship's
+// ability; L opens the loadout; K the talents; J the combat log; M the sea chart; I the statistics
 export function bindKeyboardInput(ship: Ship, selection: Selection, actions: KeyboardActions) {
   window.addEventListener('keydown', (e) => {
     if (e.defaultPrevented) return;
@@ -36,16 +44,25 @@ export function bindKeyboardInput(ship: Ship, selection: Selection, actions: Key
         ship.setWeapon('harpoon');
         break;
       case 'KeyR':
-        ship.startRepair();
+        actions.repair();
+        break;
+      case 'KeyF':
+        actions.useAbility();
         break;
       case 'KeyL':
         actions.toggleLoadout();
+        break;
+      case 'KeyK':
+        actions.toggleTalents();
         break;
       case 'KeyJ':
         actions.toggleLog();
         break;
       case 'KeyM':
         actions.toggleMap();
+        break;
+      case 'KeyI':
+        actions.toggleStats();
         break;
     }
   });

@@ -23,6 +23,8 @@ const SPAWN_TRIES = 40;
 // fighting there stays as full as it was, instead of the bots drifting off to the rest of the world
 const RESPAWN_SPREAD = 1500;
 const RETRY_TIME = 1; // seconds before a bot that found no room tries again
+const LAIR_SPREAD = 200; // world units round its lair a boss comes in
+const ESCORT_SPREAD = [50, 90] as const; // world units from the boss its escorts come in
 
 /** A bot waiting to come into the game in place of one that was sunk */
 export interface Respawn {
@@ -36,6 +38,11 @@ export interface Respawn {
 /** The bots of every kind, there when the game starts: anywhere on the sea, but not on top of a player */
 export function populate(state: GameState, nav: NavGrid, random: () => number) {
   for (const kind of BOT_KIND_IDS) {
+    if (BOT_KINDS[kind].boss) {
+      if (!spawnBoss(state, nav, random, kind, false))
+        state.respawns.push({ kind, at: state.time + RETRY_TIME, near: null });
+      continue;
+    }
     const count = Math.round(BOT_KINDS[kind].perSquare * MAP_SQUARES * MAP_SQUARES);
     for (let i = 0; i < count; i++) {
       if (!spawn(state, nav, random, kind, false, null)) {
@@ -55,14 +62,101 @@ export function stepSpawns(state: GameState, nav: NavGrid, random: () => number)
     const { bot, isSinking } = state.ships[i];
     if (!bot || !isSinking) continue;
     state.ships.splice(i, 1);
+    // A boss's escort comes back with the boss
+    if (bot.escort) continue;
     state.respawns.push({ kind: bot.kind, at: state.time + BOT_KINDS[bot.kind].respawnTime, near: bot.home });
   }
   const due = state.respawns.filter((r) => state.time >= r.at);
   if (due.length === 0) return;
   state.respawns = state.respawns.filter((r) => state.time < r.at);
   for (const { kind, near } of due) {
-    if (!spawn(state, nav, random, kind, true, near)) state.respawns.push({ kind, at: state.time + RETRY_TIME, near });
+    const done = BOT_KINDS[kind].boss
+      ? spawnBoss(state, nav, random, kind, true)
+      : spawn(state, nav, random, kind, true, near);
+    if (!done) state.respawns.push({ kind, at: state.time + RETRY_TIME, near });
   }
+}
+
+/**
+ * A boss at its lair (open water within LAIR_SPREAD of it, out of every player's sight when `unseen`) and its escort
+ * round it; false if there was no room this time
+ */
+function spawnBoss(state: GameState, nav: NavGrid, random: () => number, kindId: BotKindId, unseen: boolean) {
+  const kind = BOT_KINDS[kindId];
+  if (!kind.boss) return false;
+  const shipClass = SHIP_CLASSES[kind.shipClass];
+  const need = hullReach(shipClass.hull) + ROOM;
+  for (let attempt = 0; attempt < SPAWN_TRIES; attempt++) {
+    const angle = random() * Math.PI * 2;
+    const distance = Math.sqrt(random()) * LAIR_SPREAD;
+    const spot = nav.nearestOpen(
+      kind.boss.lair.x + Math.cos(angle) * distance,
+      kind.boss.lair.y + Math.sin(angle) * distance,
+      need,
+    );
+    if (!spot) continue;
+    const seen = state.ships.some(
+      (other) =>
+        !other.bot &&
+        Math.hypot(other.x - spot.x, other.y - spot.y) < (unseen ? other.viewRange + SIGHT_MARGIN : FIRST_GAP),
+    );
+    if (seen) continue;
+    const boss = addBot(state, random, kindId, spot.x, spot.y, null);
+    const { kind: escortKind, count } = kind.boss.escorts;
+    // The escort that outlived the last boss (still wandering round the lair) serves the new one, and new ships only
+    // make up the number: otherwise every boss sunk with its escort afloat would leave more of them there
+    let missing = count;
+    for (const ship of state.ships) {
+      const mind = ship.bot;
+      if (missing === 0) break;
+      if (!mind?.escort || mind.leader !== null || mind.kind !== escortKind || ship.isSinking) continue;
+      mind.leader = boss.id;
+      missing--;
+    }
+    const escortClass = SHIP_CLASSES[BOT_KINDS[escortKind].shipClass];
+    for (let i = 0; i < missing; i++) {
+      const side = boss.rotation + (i % 2 === 0 ? 1 : -1) * (Math.PI / 2);
+      const off = ESCORT_SPREAD[0] + random() * (ESCORT_SPREAD[1] - ESCORT_SPREAD[0]);
+      const place = nav.nearestOpen(
+        spot.x + Math.cos(side) * off,
+        spot.y + Math.sin(side) * off,
+        hullReach(escortClass.hull) + ROOM,
+      );
+      if (place) addBot(state, random, escortKind, place.x, place.y, boss.id);
+    }
+    return true;
+  }
+  return false;
+}
+
+/** A new bot of a kind at (x, y), facing anywhere: an escort of `leader`, if given */
+function addBot(
+  state: GameState,
+  random: () => number,
+  kindId: BotKindId,
+  x: number,
+  y: number,
+  leader: number | null,
+) {
+  const kind = BOT_KINDS[kindId];
+  const ship = new Ship(SHIP_CLASSES[kind.shipClass], state.nextId++);
+  ship.x = x;
+  ship.y = y;
+  ship.rotation = random() * Math.PI * 2 - Math.PI;
+  ship.throttle = kind.cruise;
+  if (kind.ammo) ship.loadAmmo(kind.ammo);
+  // An escort circles a fight on its own side of the leader
+  const circle =
+    leader === null
+      ? random() < 0.5
+        ? 1
+        : -1
+      : state.ships.filter((s) => s.bot?.leader === leader).length % 2 === 0
+        ? 1
+        : -1;
+  ship.bot = newBotMind(kindId, { x, y }, circle, state.time, leader);
+  state.ships.push(ship);
+  return ship;
 }
 
 /** A bot of this kind, somewhere with room for it (near `near`, if given); false if no such place turned up this time */
@@ -89,14 +183,7 @@ function spawn(
     });
     if (crowded) continue;
 
-    const ship = new Ship(shipClass, state.nextId++);
-    ship.x = x;
-    ship.y = y;
-    ship.rotation = random() * Math.PI * 2 - Math.PI;
-    ship.throttle = kind.cruise;
-    if (kind.ammo) ship.loadAmmo(kind.ammo);
-    ship.bot = newBotMind(kindId, { x, y }, random() < 0.5 ? 1 : -1, state.time);
-    state.ships.push(ship);
+    addBot(state, random, kindId, x, y, null);
     return true;
   }
   return false;

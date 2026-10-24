@@ -5,8 +5,8 @@ const LOCAL_PREFIX = 'pirate-game.'; // localStorage keys: the fallback, and whe
 const FLUSH_DELAY = 400; // milliseconds: writes within this are sent to the database together
 
 /** What the browser keeps for us, by key */
-export type StoreKey = 'save' | 'hud' | 'sound' | 'view' | 'log';
-const KEYS: readonly StoreKey[] = ['save', 'hud', 'sound', 'view', 'log'];
+export type StoreKey = 'save' | 'hud' | 'sound' | 'view' | 'log' | 'lang';
+const KEYS: readonly StoreKey[] = ['save', 'hud', 'sound', 'view', 'log', 'lang'];
 
 function request<T>(req: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {
@@ -56,6 +56,8 @@ export class Store {
   private readonly values = new Map<StoreKey, unknown>();
   private readonly dirty = new Set<StoreKey>();
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** The last write, till it is done */
+  private writing: Promise<void> = Promise.resolve();
   private readonly db: IDBDatabase | null;
 
   private constructor(db: IDBDatabase | null) {
@@ -109,9 +111,10 @@ export class Store {
     this.schedule();
   }
 
-  /** Forgets everything kept: a new game on the next start */
+  /** Forgets everything kept but the language: a new game on the next start, in the same language */
   clear() {
     for (const key of KEYS) {
+      if (key === 'lang') continue;
       this.values.delete(key);
       this.dirty.add(key);
       try {
@@ -136,10 +139,15 @@ export class Store {
         if (value === undefined) continue;
         writeLocal(key, value);
       }
+      this.writing = Promise.resolve();
       return;
     }
     try {
-      const table = this.db.transaction(TABLE, 'readwrite').objectStore(TABLE);
+      const transaction = this.db.transaction(TABLE, 'readwrite');
+      this.writing = new Promise<void>((resolve) => {
+        for (const end of ['complete', 'error', 'abort']) transaction.addEventListener(end, () => resolve());
+      });
+      const table = transaction.objectStore(TABLE);
       for (const key of keys) {
         const value = this.values.get(key);
         if (value === undefined) table.delete(key);
@@ -150,6 +158,11 @@ export class Store {
       console.warn('IndexedDB write failed, keeping the game in localStorage', error);
       for (const key of keys) writeLocal(key, this.values.get(key));
     }
+  }
+
+  /** Resolves when the last write is done: before the page reloads */
+  written(): Promise<void> {
+    return this.writing;
   }
 
   private schedule() {

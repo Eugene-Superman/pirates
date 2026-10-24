@@ -2,6 +2,7 @@ import { Container, Graphics, type Rectangle, Text } from 'pixi.js';
 import { ButtonRow } from './ButtonRow';
 import { Checkbox } from './Checkbox';
 import { HUD_GROUPS, LABEL_STYLE, type HudFrame, type HudItem, type HudWidget } from './hudItems';
+import { t } from '../i18n/i18n';
 
 const PANEL_COLOR = 0x0b2433;
 const PANEL_ALPHA = 0.95;
@@ -33,9 +34,9 @@ export class SettingsPanel {
   private readonly dim = new Graphics();
   private readonly panel = new Container();
   private readonly background = new Graphics();
-  private readonly title = new Text({ text: 'Settings (dev)', style: { ...HEADER_STYLE, fontSize: 18 } });
-  private readonly note = new Text({ text: 'Checked: also shown on the screen', style: NOTE_STYLE });
-  private readonly close = new ButtonRow([{ label: 'Close', key: null, onTap: () => this.hide() }]);
+  private readonly title = new Text({ text: t('Settings (dev)'), style: { ...HEADER_STYLE, fontSize: 18 } });
+  private readonly note = new Text({ text: t('Checked: also shown on the screen'), style: NOTE_STYLE });
+  private readonly close = new ButtonRow([{ label: t('Close'), key: null, onTap: () => this.hide() }]);
   private readonly content = new Container();
   private readonly clip = new Graphics();
   private readonly rows: Row[] = [];
@@ -74,7 +75,7 @@ export class SettingsPanel {
     for (const group of HUD_GROUPS) {
       const members = items.filter((item) => item.group === group);
       if (members.length === 0) continue;
-      const header = new Text({ text: group, style: HEADER_STYLE });
+      const header = new Text({ text: t(group), style: HEADER_STYLE });
       header.y = y;
       this.content.addChild(header);
       y += header.height + ROW_GAP;
@@ -91,7 +92,8 @@ export class SettingsPanel {
     this.container.addChild(this.dim, this.panel);
 
     window.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || !this.isOpen) return;
+      // A window over it closes first: the HUD makes them before it
+      if (e.code !== 'Escape' || !this.isOpen || e.defaultPrevented) return;
       this.hide();
       // Escape closed the panel; it shouldn't also stop the ship firing (keyboardInput)
       e.preventDefault();
@@ -124,7 +126,7 @@ export class SettingsPanel {
   /** Returns the row's height */
   private addRow(item: HudItem, y: number, onToggle: () => void) {
     const check = new Checkbox('', onToggle);
-    const label = new Text({ text: item.label, style: LABEL_STYLE });
+    const label = new Text({ text: t(item.label), style: LABEL_STYLE });
     const widget = item.kind === 'control' ? item.create() : null;
     const height = Math.max(widget ? widget.container.height : 0, label.height, 18);
     check.container.position.set(0, y + (height - 18) / 2);

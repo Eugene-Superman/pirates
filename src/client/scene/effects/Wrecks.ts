@@ -1,11 +1,20 @@
 import { SHIP_CLASSES, type GameState, type Mount, type UnitKind } from '../../../game';
+import type { Camera3D } from '../../render/Camera3D';
 import type { Painter3D } from '../../render/Painter3D';
+import type { BotSprites } from '../models/BotSprites';
 import { drawBotShip } from '../models/botShip3d';
 import { drawSerpent, type SpinePoint } from '../models/serpent3d';
 import { drawTurtle } from '../models/turtle3d';
+import type { SceneObject } from '../sceneObjects';
+import { smoothstep } from './foam';
 
 const SINK_TIME = 3.5; // seconds a sunk bot takes to go under
 const DEPTH = 26; // world units it goes down by then: enough for the tallest mast
+// A ship drawn from its atlases goes down by this many of its radii (its sinking atlas, the part under water masked
+// off), rolling over by TILT radians, and fades out over the last FADE share of the time
+const SPRITE_DEPTH = 1.3;
+const SPRITE_TILT = 0.22;
+const SPRITE_FADE = 0.3;
 const BUBBLE_TIME = 5; // seconds the water boils where it went down
 const BUBBLES = 5; // rings of bubbles at a time
 const BUBBLE_REACH = 9; // world units round the wreck
@@ -26,8 +35,8 @@ interface Wreck {
 
 /**
  * Bots sunk in sight go down where they were: the game takes them out of the game at once, so the client keeps their
- * last pose and lowers their model into the sea, the water boiling over them a little longer. The player's own ship
- * has its own animation (Sinking)
+ * last pose and lowers their model (or their sprite, burning) into the sea, the water boiling over them a little
+ * longer. The player's own ship has its own animation (Sinking)
  */
 export class Wrecks {
   private wrecks: Wreck[] = [];
@@ -75,13 +84,31 @@ export class Wrecks {
     }
   }
 
-  /** Every wreck still above the water, as volumetric objects to sort with the rest */
-  objects(p: Painter3D, time: number) {
+  /** Every wreck still above the water, as volumetric objects to sort with the rest. A ship with atlases goes down
+   * as its sprite (its sinking stage, still burning a while), a serpent as its pieces, the rest as their models */
+  objects(p: Painter3D, time: number, dt: number, camera: Camera3D, sprites: BotSprites): SceneObject[] {
     return this.wrecks
       .filter((w) => time - w.start < SINK_TIME)
-      .map((w) => {
+      .map((w): SceneObject => {
         const t = (time - w.start) / SINK_TIME;
+        const shipClass = SHIP_CLASSES[w.kind];
         const sink = DEPTH * t * t;
+        const serpent = w.spine ? sprites.takeSerpent(w.id) : null;
+        if (w.spine && serpent) {
+          serpent.update(w.spine, camera, time, 'sinking', 0, 0, null, sink);
+          return { depth: p.depth([w.x, w.y, 0]), layers: serpent.layers };
+        }
+        const sprite = w.spine ? null : sprites.take(w.id, w.kind);
+        if (sprite) {
+          const target = { x: w.x, y: w.y, rotation: w.heading, radius: shipClass.radius, speed: 0, shipClass };
+          const pose = {
+            depth: SPRITE_DEPTH * shipClass.radius * t ** 1.4,
+            tilt: SPRITE_TILT * t,
+            alpha: 1 - smoothstep(1 - SPRITE_FADE, 1, t),
+          };
+          sprite.update(dt, target, camera, time, 'sinking', pose);
+          return { depth: p.depth([w.x, w.y, shipClass.radius]), layers: sprite.layers };
+        }
         return {
           depth: p.depth([w.x, w.y, 0]),
           draw: (painter: Painter3D) => {

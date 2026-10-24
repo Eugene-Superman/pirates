@@ -34,10 +34,14 @@ interface ShipLook {
   /** A square sail across the ship, or a triangular one along it (a fishing boat's) */
   readonly sail: 'square' | 'lateen';
   readonly sailWidth: number;
+  /** A second mast before the main one, with a sail of its own (a brig's) */
+  readonly foremast?: { readonly x: number; readonly height: number; readonly sailWidth: number };
   /** Cargo on deck: crates (a merchant's) or net floats (a fisher's) */
   readonly deckLoad: 'crates' | 'nets' | null;
 }
 
+// Every bot ship is drawn from its atlases (BotSprites); its look here draws it until they have loaded, and gives its
+// height for its hit point bar (botShipTop)
 // prettier-ignore
 const LOOKS: Readonly<Partial<Record<ShipClassId, ShipLook>>> = {
   fishingBoat: {
@@ -69,6 +73,19 @@ const LOOKS: Readonly<Partial<Record<ShipClassId, ShipLook>>> = {
     sail: 'square',
     sailWidth: 15,
     deckLoad: null,
+  },
+  // The Smuggler Baron's: a long black hull with a red stripe, two masts of dark sails, his flag on the main. Its
+  // atlases (the smuggler's ship made bigger, with red sails) reach higher: this mast puts the hit point bar over them
+  baronBrig: {
+    outline: [[22, 0], [16.5, 5.6], [6, 7.6], [-8, 7.4], [-17.5, 6], [-20.5, 3.4], [-20.5, -3.4], [-17.5, -6], [-8, -7.4], [6, -7.6], [16.5, -5.6]],
+    deckZ: 4.2,
+    colors: { hull: 0x241a16, deck: 0x5b4330, stripe: 0xc0392b, mast: 0x2e2018, sail: 0x1f1f26, trim: 0x8a2a22, flag: 0x8a1a12, flagMark: 0xf2d24b },
+    mastX: -3,
+    mastHeight: 29.5,
+    sail: 'square',
+    sailWidth: 19,
+    deckLoad: 'crates',
+    foremast: { x: 9, height: 23, sailWidth: 16 },
   },
 };
 
@@ -175,11 +192,43 @@ function drawDeckLoad(p: Painter3D, look: ShipLook, at: At) {
   }
 }
 
-/** The mast, its sail and the flag on top, sorted against each other so the nearer is drawn last */
+/** The masts, their sails and the flag on the main one, sorted against each other so the nearer is drawn last */
 function drawRig(p: Painter3D, look: ShipLook, at: At, phase: number, speed: number) {
-  const { colors, deckZ, mastX, mastHeight, sailWidth } = look;
+  const { colors, deckZ, mastX, mastHeight } = look;
   const top = deckZ + mastHeight;
   const parts: { depth: number; draw: () => void }[] = [];
+  mastParts(p, look, at, parts, mastX, mastHeight, look.sailWidth);
+  if (look.foremast) mastParts(p, look, at, parts, look.foremast.x, look.foremast.height, look.foremast.sailWidth);
+
+  if (colors.flag !== null) {
+    const { flag, flagMark } = colors;
+    const head = at(mastX, 0, top);
+    const wave = Math.sin(phase * 6) * 0.6;
+    const stream = 3.4 + Math.min(speed / 60, 1);
+    parts.push({
+      depth: p.depth(head) - 1,
+      draw: () => {
+        p.surface([at(mastX, 0, top + 0.2), at(mastX - stream, wave, top - 0.9), at(mastX, 0, top - 2.2)], flag);
+        if (flagMark !== null) p.ball(at(mastX - stream * 0.35, wave * 0.35, top - 1), 0.45, flagMark);
+      },
+    });
+  }
+  parts.sort((a, b) => b.depth - a.depth);
+  for (const part of parts) part.draw();
+}
+
+/** A mast at `mastX` along the ship, `mastHeight` over the deck, and its sail, `sailWidth` across */
+function mastParts(
+  p: Painter3D,
+  look: ShipLook,
+  at: At,
+  parts: { depth: number; draw: () => void }[],
+  mastX: number,
+  mastHeight: number,
+  sailWidth: number,
+) {
+  const { colors, deckZ } = look;
+  const top = deckZ + mastHeight;
   const foot = at(mastX, 0, deckZ);
   const head = at(mastX, 0, top);
   parts.push({
@@ -230,21 +279,6 @@ function drawRig(p: Painter3D, look: ShipLook, at: At, phase: number, speed: num
       draw: () => p.surface(sail, colors.sail),
     });
   }
-
-  if (colors.flag !== null) {
-    const { flag, flagMark } = colors;
-    const wave = Math.sin(phase * 6) * 0.6;
-    const stream = 3.4 + Math.min(speed / 60, 1);
-    parts.push({
-      depth: p.depth(head) - 1,
-      draw: () => {
-        p.surface([at(mastX, 0, top + 0.2), at(mastX - stream, wave, top - 0.9), at(mastX, 0, top - 2.2)], flag);
-        if (flagMark !== null) p.ball(at(mastX - stream * 0.35, wave * 0.35, top - 1), 0.45, flagMark);
-      },
-    });
-  }
-  parts.sort((a, b) => b.depth - a.depth);
-  for (const part of parts) part.draw();
 }
 
 /** The control point of a quadratic curve from a to b that passes through m halfway */

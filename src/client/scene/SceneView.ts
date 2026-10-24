@@ -16,9 +16,11 @@ import type { Selection } from '../input/selection';
 import { Camera3D, type CameraConfig, type Vec3 } from '../render/Camera3D';
 import { Painter3D } from '../render/Painter3D';
 import { CAMERA_MODES, CameraControl, type CameraMode } from './cameraControl';
+import { BarrageMarks } from './effects/BarrageMarks';
 import { DamageNumbers } from './effects/DamageNumbers';
 import { FogClouds } from './effects/FogClouds';
 import { FOG_LAYERS, createFogOfWar, type FogLayer, type FogOfWar, updateFogOfWar } from './effects/fogOfWar';
+import { LevelUpEffect } from './effects/LevelUpEffect';
 import { drawRangeRing } from './effects/rangeRings';
 import { RepairEffect } from './effects/RepairEffect';
 import { ShipFire } from './effects/ShipFire';
@@ -35,11 +37,14 @@ import { createSeaSurface, type SeaSurface, updateSeaSurface } from './effects/s
 import { drawChest, drawChestWater } from './models/chest3d';
 import { drawIslandGround, drawIslandRaised } from './models/island3d';
 import { portPieces } from './models/port3d';
+import { BotSprites } from './models/BotSprites';
+import { ChestSprites } from './models/ChestSprites';
 import { botShipTop, drawBotShip } from './models/botShip3d';
 import { drawProjectile, drawProjectileShadow } from './models/projectile3d';
 import { SPINE, drawSerpent, drawSerpentWater, type SpinePoint } from './models/serpent3d';
 import { ShipSprite } from './models/ShipSprite';
 import { drawTurtle, drawTurtleWater } from './models/turtle3d';
+import type { SceneObject } from './sceneObjects';
 
 // Classic 2:1 isometric: tilted 30°, world rotated 45°
 const CAMERA: CameraConfig = { pitch: 30, yaw: 45, zoom: 1.4, originY: 0.5 };
@@ -72,6 +77,14 @@ const BORDER_COLOR = 0x0b3a52;
 // the player (an aggressive bot, or one fighting them)
 const HP_BAR = { width: 36, height: 5, lift: 12 };
 const HP_COLORS = { back: 0x0b1a22, high: 0x5ad15a, mid: 0xf2c84b, low: 0xe5533d, border: 0xffffff, hostile: 0xff3b2f };
+// Radians a ship's sprite rolls when hit (the player's and the bots'), rocking to and fro as the shake dies out
+const SHAKE_TILT = 0.06;
+const SHAKE_SWINGS = 16; // radians of the rocking over the whole shake: about two and a half swings
+
+/** How far a ship's sprite is rolled by a hit: shake is 1 right after it, 0 once settled (ShotEffects.shake) */
+function hitRoll(shake: number) {
+  return SHAKE_TILT * shake * Math.sin(shake * SHAKE_SWINGS);
+}
 
 /** Copies the kept on/off flags for these keys into a record of them: those that are true or false */
 function readFlags<K extends string>(value: unknown, keys: readonly K[], into: Record<K, boolean>) {
@@ -100,10 +113,15 @@ function unitTop(unit: Unit) {
 // Decorations (wakes, foam) are view state: the scene owns and updates them itself.
 export class SceneView {
   readonly container = new Container();
+  /** What lies on the water, then the farthest volumetric objects, up to the first ship sprite */
   private readonly scene = new Graphics();
-  /** Islands nearer than the ship sprite: they must be drawn on top of it */
-  private readonly front = new Graphics();
-  /** Fire, smoke and shot effects above the ship, under the islands in front of it */
+  /** The scene's volumetric objects from far to near: the ships' sprites, each with its fire over it, and between
+   * them layers (`segments`) of the vector-drawn objects in between, starting with `scene` */
+  private readonly layers = new Container();
+  private readonly segments: { graphics: Graphics; painter: Painter3D }[] = [];
+  /** Over the whole scene: the debug drawings */
+  private readonly overlay = new Graphics();
+  /** Fire, smoke and shot effects above the player's ship, under whatever is nearer than it */
   private readonly fireLayer = new Graphics();
   /** Over everything in the scene, in screen pixels: the units' hit point bars, then the damage numbers */
   private readonly hpBars = new Graphics();
@@ -112,7 +130,9 @@ export class SceneView {
   private readonly fire = new ShipFire();
   private readonly sinking = new Sinking();
   private readonly shots = new ShotEffects();
+  private readonly barrage = new BarrageMarks();
   private readonly repair = new RepairEffect();
+  private readonly levelUp = new LevelUpEffect();
   private readonly trails = new Trails();
   private readonly wrecks = new Wrecks();
   /** Each serpent's body as last drawn, by id: a wreck keeps the pose it died in */
@@ -126,9 +146,12 @@ export class SceneView {
   private readonly seaSurface: SeaSurface;
   private readonly fog: FogOfWar;
   private readonly fogClouds: FogClouds;
-  private readonly frontPainter: Painter3D;
+  private readonly overlayPainter: Painter3D;
   private readonly firePainter: Painter3D;
   private readonly shipSprite: ShipSprite;
+  private readonly bots: BotSprites;
+  /** The chests afloat in sight, drawn from their atlases */
+  private readonly chestSprites: ChestSprites;
   /** Zoom as a multiple of CAMERA.zoom; the camera eases towards it */
   private zoomLevel = 1;
   /** Whether the HUD outlines the camera's zone */
@@ -151,9 +174,11 @@ export class SceneView {
     app.renderer.background.color = SEA_COLOR;
     this.fog = createFogOfWar();
     this.fogClouds = new FogClouds();
-    this.frontPainter = new Painter3D(this.front, this.camera);
+    this.overlayPainter = new Painter3D(this.overlay, this.camera);
     this.firePainter = new Painter3D(this.fireLayer, this.camera);
     this.shipSprite = new ShipSprite(state.ship.shipClass);
+    this.bots = new BotSprites(this.camera);
+    this.chestSprites = new ChestSprites(this.camera);
 
     this.camera.focusX = state.ship.x;
     this.camera.focusY = state.ship.y;
@@ -164,11 +189,8 @@ export class SceneView {
       this.fogClouds.container,
       this.wake.mesh,
       this.sinking.water,
-      this.scene,
-      this.shipSprite.sprite,
-      this.shipSprite.waterMask,
-      this.fireLayer,
-      this.front,
+      this.layers,
+      this.overlay,
       this.hpBars,
       this.damageNumbers.container,
     );
@@ -199,6 +221,7 @@ export class SceneView {
     this.fire.update(dt, ship, stage, this.sinking.pose, time);
     this.shots.update(dt, this.state);
     this.repair.update(dt, this.state);
+    this.levelUp.update(dt, this.state);
 
     const targetZoom = CAMERA.zoom * this.zoomLevel;
     camera.zoom += (targetZoom - camera.zoom) * Math.min(1, dt * ZOOM_EASE);
@@ -206,8 +229,8 @@ export class SceneView {
     camera.originX = width / 2;
     camera.originY = height * CAMERA.originY;
     this.cameraControl.update(camera, ship, dt, width, height);
-    painter.screenWidth = this.frontPainter.screenWidth = width;
-    painter.screenHeight = this.frontPainter.screenHeight = height;
+    painter.screenWidth = this.overlayPainter.screenWidth = width;
+    painter.screenHeight = this.overlayPainter.screenHeight = height;
 
     this.scene.clear();
 
@@ -260,12 +283,14 @@ export class SceneView {
     const chests = this.state.chests.filter((c) => ship.canSee(c.x, c.y) && painter.isVisible(c.x, c.y, 0, 12));
     for (const chest of chests) drawChestWater(painter, chest, time);
     this.repair.drawWater(painter);
+    this.levelUp.drawWater(painter);
     const units: Unit[] = others;
     const locked = units.find((u) => u.id === ship.attackTarget);
     if (locked) drawTargetLock(painter, locked, time, ship.holdReason !== null);
     const selected = units.find((u) => u.id === this.selection.id);
     if (selected && selected !== locked) drawSelection(painter, selected);
     this.shots.drawWater(painter);
+    this.barrage.drawWater(painter, this.state);
     for (const projectile of this.state.projectiles) drawProjectileShadow(painter, projectile);
     // No ship shadow here: it is baked into the ship's sprite
     // Where the ship will stop: the target, or the nearest open water to it when it is on land
@@ -273,7 +298,7 @@ export class SceneView {
     if (goal) drawTargetMarker(painter, goal, time);
 
     // Volumetric objects: from far to near
-    const objects = islands.map((island) => ({
+    const objects: SceneObject[] = islands.map((island) => ({
       depth: painter.depth([island.x, island.y, island.height / 2]),
       draw: (p: Painter3D) => drawIslandRaised(p, island, time),
     }));
@@ -281,6 +306,21 @@ export class SceneView {
       const shake = this.shots.shake(other.id, time);
       const lunge = this.shots.lunge(other.id, time);
       const spine = this.spines.get(other.id);
+      const biteAge = this.shots.biteAge(other.id, time);
+      // A bot's ship, the turtle and the serpent from their atlases, once they have loaded
+      const serpent = spine ? this.bots.takeSerpent(other.id) : null;
+      if (spine && serpent) {
+        serpent.update(spine, camera, time, other.damageStage, shake, lunge, biteAge);
+        objects.push({ depth: painter.depth([other.x, other.y, other.height / 2]), layers: serpent.layers });
+        continue;
+      }
+      const sprite = spine ? null : this.bots.take(other.id, other.shipClass.id);
+      if (sprite) {
+        const pose = { depth: 0, tilt: hitRoll(shake), alpha: 1 };
+        sprite.update(dt, other, camera, time, other.damageStage, pose, biteAge);
+        objects.push({ depth: painter.depth([other.x, other.y, other.radius]), layers: sprite.layers });
+        continue;
+      }
       objects.push({
         depth: painter.depth([other.x, other.y, other.height / 2]),
         draw: (p) => {
@@ -290,9 +330,12 @@ export class SceneView {
         },
       });
     }
-    objects.push(...this.wrecks.objects(painter, time));
+    objects.push(...this.wrecks.objects(painter, time, dt, camera, this.bots));
     for (const chest of chests) {
-      objects.push({ depth: painter.depth([chest.x, chest.y, 2]), draw: (p) => drawChest(p, chest, time) });
+      // From its atlas once it has loaded
+      const layers = this.chestSprites.take(chest, time);
+      const depth = painter.depth([chest.x, chest.y, 2]);
+      objects.push(layers ? { depth, layers } : { depth, draw: (p) => drawChest(p, chest, time) });
     }
     const { port } = world;
     if (painter.isVisible(port.island.x, port.island.y, 0, port.island.reach * ISLAND_SHALLOWS + ISLAND_MARGIN)) {
@@ -304,29 +347,69 @@ export class SceneView {
     }
     // Sorted by a point about half the ship's height up; its collision radius is a fair measure of its size
     const shipDepth = painter.depth([ship.x, ship.y, ship.radius]);
+    const { pose } = this.sinking;
+    this.shipSprite.update(ship, camera, time, stage, {
+      ...pose,
+      tilt: pose.tilt + hitRoll(this.shots.shake(ship.id, time)),
+    });
+    objects.push({ depth: shipDepth, layers: [...this.shipSprite.layers, this.fireLayer] });
     objects.sort((a, b) => b.depth - a.depth);
-
-    // A sprite can't go inside a Graphics, so everything nearer than the ship goes to a layer on top of it
-    this.front.clear();
-    for (const object of objects) {
-      object.draw(object.depth < shipDepth ? this.frontPainter : painter);
-    }
-    this.shipSprite.update(ship, camera, time, stage, this.sinking.pose);
+    const behindShip = this.drawLayers(objects, width, height);
+    this.bots.sweep();
+    this.chestSprites.sweep();
 
     // Smoke after flames: it rises from them and drifts over them
     this.fireLayer.clear();
     this.fire.drawFlames(this.firePainter);
     this.fire.drawSmoke(this.firePainter);
-    // Shot effects behind the ship go to the scene layer, under the sprite; the rest over it
-    this.shots.draw(painter, this.firePainter, shipDepth);
+    // Shot effects behind the ship go to the layer right under its sprite; the rest over it
+    this.shots.draw(behindShip, this.firePainter, shipDepth);
     this.repair.draw(this.firePainter);
+    this.levelUp.draw(this.firePainter);
+    this.barrage.draw(this.firePainter, this.state);
 
     // On the top layer, so nothing hides it
-    if (this.debug.route) drawRoute(this.frontPainter, ship);
-    if (this.debug.hulls) drawHulls(this.frontPainter, this.state);
+    this.overlay.clear();
+    if (this.debug.route) drawRoute(this.overlayPainter, ship);
+    if (this.debug.hulls) drawHulls(this.overlayPainter, this.state);
 
     this.drawHpBars(units);
     this.damageNumbers.update(dt, this.state, camera);
+  }
+
+  /**
+   * Draws the sorted objects, far to near: a sprite can't go inside a Graphics, so each ship's sprite (and its fire)
+   * goes between two layers, the vector-drawn objects farther than it in the one under it, the nearer ones in the next.
+   * Returns the painter of the layer right under the player's ship
+   */
+  private drawLayers(objects: readonly SceneObject[], width: number, height: number) {
+    const order: Container[] = [this.scene];
+    let painter = this.painter;
+    let behindShip = this.painter;
+    let used = 0;
+    for (const object of objects) {
+      if ('draw' in object) {
+        object.draw(painter);
+        continue;
+      }
+      if (object.layers.includes(this.fireLayer)) behindShip = painter;
+      order.push(...object.layers);
+      if (used === this.segments.length) {
+        const graphics = new Graphics();
+        this.segments.push({ graphics, painter: new Painter3D(graphics, this.camera) });
+      }
+      const segment = this.segments[used++];
+      segment.graphics.clear();
+      segment.painter.screenWidth = width;
+      segment.painter.screenHeight = height;
+      order.push(segment.graphics);
+      painter = segment.painter;
+    }
+    // Layers left over from a frame with more ships in sight stay empty
+    for (const segment of this.segments.slice(used)) segment.graphics.clear();
+    this.layers.removeChildren();
+    this.layers.addChild(...order);
+    return behindShip;
   }
 
   /** The view's settings as plain data, to keep between visits */

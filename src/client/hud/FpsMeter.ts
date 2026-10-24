@@ -1,4 +1,5 @@
 import type { Text } from 'pixi.js';
+import { t } from '../i18n/i18n';
 
 const REPORT_INTERVAL_MS = 500;
 
@@ -19,7 +20,10 @@ export class FpsMeter {
     this.worstFrameMs = Math.max(this.worstFrameMs, frameMs);
     if (this.elapsedMs >= REPORT_INTERVAL_MS) {
       const fps = (this.frames * 1000) / this.elapsedMs;
-      this.text.text = `FPS: ${fps.toFixed(1)}   longest frame: ${this.worstFrameMs.toFixed(1)} ms`;
+      this.text.text = t('FPS: {fps}   longest frame: {ms} ms', {
+        fps: fps.toFixed(1),
+        ms: this.worstFrameMs.toFixed(1),
+      });
       this.frames = 0;
       this.elapsedMs = 0;
       this.worstFrameMs = 0;

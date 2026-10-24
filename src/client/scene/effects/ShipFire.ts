@@ -1,7 +1,13 @@
-import type { DamageStage, Ship, ShipClassId } from '../../../game';
+import type { DamageStage, ShipClassId } from '../../../game';
 import type { Vec3 } from '../../render/Camera3D';
 import type { Painter3D } from '../../render/Painter3D';
-import { shipBob, type SinkPose } from '../models/ShipSprite';
+import { shipBob, type SinkPose, type SpriteShip } from '../models/ShipSprite';
+
+/** What burns: a ship afloat, or a sunk bot's wreck going down */
+export interface BurningShip extends SpriteShip {
+  readonly speed: number;
+  readonly shipClass: { readonly id: ShipClassId };
+}
 import { WIND_X, WIND_Y } from './wind';
 
 /** Where fire and smoke come from, in ship coordinates (x to the bow, y to starboard, z up), world units */
@@ -26,7 +32,7 @@ interface Particle {
   size: number;
 }
 
-// Ships with a sprite only: the bots' vector-drawn ships don't burn yet
+// Ships with a sprite only: the vector-drawn ships don't burn. Emitters are in units of the sloop's size (radius 9)
 // prettier-ignore
 const EMITTERS: Readonly<Partial<Record<ShipClassId, { burning: Emitter[]; sinking: Emitter[] }>>> = {
   // Matches the sloop model in blender-assets/ships/starter/sloop/build.py (its y points to port, so y is negated here)
@@ -42,6 +48,83 @@ const EMITTERS: Readonly<Partial<Record<ShipClassId, { burning: Emitter[]; sinki
       { x: 9, y: -2, z: 6.2, spread: [4, 3, 0.5] }, // the sail lying over the bow
       { x: -4, y: 2, z: 5, spread: [3, 2, 0.4] },
       { x: -11.5, y: -1.2, z: 6.9, spread: [1.2, 1.5, 0.3] },
+    ],
+  },
+  // Matches blender-assets/ships/european/corsair/build.py (y negated): the waist, the forecastle, the quarterdeck
+  // and the burning feet of both courses; going down, the foremast fallen over the bow and the main course
+  corsair: {
+    burning: [
+      { x: 2, y: -2, z: 6.2, spread: [2.5, 1.5, 0.4] },
+      { x: -6, y: 3, z: 6.2, spread: [1.5, 1.5, 0.4] },
+      { x: 13, y: 1.5, z: 8.2, spread: [1.5, 1.2, 0.3] },
+      { x: -15, y: -1.5, z: 9, spread: [1.5, 2, 0.3] },
+      { x: -1.5, y: 0, z: 16.2, spread: [1.5, 7, 0.6] },
+      { x: 10, y: 0, z: 15.3, spread: [1.5, 6.5, 0.6] },
+    ],
+    sinking: [
+      { x: 18, y: -3, z: 8.5, spread: [5, 4, 0.6] },
+      { x: -1.5, y: 0, z: 17.5, spread: [1.5, 6, 0.6] },
+      { x: -5, y: -2, z: 5.8, spread: [3, 2, 0.4] },
+      { x: -15, y: -1.5, z: 8.5, spread: [1.5, 2, 0.3] },
+    ],
+  },
+  // The bots' ships, from blender-assets/ships/bots/ (y negated, then scaled to the sloop's size): the catch, the
+  // little decks and the sail's burning foot of a fishing boat; going down, its side still out of the water
+  fishingBoat: {
+    burning: [
+      { x: -0.9, y: 0, z: 2.7, spread: [3, 2.2, 0.45] },
+      { x: -10.5, y: 0, z: 3.9, spread: [1.5, 1.8, 0.3] },
+      { x: 12, y: 0, z: 4.4, spread: [1.2, 1.2, 0.3] },
+      { x: -0.3, y: -3, z: 9, spread: [3.8, 1.2, 0.75] },
+    ],
+    sinking: [
+      { x: -1.5, y: 3, z: 2.2, spread: [4.5, 1.5, 0.45] },
+      { x: -10.5, y: 0, z: 2.8, spread: [1.5, 1.5, 0.3] },
+    ],
+  },
+  // The cargo before the mast, the deckhouse, the boat, the mainsail's and the jib's feet
+  merchantSloop: {
+    burning: [
+      { x: 6.2, y: 0, z: 5.2, spread: [1.8, 2.2, 0.4] },
+      { x: -9.6, y: 0, z: 5.1, spread: [1.6, 2, 0.3] },
+      { x: -3.5, y: 0, z: 4.1, spread: [2, 2, 0.3] },
+      { x: -4, y: -4, z: 9.3, spread: [3.5, 1.5, 0.6] },
+      { x: 10, y: -1.2, z: 8, spread: [3, 0.8, 0.6] },
+    ],
+    sinking: [
+      { x: 6, y: 2, z: 3.8, spread: [2.5, 2, 0.4] },
+      { x: -9.6, y: 0.5, z: 4.3, spread: [1.5, 1.8, 0.3] },
+      { x: -3.5, y: 1.5, z: 3.4, spread: [2, 1.5, 0.3] },
+    ],
+  },
+  // The kegs, the tarpaulin over the cargo, the companionway, the mainsail's and the jib's feet
+  smugglerSloop: {
+    burning: [
+      { x: 6.6, y: 0, z: 4.2, spread: [1.5, 1.8, 0.4] },
+      { x: -4.2, y: 0, z: 4.4, spread: [2.5, 2.3, 0.4] },
+      { x: -9.4, y: 0, z: 4.2, spread: [1.2, 1.2, 0.3] },
+      { x: -4.7, y: -4, z: 9, spread: [3.5, 1.5, 0.6] },
+      { x: 10.4, y: -1.1, z: 7.6, spread: [3, 0.8, 0.6] },
+    ],
+    sinking: [
+      { x: 5.7, y: 1.9, z: 3.6, spread: [2.5, 2, 0.4] },
+      { x: -4, y: 1.4, z: 3.7, spread: [2.5, 1.5, 0.3] },
+      { x: -9.4, y: 0.5, z: 3.8, spread: [1.2, 1.2, 0.3] },
+    ],
+  },
+  // The Baron's ship is the smuggler's stretched (blender-assets/ships/bots/baronBrig/build.py): the same points
+  baronBrig: {
+    burning: [
+      { x: 5.9, y: 0, z: 3.6, spread: [1.35, 1.5, 0.35] },
+      { x: -3.8, y: 0, z: 3.8, spread: [2.25, 1.9, 0.35] },
+      { x: -8.5, y: 0, z: 3.6, spread: [1.1, 1, 0.25] },
+      { x: -4.2, y: -3.3, z: 7.7, spread: [3.15, 1.25, 0.5] },
+      { x: 9.35, y: -0.9, z: 6.5, spread: [2.7, 0.65, 0.5] },
+    ],
+    sinking: [
+      { x: 5.1, y: 1.6, z: 3.1, spread: [2.25, 1.65, 0.35] },
+      { x: -3.6, y: 1.2, z: 3.2, spread: [2.25, 1.25, 0.25] },
+      { x: -8.5, y: 0.4, z: 3.25, spread: [1.1, 1, 0.25] },
     ],
   },
 };
@@ -92,7 +175,8 @@ export class ShipFire {
   private flameDebt = 0;
   private smokeDebt = 0;
 
-  update(dt: number, ship: Ship, stage: DamageStage, pose: SinkPose, time: number) {
+  /** bobPhase: the ship's, see shipBob */
+  update(dt: number, ship: BurningShip, stage: DamageStage, pose: SinkPose, time: number, bobPhase = 0) {
     for (const p of this.flames) this.move(p, dt, FLAME_WIND);
     for (const p of this.smoke) this.move(p, dt, SMOKE_WIND);
 
@@ -119,7 +203,8 @@ export class ShipFire {
       this.flameDebt--;
       const p = this.flames[this.nextFlame];
       this.nextFlame = (this.nextFlame + 1) % FLAME_POOL;
-      this.spawn(p, ship, points, points.length, scale, pose, time, FLAME_LIFE, FLAME_SIZE, FLAME_RISE, FLAME_DRAG);
+      const lift = shipBob(time, bobPhase) - pose.depth;
+      this.spawn(p, ship, points, points.length, scale, lift, FLAME_LIFE, FLAME_SIZE, FLAME_RISE, FLAME_DRAG);
     }
     // Smouldering ships smoke from one spot only
     const smokePoints = stage === 'heavy' ? 1 : points.length;
@@ -128,7 +213,8 @@ export class ShipFire {
       this.smokeDebt--;
       const p = this.smoke[this.nextSmoke];
       this.nextSmoke = (this.nextSmoke + 1) % SMOKE_POOL;
-      this.spawn(p, ship, points, smokePoints, scale, pose, time, SMOKE_LIFE, SMOKE_SIZE, SMOKE_RISE, SMOKE_DRAG);
+      const lift = shipBob(time, bobPhase) - pose.depth;
+      this.spawn(p, ship, points, smokePoints, scale, lift, SMOKE_LIFE, SMOKE_SIZE, SMOKE_RISE, SMOKE_DRAG);
     }
   }
 
@@ -167,13 +253,13 @@ export class ShipFire {
 
   private spawn(
     p: Particle,
-    ship: Ship,
+    ship: BurningShip,
     points: readonly Emitter[],
     /** Only the first `count` emitters are used */
     count: number,
     scale: number,
-    pose: SinkPose,
-    time: number,
+    /** World units the ship is above where it floats: bobbing on the waves, less what it has sunk */
+    lift: number,
     life: readonly [number, number],
     size: readonly [number, number],
     rise: number,
@@ -185,7 +271,7 @@ export class ShipFire {
     const lz = (e.z + (Math.random() * 2 - 1) * e.spread[2]) * scale;
     const cos = Math.cos(ship.rotation);
     const sin = Math.sin(ship.rotation);
-    const z = lz + shipBob(time) - pose.depth;
+    const z = lz + lift;
     // Nothing burns under water
     if (z < 0.3) return;
     p.x = ship.x + lx * cos - ly * sin;

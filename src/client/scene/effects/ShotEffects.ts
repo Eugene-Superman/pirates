@@ -174,6 +174,12 @@ export class ShotEffects {
     return hit === undefined ? 0 : Math.max(0, 1 - (time - hit) / SHAKE_TIME);
   }
 
+  /** Seconds since a monster's last bite, while its head is still darted forward from it; null otherwise */
+  biteAge(monsterId: number, time: number) {
+    const bite = this.biteTimes.get(monsterId);
+    return bite === undefined || time - bite >= LUNGE_TIME ? null : time - bite;
+  }
+
   /** How far a monster's head is still darted forward from its last bite: 1 as it bites, 0 once back */
   lunge(monsterId: number, time: number) {
     const bite = this.biteTimes.get(monsterId);
@@ -212,8 +218,24 @@ export class ShotEffects {
 
   private start(event: GameEvent, state: GameState) {
     const { time } = state;
-    // The damage, repair and gold numbers are DamageNumbers'
-    if (event.type === 'damage' || event.type === 'repair' || event.type === 'gold') return;
+    // A boss's mortar: fire and smoke up from its deck; a shell landing throws up a column of water
+    if (event.type === 'barrage') {
+      const at: Vec3 = [event.at.x, event.at.y, event.at.z + 2];
+      this.flash(at, 0, 0, 'cannon');
+      this.burst(at, 18, (p) => smoke(p, 0, 0));
+      this.burst(at, 10, (p) => spark(p, 0, 0));
+      return;
+    }
+    if (event.type === 'shellLanded') {
+      const { x, y } = event.at;
+      this.burst([x, y, 0], 26, (p) => spray(p, 1.3));
+      this.burst([x, y, 1], 10, (p) => smoke(p, 0, 0));
+      this.ripple(x, y, 4, 26, 1.4, 0.7, 0);
+      this.ripple(x, y, 3, 18, 1.2, 0.5, 0.25);
+      return;
+    }
+    // The damage, repair, gold, XP and talent numbers are DamageNumbers'
+    if (event.type !== 'shot' && event.type !== 'impact' && event.type !== 'bite' && event.type !== 'destroyed') return;
     if (event.type === 'destroyed') {
       // The player's own ship has its sinking animation instead
       if (event.targetId === state.ship.id) return;

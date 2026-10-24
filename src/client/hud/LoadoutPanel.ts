@@ -14,20 +14,21 @@ import {
   gunPrice,
   type WeaponId,
 } from '../../game';
-import { Tile, UI, drawBall, drawHarpoon, show, text, tierColor, tint } from './ui';
+import { HudWindow, Tile, UI, drawBall, drawHarpoon, show, text, tierColor, tint } from './ui';
+import { t } from '../i18n/i18n';
 
 const WIDTH = 1044; // pixels, before scaling down to fit the screen
-const HEIGHT = 572;
-const MARGIN = 20; // between the panel and the screen's edge, at least
+const HEIGHT = 572; // at least: a ship with more gun slots makes it taller
 const PAD = 16;
 const TOP = 58; // where the columns start
 const COLUMN = { slots: 280, guns: 360, ammo: 340 };
 const SLOT_HEIGHT = 44;
+const WEAPON_HEADER = 40; // pixels: a weapon's name and summary over its slots
+const WEAPON_GAP = 12; // pixels after a weapon's slots
 const GUN_HEIGHT = 40;
 const AMMO_HEIGHT = 28;
 const ROW_GAP = 5;
-const LOAD_BUTTON = 54;
-const DIM_ALPHA = 0.5;
+const LOAD_BUTTON = 72; // pixels: room for Load in every language
 const SLOT_NAMES: Readonly<Record<WeaponId, string>> = { cannon: 'Cannons', harpoon: 'Harpoon guns' };
 const AMMO_NAMES: Readonly<Record<WeaponId, string>> = { cannon: 'Cannonballs', harpoon: 'Harpoons' };
 
@@ -64,7 +65,7 @@ interface AmmoRow {
 /** A gun in a few words: its die, reach and reload */
 function gunStats(gun: GunId) {
   const { die, range, reload } = GUNS[gun];
-  return `d${die} · reach ${range} · ${reload} s`;
+  return t('d{die} · reach {range} · {reload} s', { die, range, reload });
 }
 
 /**
@@ -73,11 +74,10 @@ function gunStats(gun: GunId) {
  * the ammo in the hold and which one is loaded. Closed by Close, Escape, L or a click beside it
  */
 export class LoadoutPanel {
-  readonly container = new Container();
-  private readonly dim = new Graphics();
-  private readonly panel = new Container();
-  private readonly background = new Graphics();
-  private readonly title = text('Loadout', 20, UI.active, { fontWeight: 'bold' });
+  readonly container: Container;
+  private readonly window: HudWindow;
+  private readonly panel: Container;
+  private readonly title = text(t('Loadout'), 20, UI.active, { fontWeight: 'bold' });
   private readonly summaries: Record<WeaponId, Text>;
   private readonly slots: SlotView[] = [];
   private readonly listTitle = text('', 14, UI.text, { fontWeight: 'bold' });
@@ -85,7 +85,6 @@ export class LoadoutPanel {
   private rows: GunRow[] = [];
   private readonly ammoRows: AmmoRow[] = [];
   private readonly actions: LoadoutActions;
-  private readonly screen: Rectangle;
   /** The slot the gun list is for */
   private picked: { weapon: WeaponId; slot: number } = { weapon: 'cannon', slot: 0 };
   private listFor = '';
@@ -93,38 +92,28 @@ export class LoadoutPanel {
   /** shipClass: the player's ship's, for its gun slots */
   constructor(actions: LoadoutActions, screen: Rectangle, shipClass: ShipClass) {
     this.actions = actions;
-    this.screen = screen;
-    this.container.visible = false;
-    for (const blocker of [this.dim, this.background]) {
-      blocker.eventMode = 'static';
-      // Clicks on the panel and round it must not reach the stage, which would steer the ship
-      blocker.on('pointerdown', (e) => e.stopPropagation());
-    }
-    this.dim.on('pointertap', () => this.hide());
-    this.background.roundRect(0, 0, WIDTH, HEIGHT, 12).fill({ color: UI.panel, alpha: 0.97 }).stroke({
-      width: 1.5,
-      color: UI.border,
-      alpha: 0.4,
-    });
+    // As tall as the ship's slots need: a header per weapon, its slots, a gap after them
+    const slots = WEAPON_IDS.reduce(
+      (sum, weapon) => sum + WEAPON_HEADER + shipClass.slots[weapon].length * (SLOT_HEIGHT + ROW_GAP) + WEAPON_GAP,
+      0,
+    );
+    const height = Math.max(HEIGHT, TOP + slots - WEAPON_GAP + PAD);
+    this.window = new HudWindow(screen, { width: WIDTH, height, pad: PAD }, () => this.hide());
+    this.container = this.window.container;
+    this.panel = this.window.panel;
     this.title.position.set(PAD, PAD);
-    const note = text('Guns come from the hold; the one taken out goes back. Buy more in port', 12, UI.dim);
+    const note = text(t('Guns come from the hold; the one taken out goes back. Buy more in port'), 12, UI.dim);
     note.position.set(PAD + this.title.width + 16, PAD + 6);
-    const close = new Tile(70, 26, () => this.hide(), 6);
-    const closeText = text('Close', 13);
-    closeText.anchor.set(0.5);
-    closeText.position.set(35, 13);
-    close.content.addChild(closeText);
-    close.container.position.set(WIDTH - PAD - 70, PAD);
-    this.panel.addChild(this.background, this.title, note, close.container);
+    this.panel.addChild(this.title, note);
 
     this.summaries = { cannon: text('', 12, UI.dim), harpoon: text('', 12, UI.dim) };
     let y = TOP;
     for (const weapon of WEAPON_IDS) {
-      const header = text(SLOT_NAMES[weapon], 15, UI.text, { fontWeight: 'bold' });
+      const header = text(t(SLOT_NAMES[weapon]), 15, UI.text, { fontWeight: 'bold' });
       header.position.set(PAD, y);
       this.summaries[weapon].position.set(PAD, y + 20);
       this.panel.addChild(header, this.summaries[weapon]);
-      y += 40;
+      y += WEAPON_HEADER;
       for (let slot = 0; slot < shipClass.slots[weapon].length; slot++) {
         const tile = new Tile(COLUMN.slots, SLOT_HEIGHT, () => (this.picked = { weapon, slot }), 6);
         const label = text(`${slot + 1}`, 18, UI.dim, { fontWeight: 'bold' });
@@ -139,7 +128,7 @@ export class LoadoutPanel {
         this.slots.push({ weapon, slot, tile, name, stats });
         y += SLOT_HEIGHT + ROW_GAP;
       }
-      y += 12;
+      y += WEAPON_GAP;
     }
 
     const listX = PAD * 2 + COLUMN.slots;
@@ -150,7 +139,7 @@ export class LoadoutPanel {
     const ammoX = listX + COLUMN.guns + PAD;
     y = TOP;
     for (const weapon of WEAPON_IDS) {
-      const header = text(AMMO_NAMES[weapon], 15, UI.text, { fontWeight: 'bold' });
+      const header = text(t(AMMO_NAMES[weapon]), 15, UI.text, { fontWeight: 'bold' });
       header.position.set(ammoX, y);
       this.panel.addChild(header);
       y += 24;
@@ -160,18 +149,10 @@ export class LoadoutPanel {
       }
       y += 12;
     }
-
-    this.container.addChild(this.dim, this.panel);
-    window.addEventListener('keydown', (e) => {
-      if (e.code !== 'Escape' || !this.isOpen) return;
-      this.hide();
-      // Escape closed the panel; it shouldn't also stop the ship firing (keyboardInput)
-      e.preventDefault();
-    });
   }
 
   get isOpen() {
-    return this.container.visible;
+    return this.window.isOpen;
   }
 
   toggle() {
@@ -184,11 +165,7 @@ export class LoadoutPanel {
 
   update(ship: Ship, player: Player) {
     if (!this.isOpen) return;
-    const { width, height } = this.screen;
-    this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: DIM_ALPHA });
-    const scale = Math.min(1, (width - MARGIN * 2) / WIDTH, (height - MARGIN * 2) / HEIGHT);
-    this.panel.scale.set(scale);
-    this.panel.position.set(Math.round((width - WIDTH * scale) / 2), Math.round((height - HEIGHT * scale) / 2));
+    this.window.fit();
 
     for (const weapon of WEAPON_IDS) {
       const bonus = AMMO[ship.loaded[weapon]].bonus;
@@ -198,17 +175,25 @@ export class LoadoutPanel {
       show(
         this.summaries[weapon],
         fitted.length === 0
-          ? 'No guns fitted'
-          : `${fitted.length} guns · ≈${volley.toFixed(1)} a volley · ${perSecond.toFixed(1)}/s · reach ${ship.range(weapon)}`,
+          ? t('No guns fitted')
+          : t(
+              '{n} gun · ≈{volley} a volley · {perSecond}/s · reach {range}|{n} guns · ≈{volley} a volley · {perSecond}/s · reach {range}',
+              {
+                n: fitted.length,
+                volley: volley.toFixed(1),
+                perSecond: perSecond.toFixed(1),
+                range: ship.range(weapon),
+              },
+            ),
       );
     }
     for (const view of this.slots) {
       const gun = ship.guns[view.weapon][view.slot];
       const picked = this.picked.weapon === view.weapon && this.picked.slot === view.slot;
       view.tile.setLook({ border: picked ? UI.active : gun ? tierColor(GUNS[gun].tier) : UI.border, pressed: false });
-      show(view.name, gun ? GUNS[gun].name : 'Empty');
+      show(view.name, gun ? t(GUNS[gun].name) : t('Empty'));
       tint(view.name, gun ? UI.text : UI.dim);
-      show(view.stats, gun ? gunStats(gun) : 'Click, then pick a gun on the right');
+      show(view.stats, gun ? gunStats(gun) : t('Click, then pick a gun on the right'));
       view.tile.container.alpha = picked ? 1 : 0.85;
     }
 
@@ -218,7 +203,10 @@ export class LoadoutPanel {
       this.listFor = key;
       this.buildList(weapon);
     }
-    show(this.listTitle, `${SLOT_NAMES[weapon]}, slot ${slot + 1}: pick what goes in it`);
+    show(
+      this.listTitle,
+      t('{weapon}, slot {slot}: pick what goes in it', { weapon: t(SLOT_NAMES[weapon]), slot: slot + 1 }),
+    );
     const fitted = ship.guns[weapon][slot];
     const bonus = AMMO[ship.loaded[weapon]].bonus;
     for (const row of this.rows) {
@@ -235,8 +223,12 @@ export class LoadoutPanel {
       tint(row.average, here ? UI.darkText : UI.active);
       tint(row.details, here ? UI.darkText : UI.dim);
       if (!row.gun) continue;
-      show(row.average, `≈${averageDamage(GUNS[row.gun], bonus).toFixed(1)} a shot`);
-      const where = here ? 'Fitted here' : stock > 0 ? `In the hold: ${stock}` : `In port: ${gunPrice(row.gun)} gold`;
+      show(row.average, t('≈{damage} a shot', { damage: averageDamage(GUNS[row.gun], bonus).toFixed(1) }));
+      const where = here
+        ? t('Fitted here')
+        : stock > 0
+          ? t('In the hold: {n}', { n: stock })
+          : t('In port: {n} gold', { n: gunPrice(row.gun) });
       show(row.details, `${where} · ${gunStats(row.gun)}`);
     }
 
@@ -245,7 +237,7 @@ export class LoadoutPanel {
       const loaded = ship.loaded[kind] === row.ammo;
       show(row.count, `${ship.ammo[row.ammo]}`);
       row.load.setLook({ pressed: loaded });
-      show(row.loadText, loaded ? 'Loaded' : 'Load');
+      show(row.loadText, loaded ? t('Loaded') : t('Load'));
       tint(row.loadText, loaded ? UI.darkText : UI.text);
     }
   }
@@ -256,12 +248,12 @@ export class LoadoutPanel {
     const guns: (GunId | null)[] = [null, ...GUN_IDS[weapon]];
     this.rows = guns.map((gun, i) => {
       const tile = new Tile(COLUMN.guns, GUN_HEIGHT, () => this.actions.fitGun(weapon, this.picked.slot, gun), 6);
-      const name = text(gun ? GUNS[gun].name : 'Empty slot', 13, UI.text, { fontWeight: 'bold' });
+      const name = text(gun ? t(GUNS[gun].name) : t('Empty slot'), 13, UI.text, { fontWeight: 'bold' });
       name.position.set(40, 4);
       const average = text('', 12, UI.active, { fontWeight: 'bold' });
       average.anchor.set(1, 0);
       average.position.set(COLUMN.guns - 10, 5);
-      const details = text(gun ? gunStats(gun) : 'Takes the gun out, into the hold', 11, UI.dim);
+      const details = text(gun ? gunStats(gun) : t('Takes the gun out, into the hold'), 11, UI.dim);
       details.position.set(40, 22);
       tile.content.addChild(name, average, details);
       if (gun) {
@@ -286,7 +278,7 @@ export class LoadoutPanel {
     if (weapon === 'cannon') drawBall(icon, 5, tier);
     else drawHarpoon(icon, 14, tier);
     icon.position.set(8, AMMO_HEIGHT / 2);
-    const label = text(`${name}  +${bonus}`, 12, tierColor(tier), { fontWeight: 'bold' });
+    const label = text(`${t(name)}  +${bonus}`, 12, tierColor(tier), { fontWeight: 'bold' });
     label.position.set(20, (AMMO_HEIGHT - label.height) / 2);
     // Load on the right, the count just before it
     const bx = COLUMN.ammo - LOAD_BUTTON;
@@ -295,7 +287,7 @@ export class LoadoutPanel {
     count.position.set(bx - 10, AMMO_HEIGHT / 2);
     row.addChild(icon, label, count);
     const load = new Tile(LOAD_BUTTON, AMMO_HEIGHT - 4, () => this.actions.loadAmmo(ammo), 4);
-    const loadText = text('Load', 11);
+    const loadText = text(t('Load'), 11);
     loadText.anchor.set(0.5);
     loadText.position.set(LOAD_BUTTON / 2, (AMMO_HEIGHT - 4) / 2);
     load.content.addChild(loadText);

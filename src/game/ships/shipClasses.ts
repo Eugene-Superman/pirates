@@ -1,15 +1,18 @@
 import type { Bite, GunId } from '../combat/arsenal';
+import type { Barrage } from '../combat/barrage';
 import type { TargetNature, WeaponId } from '../combat/weapons';
 import type { Hull } from '../physics/hull';
 
 /**
  * Ship lines: families of ships with their own style and role (docs/ships.md lists the planned ones).
- * Every player starts in `starter`. `bots` and `monsters` are the hulls of the bots (bots/botKinds.ts), not for players
+ * Every player starts in `starter`, then goes on in a line of their choice from tier 2 (`european` first). `bots` and
+ * `monsters` are the hulls of the bots (bots/botKinds.ts), not for players
  */
-export type ShipLineId = 'starter' | 'bots' | 'monsters';
+export type ShipLineId = 'starter' | 'european' | 'bots' | 'monsters';
 
 /** Kinds of ships, unique across all lines. The client finds a class's art by `line` and `id` */
-export type ShipClassId = 'sloop' | 'fishingBoat' | 'merchantSloop' | 'smugglerSloop' | 'seaTurtle' | 'seaSerpent';
+export type ShipClassId =
+  'sloop' | 'corsair' | 'fishingBoat' | 'merchantSloop' | 'smugglerSloop' | 'baronBrig' | 'seaTurtle' | 'seaSerpent';
 
 /** A place for a gun on the ship, in ship coordinates: x to the bow, y to starboard, z up from the waterline */
 export interface Mount {
@@ -55,6 +58,12 @@ export interface ShipClass {
   readonly startingGuns: Readonly<Record<WeaponId, readonly (GunId | null)[]>>;
   /** A sea monster's jaws; null for a ship */
   readonly bite: Bite | null;
+  /** A boss's barrage: shells on marked spots round its foe (combat/barrage.ts); null for the rest */
+  readonly barrage: Barrage | null;
+  /** Places in the hold for goods (economy/cargo.ts); 0 for a bot's */
+  readonly hold: number;
+  /** The highest level a ship of the class reaches (ships/talents.ts); 1 for a bot's, which don't level */
+  readonly maxLevel: number;
 }
 
 const NO_GUNS = { slots: { cannon: [], harpoon: [] }, startingGuns: { cannon: [], harpoon: [] } } as const;
@@ -99,6 +108,61 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
       harpoon: ['harpoonGun1', 'harpoonGun1', null, null],
     },
     bite: null,
+    barrage: null,
+    hold: 12,
+    maxLevel: 10,
+  },
+
+  // The first ship of the European line, tier 2: what a player works towards in the starting waters (economy/
+  // shipyard.ts). All round, like the line: twice the sloop's hull and twice its broadside (8 cannons to 4), a harpoon
+  // gun more, a bigger hold, a little slower to turn. Its model is blender-assets/ships/european/corsair/build.py: the
+  // hull and the slots' places are measured on it. How many guns a ship carries is the game's number, not the
+  // model's: the model shows six ports a side, a tier 5 ship may carry fifty guns
+  corsair: {
+    id: 'corsair',
+    line: 'european',
+    tier: 2,
+    name: 'Corsair',
+    hp: 800,
+    nature: 'object',
+    height: 10,
+    radius: 12.5,
+    // Measured on the model: stem to transom at the gun deck, widest beam
+    hull: { bow: 21.5, stern: -19.7, halfBeam: 7.3 },
+    viewRange: 600,
+    maxSpeed: 125,
+    minSpeed: 65,
+    acceleration: 48,
+    deceleration: 75,
+    turnSpeed: 1.55,
+    slots: {
+      // The gun deck's ports from amidships out (the model's CANNONS_X), at the muzzles; then a gun at the rail of the
+      // forecastle and of the quarterdeck
+      cannon: [
+        { x: -0.8, y: 7.5, z: 6.5 },
+        { x: 2.6, y: 7.5, z: 6.5 },
+        { x: -4.2, y: 7.5, z: 6.5 },
+        { x: 6, y: 7.4, z: 6.5 },
+        { x: -7.6, y: 7.5, z: 6.5 },
+        { x: 9.2, y: 7.1, z: 6.5 },
+        { x: 12.5, y: 6, z: 8.7 },
+        { x: -12.5, y: 6.6, z: 9.5 },
+      ],
+      harpoon: [
+        { x: 17, y: 0, z: 8.9 },
+        { x: 13.5, y: 3, z: 8.4 },
+        { x: 13.5, y: -3, z: 8.4 },
+        { x: -16.5, y: 0, z: 9.9 },
+      ],
+    },
+    startingGuns: {
+      cannon: ['cannon1', 'cannon1', 'cannon1', 'cannon1', 'cannon1', 'cannon1', null, null],
+      harpoon: ['harpoonGun1', 'harpoonGun1', null, null],
+    },
+    bite: null,
+    barrage: null,
+    hold: 20,
+    maxLevel: 20,
   },
 
   // The bots' hulls (bots/botKinds.ts says how each bot behaves). Sea monsters sail as ships do, under a pilot, so
@@ -123,6 +187,9 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     turnSpeed: 1.6,
     ...NO_GUNS,
     bite: null,
+    barrage: null,
+    hold: 0,
+    maxLevel: 1,
   },
   merchantSloop: {
     id: 'merchantSloop',
@@ -145,6 +212,9 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     slots: { cannon: [{ x: 1, y: 5.4, z: 4.2 }], harpoon: [] },
     startingGuns: { cannon: ['swivelGun'], harpoon: [] },
     bite: null,
+    barrage: null,
+    hold: 0,
+    maxLevel: 1,
   },
   smugglerSloop: {
     id: 'smugglerSloop',
@@ -165,6 +235,53 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     slots: { cannon: [{ x: -1, y: 5.6, z: 4.6 }], harpoon: [] },
     startingGuns: { cannon: ['cannon1'], harpoon: [] },
     bite: null,
+    barrage: null,
+    hold: 0,
+    maxLevel: 1,
+  },
+  // The starting waters' boss (bots/botKinds.ts, `baron`): a slow brig with four cannons and a mortar that marks
+  // where its shells will fall; it sails with two smugglers. Balanced against a sloop of about level 7 with guns of
+  // tier 2: a fight of a minute or two, won by keeping out of the marked circles
+  baronBrig: {
+    id: 'baronBrig',
+    line: 'bots',
+    tier: 2,
+    name: 'Smuggler Baron',
+    hp: 900,
+    nature: 'object',
+    height: 10,
+    radius: 15,
+    hull: { bow: 22, stern: -20.5, halfBeam: 7.6 },
+    viewRange: 560,
+    maxSpeed: 65,
+    minSpeed: 45,
+    acceleration: 32,
+    deceleration: 60,
+    turnSpeed: 1,
+    slots: {
+      cannon: [
+        { x: -3, y: 7.6, z: 5.6 },
+        { x: 6, y: 7.2, z: 5.6 },
+      ],
+      harpoon: [],
+    },
+    startingGuns: { cannon: ['swivelGun', 'swivelGun'], harpoon: [] },
+    bite: null,
+    barrage: {
+      range: 420,
+      cooldown: 8,
+      shells: 4,
+      radius: 24,
+      delay: 1.8,
+      spread: 55,
+      die: 16,
+      missOn: 1,
+      critFrom: 16,
+      critMultiplier: 2,
+      bonus: 5,
+    },
+    hold: 0,
+    maxLevel: 1,
   },
   seaTurtle: {
     id: 'seaTurtle',
@@ -185,6 +302,9 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     turnSpeed: 1.5,
     ...NO_GUNS,
     bite: { die: 6, missOn: 1, critFrom: 6, critMultiplier: 2, bonus: 1, reach: 18, reload: 3 },
+    barrage: null,
+    hold: 0,
+    maxLevel: 1,
   },
   seaSerpent: {
     id: 'seaSerpent',
@@ -207,6 +327,9 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     turnSpeed: 2.2,
     ...NO_GUNS,
     bite: { die: 12, missOn: 1, critFrom: 12, critMultiplier: 2, bonus: 2, reach: 20, reload: 2.5 },
+    barrage: null,
+    hold: 0,
+    maxLevel: 1,
   },
 };
 
