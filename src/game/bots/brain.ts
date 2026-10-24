@@ -16,6 +16,7 @@ const CIRCLE_STEP = 0.7; // radians round its foe a gunship moves on with each n
 const FLEE_DISTANCE = 400; // world units ahead of its foe a bot with no weapon runs to
 const REAIM_TIME = 0.6; // seconds between two new courses in a fight…
 const REAIM_DISTANCE = 20; // …and world units the new one must move the goal by: each may need a route round an island
+const ESCORT = { distance: 70, slack: 40, every: 1 } as const; // world units off its leader's beam; seconds between courses
 // World units from a player's ship: a bot farther than that from every player is dormant, waiting where it is (no
 // thinking, no sailing), so a big sea full of bots costs only the bots round the players. Well beyond a player's view
 // range and LEASH: a bot wakes before anyone can see it, and gives up a fight before it falls asleep
@@ -37,10 +38,31 @@ export interface BotMind {
   nextLegAt: number;
   /** Game time of its last course in a fight */
   aimedAt: number;
+  /** The boss it escorts (botKinds.ts, Boss): it follows it and joins its fights; null once the boss is gone */
+  leader: number | null;
+  /** Part of a boss's escort: it doesn't come back on its own when sunk, the boss brings new ones */
+  readonly escort: boolean;
 }
 
-export function newBotMind(kind: BotKindId, home: Point, circle: number, time: number): BotMind {
-  return { kind, home, circle, foe: null, foeSeenAt: time, wandering: false, nextLegAt: time, aimedAt: -Infinity };
+export function newBotMind(
+  kind: BotKindId,
+  home: Point,
+  circle: number,
+  time: number,
+  leader: number | null = null,
+): BotMind {
+  return {
+    kind,
+    home,
+    circle,
+    foe: null,
+    foeSeenAt: time,
+    wandering: false,
+    nextLegAt: time,
+    aimedAt: -Infinity,
+    leader,
+    escort: leader !== null,
+  };
 }
 
 /** Whether a ship is a threat to this player: an aggressive bot, or any bot fighting them now */
@@ -74,10 +96,36 @@ export function thinkBots(
   for (const ship of ships) {
     const mind = ship.bot;
     if (!mind || ship.isSinking) continue;
+    const leader = mind.leader === null ? undefined : state.ships.find((s) => s.id === mind.leader);
+    if (mind.leader !== null && (!leader || leader.isSinking)) mind.leader = null;
+    // An escort joins its leader's fight
+    const leaderFoe = leader?.bot?.foe ?? null;
+    if (leader && mind.foe === null && leaderFoe !== null) {
+      const foe = state.ships.find((s) => s.id === leaderFoe);
+      if (foe && !foe.isSinking && !foe.docked) engage(mind, foe, state.time);
+    }
     const foe = pickFoe(state, players, ship, mind);
     if (foe) fight(state.time, ship, mind, foe);
+    else if (leader && !leader.isSinking) follow(state.time, ship, mind, leader);
     else wander(state, nav, ship, mind, random);
   }
+}
+
+/** An escort keeps off its leader's beam, on its own side, a little faster than the leader cruises */
+function follow(time: number, ship: Ship, mind: BotMind, leader: Ship) {
+  ship.pursuing = false;
+  // The throttle is set with each leg, not every update: set here, it would undo the cruise until the next leg
+  if (time < mind.nextLegAt) return;
+  mind.nextLegAt = time + ESCORT.every;
+  const side = leader.rotation + (Math.PI / 2) * mind.circle;
+  const x = leader.x + Math.cos(side) * ESCORT.distance - Math.cos(leader.rotation) * ESCORT.distance * 0.5;
+  const y = leader.y + Math.sin(side) * ESCORT.distance - Math.sin(leader.rotation) * ESCORT.distance * 0.5;
+  if (Math.hypot(ship.x - x, ship.y - y) < ESCORT.slack) {
+    ship.throttle = BOT_KINDS[mind.kind].cruise;
+    return;
+  }
+  ship.throttle = 1;
+  steerTo(ship, x, y);
 }
 
 function pickFoe(state: GameState, players: readonly Ship[], ship: Ship, mind: BotMind): Ship | null {

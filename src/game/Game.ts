@@ -1,5 +1,6 @@
 import { WAKE_RANGE, isAwake, nearPlayers, thinkBots } from './bots/brain';
 import { populate, stepSpawns } from './bots/spawner';
+import { stepBarrages } from './combat/barrage';
 import { stepCombat } from './combat/combat';
 import { stepChests, stepLoot } from './economy/loot';
 import { newPlayer } from './economy/player';
@@ -12,6 +13,8 @@ import { loadGame, saveGame, type SaveData } from './save';
 import { stepRepairs } from './ships/repair';
 import { Ship } from './ships/Ship';
 import { SHIP_CLASSES, STARTER_SHIP } from './ships/shipClasses';
+import { stepTalents } from './ships/talents';
+import { stepStats } from './records/tally';
 import { stepDocking } from './world/port';
 import { START, createWorld } from './world/World';
 
@@ -42,6 +45,11 @@ export class Game {
   private readonly random: () => number;
   private readonly botRandom: () => number;
   private readonly lootRandom: () => number;
+  /**
+   * How many of state.events the last update left: the client has read those. Any after them came from a player's
+   * action between two updates (an ability used, a quest turned in) and live through the next update, to be read too
+   */
+  private eventsRead = 0;
 
   /**
    * seed: the match's own, so each match rolls its own dice and places its own bots. Online the server will pick it and
@@ -64,6 +72,7 @@ export class Game {
       player: newPlayer(ship.id),
       chests: [],
       projectiles: [],
+      shells: [],
       events: [],
       respawns: [],
       nextId,
@@ -86,7 +95,9 @@ export class Game {
   update(dt: number) {
     const { state } = this;
     state.time += dt;
-    state.events.length = 0;
+    state.events.splice(0, this.eventsRead);
+    // Every ship's top speed for this update (Full sail, a chain shot), before anything sails
+    stepTalents(state, dt);
     // Bots far from every player wait where they are, stopped: only those near one think and sail
     const players = state.ships.filter((ship) => !ship.bot);
     const awake: Ship[] = [];
@@ -114,12 +125,16 @@ export class Game {
       }
     }
     stepCombat(state, dt, this.random);
+    stepBarrages(state, this.random);
     stepLoot(state, this.lootRandom);
     stepRepairs(state, dt);
     stepChests(state);
     stepSpawns(state, this.nav, this.botRandom);
     stepDocking(state);
     this.bringBackWrecks();
+    // Last, with every event of the update in
+    stepStats(state, dt);
+    this.eventsRead = state.events.length;
   }
 
   /** A player's wrecked ship comes back whole at the start, WRECK_TIME after it went down. Its guns and ammo stay */

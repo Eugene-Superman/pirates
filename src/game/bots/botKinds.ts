@@ -1,7 +1,9 @@
 import type { AmmoId } from '../combat/arsenal';
+import type { CargoDrop } from '../economy/cargo';
+import type { Point } from '../lib/geometry';
 import type { ShipClassId } from '../ships/shipClasses';
 
-export type BotKindId = 'fisher' | 'merchant' | 'smuggler' | 'turtle' | 'serpent';
+export type BotKindId = 'fisher' | 'merchant' | 'smuggler' | 'turtle' | 'serpent' | 'baron';
 
 /** Neutral bots go about their business until someone hits them; aggressive ones attack a player who comes near */
 export type Behaviour = 'neutral' | 'aggressive';
@@ -27,14 +29,32 @@ export interface BotKind {
   readonly respawnTime: number;
   /** Gold the player who sinks it is paid */
   readonly bounty: number;
+  /** How tough it is, 1 up: a ship far above it earns less for it (ships/talents.ts, xpForKill) */
+  readonly level: number;
+  /** Experience the ship that sinks it earns */
+  readonly xp: number;
   /** The chance it leaves a chest floating where it sank, and the gold in one (at least, at most) */
   readonly chest: { readonly chance: number; readonly gold: readonly [number, number] };
+  /** The goods its wreck may leave floating (with the chest's gold, if any) */
+  readonly cargo: readonly CargoDrop[];
+  /** A boss: one of it, at its lair, with its escort; null for the rest */
+  readonly boss: Boss | null;
+}
+
+/**
+ * A boss sails alone in the world, round its `lair` (open water near it), with `escorts` of another kind that follow
+ * it and join its fights; none of them comes back on its own, all come back together `respawnTime` after the boss sank
+ */
+export interface Boss {
+  readonly lair: Point;
+  readonly escorts: { readonly kind: BotKindId; readonly count: number };
 }
 
 // Balanced against the starter sloop with its starting guns (two cannons I, two harpoon guns I): each fight costs it
 // a share of its hull that the repair skill brings back in half a minute or so. pirate-balance.xlsx, Plan bots, has
 // the numbers. The loot: about 8 gold a fishing boat, 20 a turtle, 30–37 the rest (bounty + chests on average), so a
-// minute's fighting pays for the ammo it took several times over (economy/shop.ts)
+// minute's fighting pays for the ammo it took several times over (economy/shop.ts); their goods sell for about half
+// as much again at the market (economy/cargo.ts), once carried home
 export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
   // Nets and fish, no guns: it runs from whoever attacks it
   fisher: {
@@ -47,7 +67,11 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     perSquare: 1,
     respawnTime: 20,
     bounty: 6,
+    level: 1,
+    xp: 10,
     chest: { chance: 0.3, gold: [4, 10] },
+    cargo: [{ good: 'fish', count: [2, 4], chance: 0.9 }],
+    boss: null,
   },
   // A swivel gun that reaches less far than the player's cannons: keep your distance and it can't answer
   merchant: {
@@ -60,7 +84,14 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     perSquare: 0.75,
     respawnTime: 25,
     bounty: 18,
+    level: 3,
+    xp: 30,
     chest: { chance: 0.7, gold: [15, 40] },
+    cargo: [
+      { good: 'cloth', count: [2, 4], chance: 0.9 },
+      { good: 'spices', count: [1, 2], chance: 0.4 },
+    ],
+    boss: null,
   },
   smuggler: {
     id: 'smuggler',
@@ -72,7 +103,14 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     perSquare: 1,
     respawnTime: 25,
     bounty: 25,
+    level: 5,
+    xp: 40,
     chest: { chance: 0.5, gold: [12, 35] },
+    cargo: [
+      { good: 'rum', count: [1, 3], chance: 0.8 },
+      { good: 'contraband', count: [1, 2], chance: 0.4 },
+    ],
+    boss: null,
   },
   // Slow: a ship that keeps away from its jaws harpoons it without a scratch
   turtle: {
@@ -85,7 +123,11 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     perSquare: 0.75,
     respawnTime: 25,
     bounty: 15,
+    level: 2,
+    xp: 20,
     chest: { chance: 0.35, gold: [8, 20] },
+    cargo: [{ good: 'turtleShell', count: [1, 2], chance: 0.8 }],
+    boss: null,
   },
   serpent: {
     id: 'serpent',
@@ -97,8 +139,33 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     perSquare: 1,
     respawnTime: 25,
     bounty: 22,
+    level: 4,
+    xp: 35,
     chest: { chance: 0.45, gold: [10, 30] },
+    cargo: [{ good: 'serpentScale', count: [1, 2], chance: 0.8 }],
+    boss: null,
+  },
+  // The boss of the starting waters (ships/shipClasses.ts, baronBrig): its lair is far from the port, and it sails
+  // with two smugglers. Its loot is worth a long hunt, and the shipyard asks for it (economy/shipyard.ts)
+  baron: {
+    id: 'baron',
+    shipClass: 'baronBrig',
+    behaviour: 'aggressive',
+    ammo: 'ball1',
+    aggroRange: 380,
+    cruise: 0.4,
+    perSquare: 0,
+    respawnTime: 240,
+    bounty: 300,
+    level: 8,
+    xp: 450,
+    chest: { chance: 1, gold: [80, 150] },
+    cargo: [
+      { good: 'contraband', count: [4, 6], chance: 1 },
+      { good: 'baronsStrongbox', count: [1, 1], chance: 1 },
+    ],
+    boss: { lair: { x: 6500, y: 1500 }, escorts: { kind: 'smuggler', count: 2 } },
   },
 };
 
-export const BOT_KIND_IDS: readonly BotKindId[] = ['fisher', 'merchant', 'smuggler', 'turtle', 'serpent'];
+export const BOT_KIND_IDS: readonly BotKindId[] = ['fisher', 'merchant', 'smuggler', 'turtle', 'serpent', 'baron'];

@@ -1,5 +1,5 @@
 import type { Graphics } from 'pixi.js';
-import { MAP_SQUARE, MAP_SQUARES, type Island, type Ship } from '../../game';
+import { BOT_KINDS, MAP_SQUARE, MAP_SQUARES, type GameState, type Island, type Ship } from '../../game';
 
 /**
  * Which way the screen's right and up point on the water (unit vectors in world coordinates). The maps turn the world
@@ -21,7 +21,12 @@ export const CHART = {
   coast: 0x6b5a2e,
   me: 0xf2b33d,
   route: 0xffffff,
+  lost: 0xff8a2a, // the player's cargo floating where their ship went down
+  boss: 0xff4a3a,
 } as const;
+
+/** Where the starting waters' boss has its lair */
+export const BOSS_LAIR = BOT_KINDS.baron.boss?.lair ?? null;
 
 const LETTER_A = 65;
 
@@ -115,4 +120,26 @@ export function drawRoute(g: Graphics, ship: Ship, map: MapProjection, width: nu
   g.stroke({ width, color: CHART.route, alpha: 0.55 });
   const end = ship.route[ship.route.length - 1];
   g.circle(map.x(end.x, end.y), map.y(end.x, end.y), width * 2).fill({ color: CHART.route, alpha: 0.8 });
+}
+
+/**
+ * What a captain keeps on their chart whether they see it or not: their own cargo floating where their ship went down
+ * (an orange diamond in a ring), and the boss's lair (a red ring round a dot). `size` scales them, pixels
+ */
+export function drawLandmarks(g: Graphics, state: GameState, map: MapProjection, size: number) {
+  for (const chest of state.chests) {
+    if (chest.lostBy !== state.ship.id) continue;
+    const x = map.x(chest.x, chest.y);
+    const y = map.y(chest.x, chest.y);
+    g.circle(x, y, size * 1.6).stroke({ width: 1.5, color: CHART.lost, alpha: 0.9 });
+    g.poly([x, y - size, x + size, y, x, y + size, x - size, y])
+      .fill({ color: CHART.lost })
+      .stroke({ width: 1, color: 0x3a1800 });
+  }
+  if (BOSS_LAIR) {
+    const x = map.x(BOSS_LAIR.x, BOSS_LAIR.y);
+    const y = map.y(BOSS_LAIR.x, BOSS_LAIR.y);
+    g.circle(x, y, size * 1.8).stroke({ width: 2, color: CHART.boss, alpha: 0.85 });
+    g.circle(x, y, size * 0.6).fill({ color: CHART.boss });
+  }
 }

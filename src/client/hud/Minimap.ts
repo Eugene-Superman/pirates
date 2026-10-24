@@ -1,8 +1,18 @@
 import { Circle, Container, Graphics, type Rectangle } from 'pixi.js';
 import { MAP_SQUARE, WORLD_HEIGHT, WORLD_WIDTH, isAfloat, isHostile, type GameState, type Unit } from '../../game';
 import type { Selection } from '../input/selection';
-import { CHART, MapProjection, drawIsland, drawRoute, drawShipArrow, squareName, type MapAxes } from './chart';
+import {
+  CHART,
+  MapProjection,
+  drawIsland,
+  drawLandmarks,
+  drawRoute,
+  drawShipArrow,
+  squareName,
+  type MapAxes,
+} from './chart';
 import { Tile, UI, drawAnchor, show, text } from './ui';
+import { t } from '../i18n/i18n';
 
 const MARGIN = 16; // pixels from the screen's edges
 const RADIUS = 95; // pixels
@@ -13,6 +23,7 @@ const LABEL = { width: 120, height: 22 };
 const UNIT_RADIUS = 3; // pixels
 const CHEST_COLOR = 0xffcf3f;
 const ME_SIZE = 13; // pixels: the player's arrow
+const LANDMARK_SIZE = 4; // pixels: the lost cargo's and the boss's marks
 const COLORS = { neutral: 0xf4f1e6, selected: 0xf2b33d } as const;
 
 /** A unit's dot on a map: an enemy red, the rest pale */
@@ -61,7 +72,7 @@ export class Minimap {
     this.clip.circle(RADIUS, RADIUS, RADIUS - 1).fill({ color: 0xffffff });
     this.content.mask = this.clip;
     // Which way north is, at the rim: the map turns with the camera
-    const north = text('N', 11, UI.dim, { fontWeight: 'bold' });
+    const north = text(t('N'), 11, UI.dim, { fontWeight: 'bold' });
     const toNorth = this.map.direction(-Math.PI / 2);
     north.anchor.set(0.5);
     north.position.set(RADIUS + toNorth.x * (RADIUS - 10), RADIUS + toNorth.y * (RADIUS - 10));
@@ -91,7 +102,7 @@ export class Minimap {
     this.container.position.set(Math.round(left), Math.round(bottom - height));
 
     const { ship } = state;
-    show(this.labelText, `${squareName(ship.x, ship.y)}  ·  Map (M)`);
+    show(this.labelText, `${squareName(ship.x, ship.y)}  ·  ${t('Map (M)')}`);
     const map = this.map;
     map.centerX = ship.x;
     map.centerY = ship.y;
@@ -122,6 +133,7 @@ export class Minimap {
         .fill({ color: CHEST_COLOR })
         .stroke({ width: 1, color: 0x3a2400 });
     }
+    drawLandmarks(g, state, map, LANDMARK_SIZE);
     drawShipArrow(g, ship, map, ME_SIZE);
     const { mooring } = state.world.port;
     const hx = map.x(mooring.x, mooring.y);

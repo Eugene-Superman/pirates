@@ -1,16 +1,19 @@
 import { Container, Graphics, Rectangle, type Text } from 'pixi.js';
 import { MAP_SQUARE, MAP_SQUARES, WORLD_HEIGHT, WORLD_WIDTH, type GameState } from '../../game';
 import {
+  BOSS_LAIR,
   CHART,
   MapProjection,
   columnName,
   drawIsland,
+  drawLandmarks,
   drawRoute,
   drawShipArrow,
   squareName,
   type MapAxes,
 } from './chart';
 import { Tile, UI, drawAnchor, show, text } from './ui';
+import { t } from '../i18n/i18n';
 
 const MARGIN = 24; // pixels from the screen's edges to the window
 const PAD = 16; // pixels inside the window
@@ -20,6 +23,7 @@ const LABEL_OFFSET = 12; // pixels from the chart's edge to a name
 const ME_SIZE = 16; // pixels: the player's arrow
 const DIM_ALPHA = 0.55;
 const HOVER_COLOR = 0xffffff;
+const LANDMARK_SIZE = 6; // pixels: the lost cargo's and the boss's marks
 
 /**
  * The sea chart: the whole world, turned like the screen, in MAP_SQUARES × MAP_SQUARES squares named A1…H8 (the
@@ -31,12 +35,17 @@ export class SeaChart {
   readonly container = new Container();
   private readonly dim = new Graphics();
   private readonly panel = new Graphics();
-  private readonly title = text('Sea chart', 18, UI.active, { fontWeight: 'bold' });
+  private readonly title = text(t('Sea chart'), 18, UI.active, { fontWeight: 'bold' });
   private readonly info = text('', 13, UI.text);
-  private readonly hint = text('M or Esc to close', 12, UI.dim);
+  private readonly hint = text(t('M or Esc to close'), 12, UI.dim);
   private readonly close: Tile;
   private readonly chart = new Graphics();
   private readonly harbour = new Graphics();
+  /** The boss's name under its lair's mark */
+  private readonly lair = text(t('Smuggler Baron'), 12, CHART.boss, {
+    fontWeight: 'bold',
+    stroke: { color: 0x000000, width: 3 },
+  });
   private readonly marks = new Graphics();
   private readonly columns: Text[] = [];
   private readonly rows: Text[] = [];
@@ -60,7 +69,7 @@ export class SeaChart {
     this.panel.on('pointermove', (e) => this.hover(e.global.x, e.global.y));
     this.panel.on('pointerleave', () => (this.hovered = null));
     this.close = new Tile(70, 26, () => this.hide(), 6);
-    const closeText = text('Close', 13);
+    const closeText = text(t('Close'), 13);
     closeText.anchor.set(0.5);
     closeText.position.set(35, 13);
     this.close.content.addChild(closeText);
@@ -70,12 +79,15 @@ export class SeaChart {
       this.rows.push(text(`${i + 1}`, 12, UI.dim, { fontWeight: 'bold' }));
     }
     for (const label of [...this.columns, ...this.rows]) label.anchor.set(0.5);
+    this.lair.anchor.set(0.5, 0);
+    this.lair.visible = BOSS_LAIR !== null;
     this.container.addChild(
       this.dim,
       this.panel,
       this.chart,
       this.harbour,
       this.marks,
+      this.lair,
       ...this.columns,
       ...this.rows,
       this.title,
@@ -84,9 +96,9 @@ export class SeaChart {
       this.close.container,
     );
     window.addEventListener('keydown', (e) => {
-      if (e.code !== 'Escape' || !this.isOpen) return;
+      if (e.code !== 'Escape' || !this.isOpen || e.defaultPrevented) return;
       this.hide();
-      // Escape closed the chart; it shouldn't also stop the ship firing (keyboardInput)
+      // Escape closed the chart; it shouldn't also close a window under it or stop the ship firing (keyboardInput)
       e.preventDefault();
     });
   }
@@ -113,8 +125,10 @@ export class SeaChart {
       this.layout(state, width, height);
     }
     const { ship } = state;
-    const hovered = this.hovered ? `  ·  Pointer: ${columnName(this.hovered.col)}${this.hovered.row + 1}` : '';
-    show(this.info, `You are in ${squareName(ship.x, ship.y)}${hovered}`);
+    const hovered = this.hovered
+      ? `  ·  ${t('Pointer: {square}', { square: `${columnName(this.hovered.col)}${this.hovered.row + 1}` })}`
+      : '';
+    show(this.info, `${t('You are in {square}', { square: squareName(ship.x, ship.y) })}${hovered}`);
 
     const map = this.map;
     const g = this.marks.clear();
@@ -133,6 +147,7 @@ export class SeaChart {
       color: CHART.me,
       alpha: 0.6,
     });
+    drawLandmarks(g, state, map, LANDMARK_SIZE);
     drawShipArrow(g, ship, map, ME_SIZE);
   }
 
@@ -195,6 +210,9 @@ export class SeaChart {
     }
     const { mooring } = state.world.port;
     this.harbour.position.set(map.x(mooring.x, mooring.y), map.y(mooring.x, mooring.y));
+    if (BOSS_LAIR) {
+      this.lair.position.set(map.x(BOSS_LAIR.x, BOSS_LAIR.y), map.y(BOSS_LAIR.x, BOSS_LAIR.y) + LANDMARK_SIZE * 2.4);
+    }
   }
 
   /** Picks out the square under the pointer */

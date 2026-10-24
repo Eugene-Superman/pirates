@@ -1,4 +1,4 @@
-import type { Segment } from '../lib/geometry';
+import { closestOnSegment, type Segment } from '../lib/geometry';
 
 /**
  * A body's outline on the water: a capsule along its heading, like a hull seen from above. `bow` and `stern` are how
@@ -37,6 +37,12 @@ export function hullAxis(x: number, y: number, heading: number, hull: Hull): Seg
 
 export function bodyAxis(body: Body): Segment {
   return hullAxis(body.x, body.y, body.heading, body.hull);
+}
+
+/** How far a point is from the body's hull, world units: below 0 inside it */
+export function hullGap(x: number, y: number, body: Body) {
+  const axis = closestOnSegment(x, y, bodyAxis(body));
+  return Math.hypot(axis.x - x, axis.y - y) - body.hull.halfBeam;
 }
 
 /** How far the hull reaches from the body's position at most: a circle this big holds it whatever the heading */

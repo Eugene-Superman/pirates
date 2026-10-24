@@ -13,7 +13,8 @@ const COLORS = {
 };
 const SEGMENTS = 19; // balls of the body, head to tail
 const SPACING = 2.35; // world units between two of them along the body: about 42 long
-const BODY_RADIUS = 3.1; // world units, at the thickest
+/** World units, at the thickest: the Blender parts of the body are this thick (SerpentSprite) */
+export const BODY_RADIUS = 3.1;
 const HUMPS = 2; // waves along the body
 const HUMP_HEIGHT = 3.8; // world units the humps rise and the troughs dip
 const SWIM_DEPTH = 1.3; // world units the body's middle line lies under the water
@@ -25,10 +26,12 @@ const SHAKE = 0.9; // world units it jerks aside when hit
 const LUNGE = 4; // world units the head darts forward (and up) when it bites
 const UNDERWATER_ALPHA = 0.3;
 
-interface Segment {
+/** A point of the body: where it is (z up from the water: under it in the troughs) and how thick it is there */
+export interface Segment {
   x: number;
   y: number;
   z: number;
+  /** Radius, world units */
   r: number;
   /** Direction along the body, towards the head */
   ax: number;
@@ -53,9 +56,16 @@ export const SPINE = { points: SEGMENTS, spacing: SPACING } as const;
 
 /**
  * The body from head to tail, laid along the spine: where the head has just swum (effects/Trails.ts). shake: 1 right
- * after a hit, then 0; lunge: 1 right after it bit, then 0; sink: world units it has gone down when killed
+ * after a hit, then 0; lunge: 1 right after it bit, then 0; sink: world units it has gone down when killed. Its first
+ * point is where the neck ends and the head begins
  */
-function body(spine: readonly SpinePoint[], time: number, shake: number, lunge: number, sink: number): Segment[] {
+export function serpentBody(
+  spine: readonly SpinePoint[],
+  time: number,
+  shake: number,
+  lunge: number,
+  sink: number,
+): Segment[] {
   const jerk = SHAKE * shake * Math.sin(shake * 18);
   return spine.map((p, i) => {
     const u = i / (spine.length - 1);
@@ -85,7 +95,7 @@ function body(spine: readonly SpinePoint[], time: number, shake: number, lunge: 
 
 /** The body under the water, seen through it, and foam where it breaks the surface. Drawn with the sea */
 export function drawSerpentWater(p: Painter3D, spine: readonly SpinePoint[], time: number) {
-  const segments = body(spine, time, 0, 0, 0);
+  const segments = serpentBody(spine, time, 0, 0, 0);
   // One shape, so its overlapping parts don't darken each other
   const left: Vec3[] = [];
   const right: Vec3[] = [];
@@ -105,7 +115,7 @@ export function drawSerpentWater(p: Painter3D, spine: readonly SpinePoint[], tim
   }
 }
 
-/** The parts above the water: humps, neck and head, sorted far to near */
+/** The parts above the water: humps, neck and head, sorted far to near. Until its atlases load (SerpentSprite) */
 export function drawSerpent(
   p: Painter3D,
   spine: readonly SpinePoint[],
@@ -114,7 +124,7 @@ export function drawSerpent(
   lunge: number,
   sink = 0,
 ) {
-  const segments = body(spine, time, shake, lunge, sink);
+  const segments = serpentBody(spine, time, shake, lunge, sink);
   const parts: { depth: number; draw: () => void }[] = [];
   segments.forEach((s, i) => {
     // Only what shows above the water: a ball sunk deeper than half its size is under the surface

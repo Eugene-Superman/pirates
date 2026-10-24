@@ -1,6 +1,6 @@
 // Public API of the game logic. The client imports game/ only through this file,
 // so the logic can later move into a package shared with the server without touching the client
-export type { BotKindId } from './bots/botKinds';
+export { BOT_KINDS, type BotKindId } from './bots/botKinds';
 export { isHostile, type BotMind } from './bots/brain';
 export {
   AMMO,
@@ -16,6 +16,7 @@ export {
   type Gun,
   type GunId,
 } from './combat/arsenal';
+export type { Shell } from './combat/barrage';
 export {
   projectilePosition,
   type DamageSource,
@@ -36,7 +37,8 @@ export {
   type Weapon,
   type WeaponId,
 } from './combat/weapons';
-export { CHEST_TIME, type Chest } from './economy/loot';
+export { GOODS, GOOD_IDS, cargoCount, cargoValue, type Cargo, type Good, type GoodId } from './economy/cargo';
+export { CHEST_TIME, LOST_CARGO_TIME, type Chest } from './economy/loot';
 export { STARTING_GOLD, fitFromHold, giveGold, type Player } from './economy/player';
 export {
   MAX_QUESTS,
@@ -44,21 +46,83 @@ export {
   QUEST_IDS,
   dropQuest,
   questDone,
+  questOffered,
   takeQuest,
   turnInQuest,
   type ActiveQuest,
   type Quest,
   type QuestId,
 } from './economy/quests';
-export { AMMO_PACK, ammoPackPrice, buyAmmo, buyGun, gunPrice, repairInPort, repairPrice } from './economy/shop';
+export {
+  AMMO_PACK,
+  ammoPackPrice,
+  buyAmmo,
+  buyGun,
+  buyOutfit,
+  fitOutfit,
+  gunPrice,
+  outfitPrice,
+  repairInPort,
+  repairPrice,
+  resetTalents,
+  respecPrice,
+  sellCargo,
+} from './economy/shop';
+export { buyShip, laidUpLevel, takeHelm } from './economy/fleet';
+export {
+  captainsPath,
+  goalOffer,
+  offerName,
+  termsMet,
+  type PathStep,
+  type PathStepId,
+  type ShipOffer,
+} from './economy/shipyard';
 export { Game, WRECK_TIME } from './Game';
-export { SAVE_VERSION, type SaveData } from './save';
+export { SAVE_VERSION, type SaveData, type SavedShip } from './save';
+export { GOLD_REASONS, totalGold, totalKills, type GoldReason, type Stats } from './records/stats';
 export type { GameState } from './GameState';
 export { signedDistanceToPolygon } from './lib/geometry';
 export { createRandom } from './lib/random';
 export type { Body, Hull } from './physics/hull';
-export { REPAIR_RATE, REPAIR_TICK } from './ships/repair';
+export { REPAIR_HP_PER_GOLD, REPAIR_TICK, canPayRepair, orderRepair, repairStep } from './ships/repair';
 export type { Ship } from './ships/Ship';
+export {
+  OUTFITS,
+  OUTFIT_IDS,
+  OUTFIT_SLOTS,
+  OUTFIT_STATS,
+  type Outfit,
+  type OutfitBonus,
+  type OutfitId,
+  type OutfitSlot,
+  type OutfitStat,
+} from './ships/outfit';
+export {
+  BRANCHES,
+  BRANCH_IDS,
+  MAX_LEVEL,
+  MILESTONES,
+  PERKS,
+  ROW_POINTS,
+  TALENTS,
+  abilityCooldown,
+  branchTalents,
+  pointsSpent,
+  reloadShare,
+  signatureChoices,
+  takeTalent,
+  talentBlock,
+  talentPoints,
+  talentsToPick,
+  useAbility,
+  xpForLevel,
+  type BranchId,
+  type BranchTalent,
+  type SignatureTalent,
+  type Talent,
+  type TalentId,
+} from './ships/talents';
 export { DAMAGE_STAGES, MAX_HEALTH, damageStage, type DamageStage } from './ships/damage';
 export {
   SHIP_CLASSES,

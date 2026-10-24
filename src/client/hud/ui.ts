@@ -1,5 +1,6 @@
-import { Container, Graphics, Text, type TextStyleOptions } from 'pixi.js';
+import { Container, Graphics, Text, type Rectangle, type TextStyleOptions } from 'pixi.js';
 import type { AmmoId } from '../../game';
+import { t } from '../i18n/i18n';
 
 /** The HUD's colors, shared by its panels and bars */
 export const UI = {
@@ -49,13 +50,13 @@ export function text(value: string, size: number, fill: number = UI.text, extra:
 }
 
 /** Assigning Text.text re-renders its texture, so only on change */
-export function show(t: Text, value: string) {
-  if (t.text !== value) t.text = value;
+export function show(label: Text, value: string) {
+  if (label.text !== value) label.text = value;
 }
 
 /** So does assigning its color: only on change too */
-export function tint(t: Text, color: number) {
-  if (t.style.fill !== color) t.style.fill = color;
+export function tint(label: Text, color: number) {
+  if (label.style.fill !== color) label.style.fill = color;
 }
 
 /** How a tile looks: pressed (lit), disabled (dimmed, not clickable), and its border color */
@@ -63,6 +64,13 @@ export interface TileLook {
   readonly pressed?: boolean;
   readonly disabled?: boolean;
   readonly border?: number;
+}
+
+let tapSound = () => {};
+
+/** Sets what a tap on any of the HUD's tiles sounds like: the client's sounds, once they are made */
+export function setTapSound(play: () => void) {
+  tapSound = play;
 }
 
 /**
@@ -91,7 +99,9 @@ export class Tile {
     if (onTap) {
       this.container.cursor = 'pointer';
       this.container.on('pointertap', () => {
-        if (!this.look.disabled) onTap();
+        if (this.look.disabled) return;
+        tapSound();
+        onTap();
       });
       this.container.on('pointerover', () => {
         this.hovered = true;
@@ -128,6 +138,84 @@ export class Tile {
       .fill({ color: fill, alpha: disabled ? 0.5 : 0.92 })
       .stroke({ width: pressed ? 2 : 1, color: border, alpha: pressed ? 0.9 : 0.45 });
     this.content.alpha = disabled ? 0.45 : 1;
+  }
+}
+
+/** A tile with a label in its middle: a button. size: the label's, in pixels */
+export function labelButton(width: number, height: number, label: string, onTap: () => void, size = 12, bold = true) {
+  const tile = new Tile(width, height, onTap, 5);
+  const caption = text(label, size, UI.text, bold ? { fontWeight: 'bold' } : {});
+  caption.anchor.set(0.5);
+  caption.position.set(width / 2, height / 2);
+  tile.content.addChild(caption);
+  return { tile, text: caption };
+}
+
+const WINDOW_MARGIN = 20; // pixels between a window and the screen's edge, at least
+const WINDOW_DIM = 0.5; // how dark the game is behind a window
+const CLOSE = { width: 70, height: 26 } as const; // pixels: a window's Close button
+
+/**
+ * A window over the game (the loadout, the talents, the statistics): its `panel` centred on the screen and scaled
+ * down to fit, the game dimmed behind it. Clicks on it and round it never reach the stage, which would steer the
+ * ship. Close, a click beside it and Escape call `onClose`. An Escape another window has taken is left alone: the
+ * windows listen in the order the HUD makes them, the one on top first, so one press closes one window
+ */
+export class HudWindow {
+  readonly container = new Container();
+  /** What the window shows, in pixels before scaling: the owner adds to it */
+  readonly panel = new Container();
+  private readonly dim = new Graphics();
+  private readonly screen: Rectangle;
+  private readonly width: number;
+  private readonly height: number;
+  /** The screen size it was fitted to */
+  private fittedTo = '';
+
+  /** width, height: the panel's, in pixels; pad: from its top right corner to the Close button */
+  constructor(screen: Rectangle, size: { width: number; height: number; pad: number }, onClose: () => void) {
+    this.screen = screen;
+    this.width = size.width;
+    this.height = size.height;
+    this.container.visible = false;
+    const background = new Graphics()
+      .roundRect(0, 0, size.width, size.height, 12)
+      .fill({ color: UI.panel, alpha: 0.97 })
+      .stroke({ width: 1.5, color: UI.border, alpha: 0.4 });
+    for (const blocker of [this.dim, background]) {
+      blocker.eventMode = 'static';
+      blocker.on('pointerdown', (e) => e.stopPropagation());
+    }
+    this.dim.on('pointertap', onClose);
+    const close = labelButton(CLOSE.width, CLOSE.height, t('Close'), onClose, 13, false);
+    close.tile.container.position.set(size.width - size.pad - CLOSE.width, size.pad);
+    this.panel.addChild(background, close.tile.container);
+    this.container.addChild(this.dim, this.panel);
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Escape' || !this.isOpen || e.defaultPrevented) return;
+      onClose();
+      // Escape closed the window; it shouldn't also close the one under it or stop the ship firing (keyboardInput)
+      e.preventDefault();
+    });
+  }
+
+  get isOpen() {
+    return this.container.visible;
+  }
+
+  /** Every frame while open: the dim and the panel's place follow the screen's size */
+  fit() {
+    const { width, height } = this.screen;
+    const size = `${width}x${height}`;
+    if (size === this.fittedTo) return;
+    this.fittedTo = size;
+    this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: WINDOW_DIM });
+    const scale = Math.min(1, (width - WINDOW_MARGIN * 2) / this.width, (height - WINDOW_MARGIN * 2) / this.height);
+    this.panel.scale.set(scale);
+    this.panel.position.set(
+      Math.round((width - this.width * scale) / 2),
+      Math.round((height - this.height * scale) / 2),
+    );
   }
 }
 
@@ -204,4 +292,46 @@ export function drawFullscreen(g: Graphics, size: number, color: number, exit: b
       .lineTo(cx, cy + dy)
       .stroke({ width: 2.5, color, cap: 'round', join: 'round' });
   }
+}
+
+/** A sail on its mast, filled by the wind: the Full sail ability. `size` is the icon's height in pixels */
+export function drawSail(g: Graphics, size: number, color: number) {
+  const k = size / 32;
+  g.moveTo(-9 * k, -14 * k)
+    .lineTo(-9 * k, 14 * k)
+    .stroke({ width: 2.5 * k, color, cap: 'round' });
+  g.moveTo(-7 * k, -13 * k)
+    .quadraticCurveTo(14 * k, -2 * k, -7 * k, 10 * k)
+    .closePath()
+    .fill({ color });
+  g.moveTo(-14 * k, 14 * k)
+    .lineTo(12 * k, 14 * k)
+    .stroke({ width: 2.5 * k, color, cap: 'round' });
+}
+
+/** A cannon on its carriage with a blast at the muzzle: the Broadside ability. `size` is the icon's width in pixels */
+export function drawBroadside(g: Graphics, size: number, color: number) {
+  const k = size / 32;
+  g.roundRect(-13 * k, -6 * k, 18 * k, 8 * k, 3 * k).fill({ color });
+  g.circle(-8 * k, 6 * k, 4.5 * k).stroke({ width: 2.5 * k, color });
+  for (const [dx, dy] of [
+    [1, -0.6],
+    [1, 0],
+    [1, 0.6],
+  ] as const) {
+    g.moveTo(8 * k, -2 * k)
+      .lineTo((8 + 7 * dx) * k, (-2 + 7 * dy) * k)
+      .stroke({ width: 2 * k, color: 0xffb347, cap: 'round' });
+  }
+}
+
+/** A five-pointed star, a point up: a talent to pick. `radius` is its points' in pixels */
+export function drawStar(g: Graphics, radius: number, color: number) {
+  const points: number[] = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? radius : radius * 0.45;
+    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+    points.push(Math.cos(angle) * r, Math.sin(angle) * r);
+  }
+  g.poly(points).fill({ color });
 }

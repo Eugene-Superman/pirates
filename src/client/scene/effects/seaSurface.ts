@@ -1,7 +1,7 @@
 import { Assets, Geometry, GlProgram, Mesh, Shader, Texture, UniformGroup } from 'pixi.js';
 import type { Camera3D } from '../../render/Camera3D';
 import { LIGHT } from '../../render/Painter3D';
-import { SEA_LOOK, SEA_MAPS, type SeaMap, type WaveLayer } from './seaLook';
+import { SEA_LOOK, SEA_MAPS, type PatchLayer, type SeaMap } from './seaLook';
 
 const SEA_SPRITES = `${import.meta.env.BASE_URL}sprites/sea`;
 // Sun glitter shows where the water reflects this direction: just above the mirror image of the camera, so it sparkles
@@ -16,15 +16,23 @@ in vec2 aWorld;
 
 out vec2 vUv1;
 out vec2 vUv2;
+out vec2 vUv3;
+out vec2 vUvDepth;
+out vec2 vUvClouds;
 
 uniform mat3 uProjectionMatrix;
 uniform mat3 uWorldTransformMatrix;
 uniform mat3 uTransformMatrix;
 
-// Per layer: origin on the water (x, y), then cos and sin of its turn; uInvTile: 1 / tile size of each layer
+// Per layer: origin on the water (x, y), then cos and sin of its turn; 1 / tile size of each layer: the three wave
+// layers, then the depth and the clouds
 uniform vec4 uLayer1;
 uniform vec4 uLayer2;
-uniform vec2 uInvTile;
+uniform vec4 uLayer3;
+uniform vec4 uDepthLayer;
+uniform vec4 uCloudLayer;
+uniform vec3 uInvTile;
+uniform vec2 uInvPatch;
 
 vec2 layerUv(vec4 layer, float invTile) {
   vec2 d = aWorld - layer.xy;
@@ -36,22 +44,33 @@ void main() {
   gl_Position = vec4((mvp * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
   vUv1 = layerUv(uLayer1, uInvTile.x);
   vUv2 = layerUv(uLayer2, uInvTile.y);
+  vUv3 = layerUv(uLayer3, uInvTile.z);
+  vUvDepth = layerUv(uDepthLayer, uInvPatch.x);
+  vUvClouds = layerUv(uCloudLayer, uInvPatch.y);
 }
 `;
 
 const FRAGMENT = /* glsl */ `
 in vec2 vUv1;
 in vec2 vUv2;
+in vec2 vUv3;
+in vec2 vUvDepth;
+in vec2 vUvClouds;
 
 out vec4 finalColor;
 
 uniform sampler2D uMap1;
 uniform sampler2D uMap2;
+uniform sampler2D uMap3;
+uniform sampler2D uPatches;
 
-uniform vec4 uTurns; // cos and sin of the two wave layers' turns (the vertex shader's are separate: a uniform shared
-                     // by both shaders must have the same precision in both)
-uniform vec2 uStrength;
+uniform vec4 uTurns; // cos and sin of the first two wave layers' turns (the vertex shader's are separate: a uniform
+                     // shared by both shaders must have the same precision in both)
+uniform vec2 uTurn3;
+uniform vec3 uStrength;
 uniform vec3 uDeep;
+uniform vec3 uShallow;
+uniform vec2 uClouds; // the share of the sea in cloud shadow, how much they darken it
 uniform vec3 uCrestColor;
 uniform vec3 uSkyLow;
 uniform vec3 uSkyHigh;
@@ -71,14 +90,21 @@ vec2 toWorld(vec2 s, vec2 turn) {
 void main() {
   vec3 a = texture(uMap1, vUv1).rgb;
   vec3 b = texture(uMap2, vUv2).rgb;
-  vec2 slope = toWorld((a.rg * 2.0 - 1.0) * uStrength.x, uTurns.xy) + toWorld((b.rg * 2.0 - 1.0) * uStrength.y, uTurns.zw);
-  float crest = a.b + (b.b - 0.5) * uCrest.w;
+  vec3 c = texture(uMap3, vUv3).rgb;
+  vec2 slope = toWorld((a.rg * 2.0 - 1.0) * uStrength.x, uTurns.xy) + toWorld((b.rg * 2.0 - 1.0) * uStrength.y, uTurns.zw)
+    + toWorld((c.rg * 2.0 - 1.0) * uStrength.z, uTurn3);
+  float crest = a.b + (b.b + c.b - 1.0) * uCrest.w;
   vec3 n = normalize(vec3(-slope, 1.0));
 
-  // Light inside the water: brighter on the crests, and on slopes turned to the sun
+  // Deeper and shallower water in broad patches, and the shadows of clouds drifting over it
+  float depth = smoothstep(0.1, 0.9, texture(uPatches, vUvDepth).r);
+  float shade = smoothstep(1.0 - uClouds.x - 0.1, 1.0 - uClouds.x + 0.25, texture(uPatches, vUvClouds).g);
+  vec3 body = mix(uDeep, uShallow, depth);
+
+  // Light inside the water: brighter on the crests, and on slopes turned to the sun; less of it in a cloud's shadow
   float inner = smoothstep(uCrest.x, uCrest.y, crest) * uCrest.z;
-  float sun = 1.0 + uLight.x * (dot(n, uSun) - uSun.z);
-  vec3 color = mix(uDeep, uCrestColor, inner) * sun;
+  float sun = (1.0 + uLight.x * (dot(n, uSun) - uSun.z)) * (1.0 - uClouds.y * shade);
+  vec3 color = mix(body, uCrestColor + (uShallow - uDeep) * depth * 0.5, inner) * sun;
 
   // The sky, reflected more where the water turns away from the camera (Fresnel)
   float facing = max(dot(n, uView), 0.0);
@@ -86,7 +112,8 @@ void main() {
   vec3 r = reflect(-uView, n);
   vec3 sky = mix(uSkyLow, uSkyHigh, clamp((r.z - 0.2) / 0.8, 0.0, 1.0));
   color = mix(color, sky, clamp(fresnel * uLight.y, 0.0, 1.0));
-  color += pow(max(dot(r, uGlint), 0.0), uLight.w) * uLight.z;
+  color += pow(max(dot(r, uGlint), 0.0), uLight.w) * uLight.z * (1.0 - shade);
+  color *= 1.0 - 0.5 * uClouds.y * shade;
 
   // Whitecaps, broken up by the second layer's waves so they don't look like blots
   float foam = smoothstep(uFoam.x, uFoam.y, crest) * smoothstep(0.3, 0.7, b.b) * uFoam.z;
@@ -114,10 +141,17 @@ function seaUniforms() {
   return new UniformGroup({
     uLayer1: vec4(),
     uLayer2: vec4(),
-    uInvTile: vec2(),
+    uLayer3: vec4(),
+    uDepthLayer: vec4(),
+    uCloudLayer: vec4(),
+    uInvTile: vec3(),
+    uInvPatch: vec2(),
     uTurns: vec4(),
-    uStrength: vec2(),
+    uTurn3: vec2(),
+    uStrength: vec3(),
     uDeep: vec3(),
+    uShallow: vec3(),
+    uClouds: vec2(),
     uCrestColor: vec3(),
     uSkyLow: vec3(),
     uSkyHigh: vec3(),
@@ -140,10 +174,11 @@ export interface SeaSurface {
 }
 
 /**
- * The sea's surface: a mesh over the whole screen, painted by its own shader from tiles of ocean waves (two layers,
- * drifting and turned against each other), with light inside the water, reflected sky, sun glitter and whitecaps.
- * How it looks is a set of numbers (SEA_LOOK, seaLook.ts). Hidden until both wave maps have loaded: the flat sea
- * color shows till then. WebGL only (Pixi's default renderer)
+ * The sea's surface: a mesh over the whole screen, painted by its own shader from tiles of ocean waves (three layers,
+ * drifting different ways and turned against each other), with light inside the water, deeper and shallower patches,
+ * cloud shadows drifting over it, reflected sky, sun glitter and whitecaps. How it looks is a set of numbers
+ * (SEA_LOOK, seaLook.ts). Hidden until its maps have loaded: the flat sea color shows till then. WebGL only (Pixi's
+ * default renderer)
  */
 export function createSeaSurface(): SeaSurface {
   const geometry = new Geometry({
@@ -157,7 +192,7 @@ export function createSeaSurface(): SeaSurface {
   const empty = Texture.WHITE.source;
   const shader = new Shader({
     glProgram: new GlProgram({ name: 'sea-surface', vertex: VERTEX, fragment: FRAGMENT }),
-    resources: { seaUniforms: group, uMap1: empty, uMap2: empty },
+    resources: { seaUniforms: group, uMap1: empty, uMap2: empty, uMap3: empty, uPatches: empty },
   });
   const sea: SeaSurface = { mesh: new Mesh({ geometry, shader }), uniforms: group.uniforms, shader, textures: {} };
   sea.mesh.visible = false;
@@ -175,21 +210,26 @@ export function createSeaSurface(): SeaSurface {
   return sea;
 }
 
-/** Paints the water with SEA_LOOK once both of its wave maps have loaded */
+/** Paints the water with SEA_LOOK once all of its maps have loaded */
 function applyLook(sea: SeaSurface) {
   const look = SEA_LOOK;
-  const first = sea.textures[look.layers[0].map];
-  const second = sea.textures[look.layers[1].map];
-  if (!first || !second) return;
+  const [first, second, third] = look.layers.map((layer) => sea.textures[layer.map]);
+  const patches = sea.textures.patches;
+  if (!first || !second || !third || !patches) return;
   sea.mesh.visible = true;
   sea.shader.resources.uMap1 = first.source;
   sea.shader.resources.uMap2 = second.source;
+  sea.shader.resources.uMap3 = third.source;
+  sea.shader.resources.uPatches = patches.source;
 
   const u = sea.uniforms;
-  u.uStrength.set([look.layers[0].strength, look.layers[1].strength]);
-  const [a, b] = look.layers.map((layer) => (layer.turn * Math.PI) / 180);
+  u.uStrength.set(look.layers.map((layer) => layer.strength));
+  const [a, b, c] = look.layers.map((layer) => (layer.turn * Math.PI) / 180);
   u.uTurns.set([Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b)]);
+  u.uTurn3.set([Math.cos(c), Math.sin(c)]);
   u.uDeep.set(rgb(look.deep));
+  u.uShallow.set(rgb(look.shallow));
+  u.uClouds.set([look.cloudCover, look.cloudShadow]);
   u.uCrestColor.set(rgb(look.crest));
   u.uSkyLow.set(rgb(look.skyLow));
   u.uSkyHigh.set(rgb(look.skyHigh));
@@ -197,7 +237,8 @@ function applyLook(sea: SeaSurface) {
   u.uCrest.set([look.crestRange[0], look.crestRange[1], look.crestAmount, look.crestShare]);
   u.uFoam.set([look.foamRange[0], look.foamRange[1], look.foamAmount]);
   u.uLight.set([look.diffuse, look.reflect, look.glint, look.glintSharpness]);
-  u.uInvTile.set([1 / look.layers[0].tile, 1 / look.layers[1].tile]);
+  u.uInvTile.set(look.layers.map((layer) => 1 / layer.tile));
+  u.uInvPatch.set([1 / look.depth.tile, 1 / look.clouds.tile]);
 }
 
 /** screenWidth/Height: pixels; the camera must already be set for this frame */
@@ -217,9 +258,12 @@ export function updateSeaSurface(
   const lift = Math.hypot(view[0], view[1], view[2] + GLINT_LIFT);
   u.uGlint.set([-view[0] / lift, -view[1] / lift, (view[2] + GLINT_LIFT) / lift]);
 
-  const [first, second] = SEA_LOOK.layers;
+  const [first, second, third] = SEA_LOOK.layers;
   setLayer(u.uLayer1, first, camera, time);
   setLayer(u.uLayer2, second, camera, time);
+  setLayer(u.uLayer3, third, camera, time);
+  setLayer(u.uDepthLayer, SEA_LOOK.depth, camera, time);
+  setLayer(u.uCloudLayer, SEA_LOOK.clouds, camera, time);
 
   const positions = sea.mesh.geometry.getBuffer('aPosition');
   const world = sea.mesh.geometry.getBuffer('aWorld');
@@ -244,7 +288,7 @@ export function updateSeaSurface(
  * A layer's origin and turn. The origin drifts with the layer and is moved by whole tiles to near the camera, which
  * keeps the texture coordinates small: far from 0 a float loses the precision to tell the texture's pixels apart
  */
-function setLayer(target: Float32Array, layer: WaveLayer, camera: Camera3D, time: number) {
+function setLayer(target: Float32Array, layer: PatchLayer, camera: Camera3D, time: number) {
   const angle = (layer.turn * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);

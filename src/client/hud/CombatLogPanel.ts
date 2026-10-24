@@ -3,6 +3,7 @@ import type { GameState } from '../../game';
 import type { Slot } from '../storage/Store';
 import { CombatLog, LOG_FILTERS, inFilter, statsLines, type LogEntry, type LogFilter } from './combatLog';
 import { Tile, UI, show, text, tint } from './ui';
+import { t } from '../i18n/i18n';
 
 const MARGIN = 16; // pixels from the screen's edges
 const GAP = 30; // above the skill bar (and its status line), when the log would overlap it
@@ -24,13 +25,14 @@ const KIND_COLORS = {
   death: 0xff5a4a,
   repair: 0x9dffb0,
   gold: 0xffcf3f,
+  level: 0x9fd4ff,
   note: UI.dim,
 } as const;
 const FILTER_NAMES: Readonly<Record<LogFilter, string>> = {
   all: 'All',
   dealt: 'Dealt',
   taken: 'Taken',
-  other: 'Kills, gold, repairs',
+  other: 'Kills, gold, levels',
 };
 
 /** A line of the list: its text, color and how far it is set in */
@@ -55,7 +57,7 @@ export class CombatLogPanel {
   readonly container = new Container();
   readonly log = new CombatLog();
   private readonly background = new Graphics();
-  private readonly title = text('Combat log', 14, UI.active, { fontWeight: 'bold' });
+  private readonly title = text(t('Combat log'), 14, UI.active, { fontWeight: 'bold' });
   private readonly toggleButton: Tile;
   private readonly toggleText = text('', 12);
   private readonly tabs: { filter: LogFilter; tile: Tile; label: Text }[];
@@ -96,7 +98,7 @@ export class CombatLogPanel {
     this.title.position.set(PAD, 6);
 
     this.tabs = LOG_FILTERS.map((filter) => {
-      const label = text(FILTER_NAMES[filter], 11, UI.text, { fontWeight: 'bold' });
+      const label = text(t(FILTER_NAMES[filter]), 11, UI.text, { fontWeight: 'bold' });
       const tile = new Tile(Math.ceil(label.width) + 16, 20, () => this.pick(filter), 4);
       label.anchor.set(0.5);
       label.position.set(tile.width / 2, 10);
@@ -133,7 +135,7 @@ export class CombatLogPanel {
       this.background,
       this.title,
       this.toggleButton.container,
-      ...this.tabs.map((t) => t.tile.container),
+      ...this.tabs.map((tab) => tab.tile.container),
       ...this.scrollButtons.map((b) => b.container),
       ...this.stats,
       this.list,
@@ -230,7 +232,7 @@ export class CombatLogPanel {
       .roundRect(0, 0, width, height, 8)
       .fill({ color: UI.panel, alpha: this.open ? 0.94 : 0.72 })
       .stroke({ width: 1, color: UI.border, alpha: 0.3 });
-    show(this.toggleText, this.open ? 'Close  (J)' : 'Open  (J)');
+    show(this.toggleText, this.open ? t('Close  (J)') : t('Open  (J)'));
     this.toggleButton.container.position.set(width - PAD - this.toggleButton.width, 4);
     let x = PAD + this.title.width + 12;
     for (const { tile } of this.tabs) {

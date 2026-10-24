@@ -1,5 +1,6 @@
 import type { DamageStage } from '../../game';
 import { ButtonRow, type ButtonSpec } from './ButtonRow';
+import { t } from '../i18n/i18n';
 
 // A testing tool, not a game control: sets the ship's hull integrity so every damage stage can be looked at
 const PRESETS: readonly { label: string; health: number; stage: DamageStage }[] = [
@@ -24,7 +25,7 @@ export class DamagePanel {
 
   constructor(actions: DamageActions) {
     const specs: ButtonSpec<DamageStage>[] = PRESETS.map((preset) => ({
-      label: preset.label,
+      label: t(preset.label),
       key: preset.stage,
       onTap: () => actions.setHealth(preset.health),
     }));

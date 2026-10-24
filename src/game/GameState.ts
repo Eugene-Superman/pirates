@@ -1,4 +1,5 @@
 import type { Respawn } from './bots/spawner';
+import type { Shell } from './combat/barrage';
 import type { GameEvent, Projectile } from './combat/combat';
 import type { Chest } from './economy/loot';
 import type { Player } from './economy/player';
@@ -14,9 +15,11 @@ export interface GameState {
   ships: Ship[];
   /** The player: their gold, the guns in their hold, their quests. Online, one of a list */
   player: Player;
-  /** Chests of gold floating where bots sank */
+  /** Loot floating where ships sank: a bot's gold and goods, a player's lost cargo */
   chests: Chest[];
   projectiles: Projectile[];
+  /** A boss's barrage: shells on their way to the spots marked on the water */
+  shells: Shell[];
   /** What happened during the last update (shots, hits, wrecks, repairs); replaced by every update */
   events: GameEvent[];
   /** Bots waiting to replace ones that were sunk */

@@ -1,10 +1,12 @@
 import type { GameState } from '../GameState';
-import { closestOnSegment } from '../lib/geometry';
 import { clamp } from '../lib/math';
-import { bodyAxis } from '../physics/hull';
+import { hullGap } from '../physics/hull';
 import type { Ship } from '../ships/Ship';
-import { AMMO, rollVolley, type AmmoId, type Bite, type GunId } from './arsenal';
+import { PERKS, reloadShare, type TalentId } from '../ships/talents';
+import { AMMO, rollVolley, type AmmoId, type Bite, type DamageDie, type GunId } from './arsenal';
+import type { Cargo } from '../economy/cargo';
 import type { QuestId } from '../economy/quests';
+import type { PathStepId } from '../economy/shipyard';
 import { findUnit, isAfloat, unitKind, type Unit, type UnitKind } from './units';
 import { WEAPONS, WEAPON_IDS, damageShare, type HoldReason, type WeaponId } from './weapons';
 
@@ -14,8 +16,8 @@ export interface Point3 {
   readonly z: number;
 }
 
-/** What did the damage: a weapon's volley, or a sea monster's jaws */
-export type DamageSource = WeaponId | 'bite';
+/** What did the damage: a weapon's volley, a monster's bite, a boss's mortar shell (combat/barrage.ts) */
+export type DamageSource = WeaponId | 'bite' | 'shell';
 
 /** One die of a volley in full: which gun rolled it (null: a monster's jaws), its sides, the face, what it did */
 export interface DieResult {
@@ -40,6 +42,10 @@ export interface Strike {
   readonly bonus: number;
   /** Share of the dice's sum the target takes: 1, or OFF_TARGET_SHARE for a weapon not made for it */
   readonly share: number;
+  /** What the attacker's talents multiply the damage by: Broadside, Point blank; 1 without */
+  readonly boost: number;
+  /** The attacker's talents that changed this strike: Steady hands (in `bonus`), Keen eye, Broadside, Point blank */
+  readonly talents: readonly TalentId[];
   readonly dice: readonly DieResult[];
 }
 
@@ -126,6 +132,9 @@ export type GameEvent =
       readonly at: Point3;
       /** Every die of it, for the combat log */
       readonly strike: Strike;
+      /** Share of it the target's talent let through (Iron bow, Reinforced sides), and which; 1 and null without */
+      readonly guard: number;
+      readonly guardedBy: TalentId | null;
     }
   | {
       /** A unit's hit points ran out: it goes down */
@@ -144,20 +153,94 @@ export type GameEvent =
       readonly type: 'repair';
       readonly shipId: number;
       readonly amount: number;
+      /** Gold its player paid the crew for it: 0 for most steps, the fractions adding up to a coin every few */
+      readonly paid: number;
       readonly at: Point3;
     }
   | {
-      /** A player was paid (economy/): a bounty for a kill, a chest hauled aboard, a quest turned in */
+      /** A repair stopped before the hull was whole for want of gold to pay the crew (ships/repair.ts) */
+      readonly type: 'repairStopped';
+      readonly shipId: number;
+      readonly reason: 'gold';
+    }
+  | {
+      /** A player was paid (economy/): a bounty for a kill, a chest hauled aboard, a quest turned in, goods sold */
       readonly type: 'gold';
       /** The player's ship */
       readonly shipId: number;
       readonly amount: number;
-      readonly reason: 'bounty' | 'chest' | 'quest';
+      readonly reason: 'bounty' | 'chest' | 'quest' | 'market';
       /** What was sunk, for a bounty */
       readonly kind: UnitKind | null;
       /** Which quest, for a quest */
       readonly quest: QuestId | null;
       readonly at: Point3;
+    }
+  | {
+      /** A ship earned experience (ships/talents.ts) */
+      readonly type: 'xp';
+      readonly shipId: number;
+      readonly amount: number;
+      readonly reason: 'kill' | 'quest';
+      readonly at: Point3;
+    }
+  | {
+      /** A ship reached a level: a talent to pick */
+      readonly type: 'level';
+      readonly shipId: number;
+      readonly level: number;
+      readonly at: Point3;
+    }
+  | {
+      /** A talent did something now: an ability used, Second wind mending the hull (`amount` points) */
+      readonly type: 'talent';
+      readonly shipId: number;
+      readonly talent: TalentId;
+      readonly amount: number;
+      readonly at: Point3;
+    }
+  | {
+      /**
+       * Goods hauled aboard (economy/loot.ts): from a wreck's chest (`loot`), or a player's own cargo lost when their
+       * ship went down (`salvage`)
+       */
+      readonly type: 'cargo';
+      readonly shipId: number;
+      readonly goods: Cargo;
+      readonly reason: 'loot' | 'salvage';
+      readonly at: Point3;
+    }
+  | {
+      /** A player's ship went down: the cargo it had aboard floats where it sank, to be hauled aboard again */
+      readonly type: 'cargoLost';
+      readonly shipId: number;
+      readonly goods: Cargo;
+      readonly at: Point3;
+    }
+  | {
+      /** A player's ship sailed over goods with no room left in its hold */
+      readonly type: 'holdFull';
+      readonly shipId: number;
+      readonly at: Point3;
+    }
+  | {
+      /** A boss fired a barrage: its shells are marked on the water (state.shells) */
+      readonly type: 'barrage';
+      readonly shipId: number;
+      readonly targetId: number;
+      readonly at: Point3;
+    }
+  | {
+      /** A barrage's shell landed */
+      readonly type: 'shellLanded';
+      readonly ownerId: number;
+      readonly at: Point3;
+    }
+  | {
+      /** A step of the Captain's path done (economy/shipyard.ts) */
+      readonly type: 'pathStep';
+      readonly shipId: number;
+      readonly step: PathStepId;
     };
 
 /** Where a projectile is now: a straight line from the muzzle to the target, lifted by a parabolic arc */
@@ -251,27 +334,68 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
   const ammo = AMMO[ship.loaded[weapon.id]];
   const distance = Math.hypot(target.x - ship.x, target.y - ship.y);
   const reloads = ship.reloads[weapon.id];
-  const ready = ship.fittedGuns(weapon.id).filter(({ gun, slot }) => reloads[slot] === 0 && gun.range >= distance);
+  const ready = ship
+    .fittedGuns(weapon.id)
+    .filter(({ gun, slot }) => reloads[slot] === 0 && ship.reach(gun) >= distance);
   const count = ship.infiniteAmmo ? ready.length : Math.min(ready.length, ship.ammo[ammo.id]);
   if (count === 0) return;
   const firing = ready.slice(0, count);
   if (!ship.infiniteAmmo) ship.ammo[ammo.id] -= count;
-  for (const { gun, slot } of firing) reloads[slot] = gun.reload;
+  const reload = reloadShare(ship, weapon.id);
+  for (const { gun, slot } of firing) reloads[slot] = gun.reload * reload;
 
+  // The ship's talents: more on every die, crits sooner, more damage up close, from a Broadside, an ambush, a run of
+  // volleys at one target or a last stand
+  const talents: TalentId[] = [];
+  let bonus = ammo.bonus;
+  const steady = ship.rank('steadyHands');
+  if (steady > 0) {
+    bonus += PERKS.dieBonus * steady;
+    talents.push('steadyHands');
+  }
+  let dice: DamageDie[] = firing.map((f) => f.gun);
+  const keen = ship.rank('keenEye');
+  if (keen > 0) {
+    dice = dice.map((die) => ({ ...die, critFrom: Math.max(die.missOn + 1, die.critFrom - PERKS.critSooner * keen) }));
+    talents.push('keenEye');
+  }
+  let boost = 1;
+  const close = ship.rank('pointBlank');
+  if (close > 0 && distance <= ship.range(weapon.id) * PERKS.pointBlank.within) {
+    boost *= 1 + PERKS.pointBlank.boost * close;
+    talents.push('pointBlank');
+  }
+  if (ship.broadsideArmed) {
+    ship.broadsideArmed = false;
+    boost *= PERKS.broadside;
+    talents.push('broadside');
+  }
+  if (ship.hasTalent('ambush') && !target.inCombat(state.time)) {
+    boost *= PERKS.ambush;
+    talents.push('ambush');
+  }
+  const run = ship.relentless;
+  run.volleys = run.target === target.id ? Math.min(run.volleys + 1, PERKS.relentless.most) : 0;
+  run.target = target.id;
+  if (ship.hasTalent('relentless') && run.volleys > 0) {
+    boost *= 1 + PERKS.relentless.boost * run.volleys;
+    talents.push('relentless');
+  }
+  if (ship.hasTalent('lastStand') && ship.health < PERKS.lastStand.below) {
+    boost *= PERKS.lastStand.boost;
+    talents.push('lastStand');
+  }
   const share = damageShare(weapon.id, target.nature);
-  const roll = rollVolley(
-    firing.map((f) => f.gun),
-    ammo.bonus,
-    share,
-    random,
-  );
+  const roll = rollVolley(dice, bonus, share * boost, random);
   const strike: Strike = {
     attackerId: ship.id,
     attackerKind: unitKind(ship),
     source: weapon.id,
     ammo: ammo.id,
-    bonus: ammo.bonus,
+    bonus,
     share,
+    boost,
+    talents,
     dice: firing.map(({ gun }, i) => ({ gun: gun.id, die: gun.die, ...roll.rolls[i] })),
   };
 
@@ -334,45 +458,74 @@ function bite(state: GameState, monster: Ship, jaws: Bite, target: Unit, random:
     y: monster.y + Math.sin(monster.rotation) * head,
     z: monster.height,
   };
-  const hull = closestOnSegment(from.x, from.y, bodyAxis(target));
-  const gap = Math.hypot(hull.x - from.x, hull.y - from.y) - target.hull.halfBeam;
+  const gap = hullGap(from.x, from.y, target);
   monster.holdReason = !monster.canSee(target.x, target.y) ? 'sight' : gap > jaws.reach ? 'range' : null;
   if (monster.holdReason !== null || monster.biteReload > 0) return;
   monster.biteReload = jaws.reload;
-  const roll = rollVolley([jaws], jaws.bonus, 1, random);
   const at = { x: target.x, y: target.y, z: target.height / 2 };
   state.events.push({ type: 'bite', attackerId: monster.id, targetId: target.id, from, at });
   monster.enterCombat(state.time);
-  target.enterCombat(state.time);
-  const strike: Strike = {
-    attackerId: monster.id,
-    attackerKind: unitKind(monster),
-    source: 'bite',
-    ammo: null,
-    bonus: jaws.bonus,
-    share: 1,
-    dice: [{ gun: null, die: jaws.die, ...roll.rolls[0] }],
-  };
-  hurt(state, target, strike, { ...roll, guns: 1 }, { ...at, z: target.height });
+  strikeOnce(state, monster, target, jaws, 'bite', random);
 }
 
 /**
- * Damage is done: the unit loses hit points, and remembers who hit it (a bot fights back). At 0 it is wrecked: it goes
- * down (a bot's is then taken out of the game, bots/spawner.ts)
+ * One die's blow at full damage, done at once with no projectile: a monster's bite, a boss's mortar shell
+ * (combat/barrage.ts). `random` is the game's dice
  */
-function hurt(
+export function strikeOnce(
+  state: GameState,
+  attacker: Unit,
+  target: Unit,
+  weapon: DamageDie & { readonly bonus: number },
+  source: 'bite' | 'shell',
+  random: () => number,
+) {
+  const roll = rollVolley([weapon], weapon.bonus, 1, random);
+  const strike: Strike = {
+    attackerId: attacker.id,
+    attackerKind: unitKind(attacker),
+    source,
+    ammo: null,
+    bonus: weapon.bonus,
+    share: 1,
+    boost: 1,
+    talents: [],
+    dice: [{ gun: null, die: weapon.die, ...roll.rolls[0] }],
+  };
+  hurt(state, target, strike, { ...roll, guns: 1 }, { x: target.x, y: target.y, z: target.height });
+}
+
+/** The talent of a unit that takes less from this source, if it has one: Iron bow against bites, Reinforced sides cannons */
+function guardOf(unit: Unit, source: DamageSource): { talent: TalentId; share: number } | null {
+  const talent = source === 'bite' ? 'ironBow' : source === 'cannon' || source === 'shell' ? 'reinforcedSides' : null;
+  const rank = talent ? unit.rank(talent) : 0;
+  if (!talent || rank === 0) return null;
+  return { talent, share: 1 - (talent === 'ironBow' ? PERKS.biteGuard : PERKS.cannonGuard) * rank };
+}
+
+/**
+ * Damage is done: the unit loses hit points (less with a talent that guards against it), and remembers who hit it (a
+ * bot fights back). Second wind may mend it at once; a chain shot slows it. At 0 it is wrecked: it goes down (a bot's
+ * is then taken out of the game, bots/spawner.ts)
+ */
+export function hurt(
   state: GameState,
   unit: Unit,
   strike: Strike,
   roll: { readonly damage: number; readonly guns: number; readonly crits: number; readonly misses: number },
   at: Point3,
 ) {
-  const { damage, guns, crits, misses } = roll;
+  const { guns, crits, misses } = roll;
   const { attackerId, attackerKind, source } = strike;
+  const guard = guardOf(unit, source);
+  const damage = unsinkable(state, unit, guard ? Math.round(roll.damage * guard.share) : roll.damage);
   const afloat = isAfloat(unit);
   unit.takeDamage(damage);
   unit.lastHitBy = attackerId;
   unit.enterCombat(state.time);
+  if (source === 'cannon' && damage > 0 && findUnit(state, attackerId)?.hasTalent('chainShot')) {
+    unit.slowedUntil = state.time + PERKS.chainShot.time;
+  }
   state.events.push({
     type: 'damage',
     targetId: unit.id,
@@ -386,7 +539,10 @@ function hurt(
     full: strike.share === 1,
     at,
     strike,
+    guard: guard ? guard.share : 1,
+    guardedBy: guard ? guard.talent : null,
   });
+  if (isAfloat(unit)) secondWind(state, unit);
   if (!afloat || isAfloat(unit)) return;
   state.events.push({
     type: 'destroyed',
@@ -396,5 +552,36 @@ function hurt(
     attackerKind,
     at,
     heading: unit.heading,
+  });
+}
+
+/** Unsinkable: a blow that would sink the ship leaves it at 1 hull point instead, once every few minutes */
+function unsinkable(state: GameState, ship: Ship, damage: number) {
+  if (damage < ship.hp || ship.hp <= 1 || !ship.hasTalent('unsinkable') || state.time < ship.unsinkableReadyAt) {
+    return damage;
+  }
+  ship.unsinkableReadyAt = state.time + PERKS.unsinkable;
+  state.events.push({
+    type: 'talent',
+    shipId: ship.id,
+    talent: 'unsinkable',
+    amount: 0,
+    at: { x: ship.x, y: ship.y, z: ship.height },
+  });
+  return ship.hp - 1;
+}
+
+/** Second wind: once a fight, a ship hit down to a quarter of its hull gets a share of it back at once */
+function secondWind(state: GameState, ship: Ship) {
+  if (!ship.hasTalent('secondWind') || ship.secondWindUsed || ship.health > PERKS.secondWind.below) return;
+  ship.secondWindUsed = true;
+  const amount = Math.round(ship.maxHp * PERKS.secondWind.heal);
+  ship.heal(amount);
+  state.events.push({
+    type: 'talent',
+    shipId: ship.id,
+    talent: 'secondWind',
+    amount,
+    at: { x: ship.x, y: ship.y, z: ship.height },
   });
 }

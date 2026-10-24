@@ -1,12 +1,24 @@
 import { Container, Graphics } from 'pixi.js';
-import { WEAPONS, WRECK_TIME, findUnit, isHostile, type GameState } from '../../game';
+import {
+  WEAPONS,
+  WRECK_TIME,
+  findUnit,
+  isHostile,
+  talentsToPick,
+  xpForLevel,
+  type GameState,
+  type Ship,
+} from '../../game';
 import type { Selection } from '../input/selection';
 import { Tile, UI, show, text, tint } from './ui';
+import { t } from '../i18n/i18n';
 
 const WIDTH = 270; // pixels, each frame
 const PAD = 10;
 const BAR_HEIGHT = 14;
-const OWN_HEIGHT = 56;
+const OWN_HEIGHT = 68;
+const XP = { y: 50, height: 6, label: 44, right: 118 }; // pixels: the experience bar under the hull's, and its texts
+const XP_COLORS = { bar: 0x5aa8ff, back: 0x06121a } as const;
 const TARGET_HEIGHT = 78;
 const FIRE = { width: 112, height: 22 };
 
@@ -72,12 +84,19 @@ export class UnitFrames {
   static readonly OWN_HEIGHT = OWN_HEIGHT;
   readonly container = new Container();
   private readonly own = new Frame(OWN_HEIGHT);
+  private readonly level = text('', 12, UI.text, { fontWeight: 'bold' });
+  private readonly xpBar = new Graphics();
+  private readonly xpText = text('', 11, UI.dim, { fontWeight: 'bold' });
+  /** What the experience bar was drawn for */
+  private xpDrawn = -1;
   private readonly target = new Frame(TARGET_HEIGHT);
   private readonly fire: Tile;
-  private readonly fireLabel = text('Fire  (Space)', 12, UI.text, { fontWeight: 'bold' });
+  private readonly fireLabel = text(t('Fire  (Space)'), 12, UI.text, { fontWeight: 'bold' });
 
-  /** toggleFire: fires at the unit picked out, or stops */
-  constructor(toggleFire: () => void) {
+  /** toggleFire: fires at the unit picked out, or stops; openStats: the statistics, by a click on the player's frame */
+  constructor(toggleFire: () => void, openStats: () => void) {
+    this.own.container.cursor = 'pointer';
+    this.own.container.on('pointertap', openStats);
     this.fire = new Tile(FIRE.width, FIRE.height, toggleFire, 5);
     this.fireLabel.anchor.set(0.5);
     this.fireLabel.position.set(FIRE.width / 2, FIRE.height / 2);
@@ -86,7 +105,35 @@ export class UnitFrames {
     this.target.container.addChild(this.fire.container);
     this.target.note.style.wordWrap = true;
     this.target.note.style.wordWrapWidth = WIDTH - PAD * 3 - FIRE.width;
+    this.level.position.set(PAD, XP.y - 5);
+    this.xpText.anchor.set(1, 0);
+    this.xpText.position.set(WIDTH - PAD, XP.y - 5);
+    this.own.container.addChild(this.xpBar, this.level, this.xpText);
     this.container.addChild(this.own.container, this.target.container);
+  }
+
+  /** The level, lit while a talent waits to be picked (the talent button beside the frame), and the XP to the next */
+  private updateXp(ship: Ship, pending: boolean) {
+    const { level, xp } = ship;
+    const max = level >= ship.shipClass.maxLevel;
+    const start = xpForLevel(level);
+    const share = max ? 1 : (xp - start) / (xpForLevel(level + 1) - start);
+    show(this.level, t('Lv {level}', { level }));
+    tint(this.level, pending ? UI.active : UI.text);
+    show(
+      this.xpText,
+      max ? t('Max level') : t('{xp} / {need} XP', { xp: xp - start, need: xpForLevel(level + 1) - start }),
+    );
+    const width = WIDTH - PAD * 2 - XP.label - XP.right;
+    const drawn = Math.round(share * width);
+    if (drawn === this.xpDrawn) return;
+    this.xpDrawn = drawn;
+    this.xpBar
+      .clear()
+      .roundRect(PAD + XP.label, XP.y, width, XP.height, 3)
+      .fill({ color: XP_COLORS.back })
+      .roundRect(PAD + XP.label, XP.y, Math.max(drawn, 0), XP.height, 3)
+      .fill({ color: XP_COLORS.bar });
   }
 
   /**
@@ -104,39 +151,41 @@ export class UnitFrames {
     let statusColor: number = UI.dim;
     if (ship.isSinking) {
       const back = Math.max(0, Math.ceil(WRECK_TIME - (time - (ship.wreckedAt ?? time))));
-      status = `Sunk: back at the harbour in ${back} s`;
+      status = t('Sunk: back at the harbour in {n} s', { n: back });
       statusColor = UI.bad;
     } else if (ship.docked) {
-      status = 'In port';
+      status = t('In port');
       statusColor = UI.active;
     } else if (ship.repairing) {
-      status = 'Repairing';
+      status = t('Repairing');
       statusColor = UI.heal;
     } else if (ship.inCombat(time)) {
-      status = 'In combat';
+      status = t('In combat');
       statusColor = UI.warn;
     }
-    this.own.set(ship.shipClass.name, status, statusColor, ship.hp, ship.maxHp, UI.border);
+    const pending = talentsToPick(ship) > 0;
+    this.own.set(t(ship.shipClass.name), status, statusColor, ship.hp, ship.maxHp, pending ? UI.active : UI.border);
+    this.updateXp(ship, pending);
 
     const unit = selection.id === null ? undefined : findUnit(state, selection.id);
     this.target.container.visible = unit !== undefined;
     if (!unit) return;
     // Another player's ship: no bot's temper to show
-    let tag = 'Player';
+    let tag = t('Player');
     let tagColor: number = UI.dim;
     let border: number = UI.border;
     if (unit.bot) {
       const hostile = isHostile(unit, ship.id);
-      tag = unit.bot.foe === ship.id ? 'Attacking you' : hostile ? 'Aggressive' : 'Neutral';
+      tag = unit.bot.foe === ship.id ? t('Attacking you') : hostile ? t('Aggressive') : t('Neutral');
       tagColor = hostile ? UI.hostile : UI.good;
       border = hostile ? UI.hostile : UI.border;
     }
-    this.target.set(unit.shipClass.name, tag, tagColor, unit.hp, unit.maxHp, border);
+    this.target.set(t(unit.shipClass.name), tag, tagColor, unit.hp, unit.maxHp, border);
     const best = unit.nature === 'creature' ? WEAPONS.harpoon : WEAPONS.cannon;
     const what = unit.nature === 'creature' ? 'Creature' : 'Ship';
-    show(this.target.note, `${what}: ${best.name.toLowerCase()} do full damage`);
+    show(this.target.note, t('{what}: {weapon} do full damage', { what: t(what), weapon: t(best.name).toLowerCase() }));
     this.fire.setLook({ pressed: ship.attackTarget === unit.id });
-    show(this.fireLabel, ship.attackTarget === unit.id ? 'Cease fire  (Esc)' : 'Fire  (Space)');
+    show(this.fireLabel, ship.attackTarget === unit.id ? t('Cease fire  (Esc)') : t('Fire  (Space)'));
     tint(this.fireLabel, ship.attackTarget === unit.id ? UI.darkText : UI.text);
   }
 }
