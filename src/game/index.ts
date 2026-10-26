@@ -64,18 +64,24 @@ export {
 } from './economy/quests';
 export {
   AMMO_PACK,
+  MAX_AMMO_DEAL,
   ammoPackPrice,
+  ammoPrice,
+  ammoSalePrice,
   buyAmmo,
   buyGun,
   buyOutfit,
   fitOutfit,
   gunPrice,
+  gunSalePrice,
   outfitPrice,
   repairInPort,
   repairPrice,
   resetTalents,
   respecPrice,
+  sellAmmo,
   sellCargo,
+  sellGun,
 } from './economy/shop';
 export { buyShip, laidUpLevel, takeHelm } from './economy/fleet';
 export {
@@ -135,6 +141,16 @@ export {
   type Talent,
   type TalentId,
 } from './ships/talents';
+export {
+  MASTERY_BRANCHES,
+  MASTERY_BRANCH_IDS,
+  MASTERY_PASSIVES,
+  MASTERY_RANKS,
+  MASTERY_RINGS,
+  type MasteryBranchId,
+  type MasteryPassive,
+  type PassiveKind,
+} from './account/mastery';
 export { DAMAGE_STAGES, MAX_HEALTH, damageStage, type DamageStage } from './ships/damage';
 export {
   SHIP_CLASSES,

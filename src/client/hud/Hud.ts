@@ -3,19 +3,19 @@ import type { GameState, ShipClass } from '../../game';
 import type { Selection } from '../input/selection';
 import type { Slot } from '../storage/Store';
 import { ButtonRow } from './ButtonRow';
+import { ChatPanel } from './ChatPanel';
 import type { MapAxes } from './chart';
-import { CombatLogPanel } from './CombatLogPanel';
-import { FullscreenButton } from './FullscreenButton';
-import { GoldPanel } from './GoldPanel';
+import { ConfirmDialog } from './ConfirmDialog';
 import { HoldPanel } from './HoldPanel';
 import { LABEL_STYLE, hudItems, type HudActions, type HudItem, type HudWidget, type ViewStatus } from './hudItems';
 import { LoadoutPanel } from './LoadoutPanel';
+import { MasteryPanel } from './MasteryPanel';
 import { TalentButton } from './TalentButton';
 import { TalentPanel } from './TalentPanel';
 import { StatsPanel } from './StatsPanel';
 import { Minimap } from './Minimap';
-import { PathPanel } from './PathPanel';
 import { PortScreen, type PortActions } from './PortScreen';
+import { QuestTracker } from './QuestTracker';
 import { SeaChart } from './SeaChart';
 import { SettingsPanel } from './SettingsPanel';
 import { SkillBar } from './SkillBar';
@@ -30,12 +30,10 @@ const MARGIN = 16; // pixels from the screen's edge
 const METRIC_GAP = 6; // pixels under a line of text
 const ROW_GAP = 8; // pixels between the button rows
 const LABEL_WIDTH = 84; // pixels: the button rows start after their labels, lined up
-const FRAMES_GAP = 24; // pixels between the column and the target's frame at the top
-const FRAMES_HEIGHT = 80; // pixels: the frames at the top, the target's the taller
-// Pixels: the Settings button and the column of items under it go under the player's frame
+const FRAMES_GAP = 24; // pixels between the target's plate at the top and what is beside it
+// Pixels: the column of items goes under the player's plate
 const COLUMN_TOP = MARGIN + UnitFrames.OWN_HEIGHT + ROW_GAP;
-const CORNER_GAP = 8; // pixels between the fullscreen button and the gold panel
-const TALENT_GAP = 12; // pixels between the player's frame and the talent button beside it
+const TALENT_GAP = 12; // pixels between the player's plate and the talent button beside it
 const ZONE_COLOR = 0xffffff;
 const ZONE_ALPHA = 0.55;
 const ZONE_WIDTH = 2; // pixels
@@ -70,11 +68,13 @@ function saveShown(items: readonly HudItem[], ids: ReadonlySet<string>, kept: Sl
 }
 
 /**
- * Screen-space overlay: in the top left corner the frame of the player's ship (beside it a button lit while a talent
- * waits to be picked), and under it the items picked in the settings panel, stacked under its button; at the top the
- * frame of the unit they picked out; in the top right corner the gold, hold and quests, the Captain's path under them,
- * and the fullscreen button; at the bottom the skill bar, the combat log on its left and the minimap on its right; and
- * the loadout window or the sea chart over everything when open
+ * Screen-space overlay: in the top left corner the plate of the player's ship with their purse and hold (beside it a
+ * button lit while a talent waits to be picked), and under it the items picked in the settings panel; at the top the
+ * plate of the unit they picked out; in the top right corner the quest tracker, the quests and the Captain's path; at
+ * the bottom the skill bar, the chat on its left (the combat log and the chat's channels, a tab each) and the minimap
+ * on its right, the settings and the full screen in its frame's top corners; and the loadout window, the talents, the
+ * hold, the captain's mastery (the four of them opened by the buttons on the minimap's frame too), the statistics or
+ * the sea chart over everything when open, and over them all a question before a quest is given up
  */
 export class Hud {
   readonly container = new Container();
@@ -83,25 +83,28 @@ export class Hud {
   /** Made the first time an item is shown, then only hidden */
   private readonly onScreen = new Map<string, Shown>();
   private readonly column = new Container();
-  private readonly settingsButton: ButtonRow<null>;
   private readonly settings: SettingsPanel;
   /** The camera's zone, outlined across the screen behind the HUD's buttons */
   private readonly zoneOutline = new Graphics();
   private readonly frames: UnitFrames;
   private readonly skills: SkillBar;
   private readonly loadout: LoadoutPanel;
+  /** Whether the skill bar is raised over the loadout */
+  private barRaised = false;
   private readonly talents: TalentPanel;
   private readonly stats: StatsPanel;
   private readonly hold: HoldPanel;
+  private readonly mastery: MasteryPanel;
   private readonly talentButton: TalentButton;
-  private readonly log: CombatLogPanel;
+  /** The chat in the bottom left corner, the combat log one of its tabs */
+  private readonly chat: ChatPanel;
   /** Where the items on the screen are kept between visits */
   private readonly keptItems: Slot;
   private readonly minimap: Minimap;
   private readonly chart: SeaChart;
-  private readonly gold = new GoldPanel(() => this.toggleHold());
-  private readonly path = new PathPanel();
-  private readonly fullscreen = new FullscreenButton();
+  private readonly tracker: QuestTracker;
+  /** Asks before what can't be undone: a quest given up, an item sold back in port */
+  private readonly confirm: ConfirmDialog;
   private readonly port: PortScreen;
   private readonly screen: Rectangle;
   /** Height of the shown items when last laid out, and where the last of them ends on the screen */
@@ -109,7 +112,7 @@ export class Hud {
   private columnBottom = 0;
 
   /**
-   * shipClass: the player's ship's, for its gun slots and its share of the talent tree; axes: how the camera turns
+   * shipClass: the player's ship's, for its share of the talent tree; axes: how the camera turns
    * the world, for the maps; port: what the port's menus do, and the port's name
    */
   constructor(
@@ -118,39 +121,60 @@ export class Hud {
     shipClass: ShipClass,
     axes: MapAxes,
     port: { readonly actions: PortActions; readonly name: string },
-    kept: { readonly hud: Slot; readonly log: Slot },
+    kept: { readonly hud: Slot; readonly log: Slot; readonly tracker: Slot },
   ) {
     this.keptItems = kept.hud;
-    this.log = new CombatLogPanel(kept.log);
+    this.chat = new ChatPanel(kept.log);
     this.screen = screen;
     this.items = hudItems(actions);
     this.shownIds = loadShown(this.items, kept.hud.get());
     // The windows hear Escape in the order they are made, each leaving alone one another has taken: so the one on
     // top (the last added below) is made first, and one press closes only it
-    this.chart = new SeaChart(axes, screen);
+    this.confirm = new ConfirmDialog(screen);
+    this.chart = new SeaChart(axes, screen, port.name);
     this.stats = new StatsPanel(screen);
+    this.mastery = new MasteryPanel(screen);
     this.hold = new HoldPanel(actions, screen);
     this.talents = new TalentPanel(actions, screen, shipClass.maxLevel);
-    this.loadout = new LoadoutPanel(actions, screen, shipClass);
+    // Ammo dragged out of the loadout drops on the skill bar under it
+    this.loadout = new LoadoutPanel(actions, screen, {
+      placeAt: (x, y) => this.skills.ammoPlaceAt(x, y),
+      showDrop: (weapon) => this.skills.showDrop(weapon),
+    });
     // Made before the keyboard is bound: its Escape (leave port) goes before the one at sea
-    this.port = new PortScreen(port.actions, screen, port.name);
+    this.port = new PortScreen(port.actions, screen, port.name, this.confirm);
     this.settings = new SettingsPanel(
       this.items,
       (id) => this.shownIds.has(id),
       (id) => this.toggle(id),
       screen,
     );
-    this.settingsButton = new ButtonRow([{ label: t('Settings'), key: null, onTap: () => this.settings.toggle() }]);
-    this.settingsButton.container.position.set(MARGIN, COLUMN_TOP);
-    this.frames = new UnitFrames(actions.toggleFire, () => this.toggleStats());
+    this.frames = new UnitFrames(
+      actions.toggleFire,
+      () => this.toggleStats(),
+      () => this.toggleHold(),
+    );
+    this.tracker = new QuestTracker(kept.tracker, {
+      ask: (question, onYes) => this.confirm.ask(question, onYes),
+      dropQuest: actions.dropQuest,
+    });
     this.talentButton = new TalentButton(() => this.talents.toggle());
-    this.minimap = new Minimap(axes, () => this.toggleMap());
+    this.minimap = new Minimap(axes, () => this.toggleMap(), {
+      hold: () => this.toggleHold(),
+      loadout: () => this.toggleLoadout(),
+      talents: () => this.toggleTalents(),
+      mastery: () => this.toggleMastery(),
+      settings: () => this.settings.toggle(),
+    });
     this.skills = new SkillBar({
       repair: actions.repair,
       useAbility: actions.useAbility,
       setWeapon: actions.setWeapon,
       loadAmmo: actions.loadAmmo,
-      toggleLoadout: () => this.toggleLoadout(),
+      // The bar is over the open loadout: a click on it must not close it
+      openLoadout: () => {
+        if (!this.loadout.isOpen) this.toggleLoadout();
+      },
     });
     this.container.addChild(
       this.zoneOutline,
@@ -158,19 +182,19 @@ export class Hud {
       this.frames.container,
       this.talentButton.container,
       this.skills.container,
-      this.log.container,
+      this.chat.container,
       this.minimap.container,
-      this.gold.container,
-      this.path.container,
-      this.fullscreen.container,
-      this.settingsButton.container,
+      this.tracker.container,
       this.settings.container,
       this.port.container,
       this.loadout.container,
       this.talents.container,
       this.hold.container,
+      this.mastery.container,
       this.stats.container,
       this.chart.container,
+      this.confirm.container,
+      this.loadout.dragLayer,
     );
     this.layout();
   }
@@ -190,19 +214,37 @@ export class Hud {
     this.hold.toggle();
   }
 
+  /** Opens or closes the captain's mastery, the account's tree */
+  toggleMastery() {
+    this.mastery.toggle();
+  }
+
   /** Opens or closes the loadout window */
   toggleLoadout() {
     this.loadout.toggle();
   }
 
-  /** Keeps what the HUD keeps between visits that changes as the game goes on: the combat log */
-  keep() {
-    this.log.keep();
+  /**
+   * The skill bar over the loadout's dim while the loadout is open, so ammo can be dragged onto it; back in its place
+   * under the windows when it closes
+   */
+  private raiseBar(raised: boolean) {
+    if (raised === this.barRaised) return;
+    this.barRaised = raised;
+    const bar = this.skills.container;
+    this.container.removeChild(bar);
+    const under = raised ? this.loadout.container : this.talentButton.container;
+    this.container.addChildAt(bar, this.container.getChildIndex(under) + 1);
   }
 
-  /** Opens or closes the combat log */
+  /** Keeps what the HUD keeps between visits that changes as the game goes on: the combat log */
+  keep() {
+    this.chat.keep();
+  }
+
+  /** Unfolds the chat on the combat log, or folds it when the log is already shown */
   toggleLog() {
-    this.log.toggle();
+    this.chat.toggleLog();
   }
 
   /** Opens or closes the sea chart */
@@ -216,30 +258,38 @@ export class Hud {
     this.talentButton.update(
       state.ship,
       talentX,
-      MARGIN + (UnitFrames.OWN_HEIGHT - TalentButton.HEIGHT) / 2,
+      MARGIN + (UnitFrames.SHIP_HEIGHT - TalentButton.HEIGHT) / 2,
       frameMs / 1000,
     );
-    // The target's frame keeps clear of the player's, of the column under it, and of the talent button when it's lit
+    // The target's plate keeps clear of the player's, of the column under it, of the talent button when it's lit,
+    // and of the tracker on the right
     const ownWidth = this.talentButton.container.visible
       ? talentX - MARGIN + this.talentButton.width
       : UnitFrames.WIDTH;
-    this.frames.layout(screen.width, MARGIN, MARGIN + Math.max(this.column.width, ownWidth) + FRAMES_GAP);
+    const left = MARGIN + Math.max(this.column.width, ownWidth) + FRAMES_GAP;
+    this.frames.layout(screen.width, MARGIN, left, screen.width - MARGIN - QuestTracker.WIDTH - FRAMES_GAP);
     this.frames.update(state, selection);
     this.skills.update(state, screen.width, screen.height);
-    // The open log stays under the column of items in the top left corner, and under the frames
-    const top = Math.max(this.columnBottom, MARGIN + FRAMES_HEIGHT + ROW_GAP);
-    this.log.update(state, screen.width, screen.height, this.skills.box, top);
-    this.minimap.update(state, selection, screen.width, screen.height, this.skills.box);
-    this.fullscreen.update(screen.width - MARGIN, MARGIN);
-    const corner = this.fullscreen.shown ? FullscreenButton.SIZE + CORNER_GAP : 0;
-    this.gold.update(state.player, state.ship, screen.width - MARGIN - corner);
-    this.path.update(state, screen.width - MARGIN - corner, this.gold.bottom);
+    // The unfolded chat stays under the column of items in the top left corner, and under the plates
+    const top = Math.max(this.columnBottom, MARGIN + UnitFrames.TARGET_HEIGHT + ROW_GAP);
+    this.chat.update(state, screen.width, screen.height, this.skills.box, top);
+    this.minimap.update(state, selection, screen.width, screen.height, this.skills.box, {
+      hold: this.hold.isOpen,
+      loadout: this.loadout.isOpen,
+      talents: this.talents.isOpen,
+      mastery: this.mastery.isOpen,
+      settings: this.settings.isOpen,
+    });
+    this.tracker.update(state, screen.width - MARGIN, MARGIN);
     this.port.update(state);
     this.loadout.update(state.ship, state.player);
-    this.talents.update(state.ship, state.player);
+    this.raiseBar(this.loadout.isOpen);
+    this.talents.update(state.ship, state.player, frameMs / 1000);
     this.stats.update(state, frameMs / 1000);
     this.hold.update(state.ship);
+    this.mastery.update();
     this.chart.update(state);
+    this.confirm.update();
     const frame = { state, view, frameMs };
     let column = 0;
     for (const [id, { widget }] of this.onScreen) {
@@ -267,9 +317,9 @@ export class Hud {
     this.layout();
   }
 
-  /** Stacks the shown items under the Settings button: texts as they are, controls after their labels */
+  /** Stacks the shown items under the player's plate: texts as they are, controls after their labels */
   private layout() {
-    let y = COLUMN_TOP + ButtonRow.HEIGHT + ROW_GAP;
+    let y = COLUMN_TOP;
     for (const item of this.items) {
       const shown = this.shownIds.has(item.id);
       const existing = this.onScreen.get(item.id);

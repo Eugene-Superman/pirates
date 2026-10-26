@@ -1,30 +1,28 @@
+import type { WeaponId } from '../../../game';
 import type { Painter3D } from '../../render/Painter3D';
 
-// A soft, wide band of colour under a thin line: it reads on the sea without hiding it
-const BAND = { width: 6, alpha: 0.08 }; // world units
-const LINE = { width: 1.1, alpha: 0.3 }; // world units
-const INNER_LINE = { width: 0.9, alpha: 0.22 }; // world units: the edge of the full volley
-// The water barely tinted: where every gun reaches (a full volley) a little more than where only the longer ones do
-const FILL = { full: 0.065, part: 0.03 };
-// World units: guns whose reaches differ by less than this make one ring
+// Fine, faint and dashed: barely there, they never hide the sea. World units
+const LOOK = { dash: 7, gap: 7, width: 0.55, alpha: 0.28 };
+// The weapon picked: the cannons' rings warm yellow, the harpoons' light blue (pale enough to read on the sea)
+const COLORS: Readonly<Record<WeaponId, number>> = { cannon: 0xffd447, harpoon: 0x7fd4ff };
+const SPIN = 6; // world units a second the dashes run round: the longest reach's one way, the shortest's the other
+// World units: reaches closer than this make one ring
 const SAME_REACH = 1;
 
 /**
- * How far a weapon's guns reach, on the water round the ship: within `full` every gun fires (the most damage), out to
- * `longest` only the guns that reach that far. A ring at each, the water inside them faintly tinted. Drawn with the sea
+ * How far the picked weapon's guns reach, on the water round the ship: a ring at the longest gun's reach and one at
+ * the shortest (within it every gun fires), whatever reaches lie between; one ring when they are the same. Drawn with
+ * the sea
  */
 export function drawRangeRings(
   p: Painter3D,
   at: { x: number; y: number },
-  full: number,
-  longest: number,
-  color: number,
+  reach: { readonly shortest: number; readonly longest: number; readonly weapon: WeaponId },
+  time: number,
 ) {
-  p.disc(at.x, at.y, 0, full, color, FILL.full);
-  if (longest - full >= SAME_REACH) {
-    p.ring(at.x, at.y, 0, (full + longest) / 2, longest - full, color, FILL.part);
-    p.ring(at.x, at.y, 0, full, INNER_LINE.width, color, INNER_LINE.alpha);
+  const look = { ...LOOK, color: COLORS[reach.weapon] };
+  p.dashedRing(at.x, at.y, 0, reach.longest, { ...look, phase: time * SPIN });
+  if (reach.longest - reach.shortest >= SAME_REACH) {
+    p.dashedRing(at.x, at.y, 0, reach.shortest, { ...look, phase: -time * SPIN });
   }
-  p.ring(at.x, at.y, 0, longest, BAND.width, color, BAND.alpha);
-  p.ring(at.x, at.y, 0, longest, LINE.width, color, LINE.alpha);
 }

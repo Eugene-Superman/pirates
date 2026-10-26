@@ -21,6 +21,7 @@ export const THEME = {
   darkText: 0x22160a,
   button: 0x2b2017,
   buttonHover: 0x3d2d1f,
+  well: 0x0c2233, // a well sunk into the wood, deep blue as the skill bar's painted ones
 } as const;
 
 const SERIF = 'Georgia, "Times New Roman", serif';
@@ -30,13 +31,15 @@ const BRACKET = { arm: 44, width: 9, rivet: 4.5 } as const; // pixels: the brass
 const SHADOW = { steps: 4, spread: 4, drop: 8, alpha: 0.1 } as const; // the panel's soft shadow under it
 const WINDOW_CLOSE = { width: 96, height: 28 } as const; // pixels: a window's Close button
 const WINDOW_DIM = 0.55; // how dark the game gets behind a window
+const METER_NOTCH = 6; // pixels: the closest a meter's notches come
+const MEDALLION_WELL = 0.74; // a medallion's blue well, in its radii: the rest is its brass ring
 // An icon's slot: its glow (how bright in its middle and halfway out, and how far below the slot's middle its brightest
 // point sits, a share of the slot), and the chip in its corner (pixels)
 const SLOT = { glow: { middle: 0.42, half: 0.16, drop: 0.04 }, chip: { width: 26, height: 15, size: 10 } } as const;
 const GLOWS = new Map<number, FillGradient>();
 
 /** A soft light from the middle of a shape out to its edge, in `color`: one gradient a colour, shared */
-function glowFill(color: number) {
+export function glowFill(color: number) {
   let fill = GLOWS.get(color);
   if (!fill) {
     const rgb = `${(color >> 16) & 255},${(color >> 8) & 255},${color & 255}`;
@@ -115,6 +118,18 @@ const PRESSED_FILL = vertical([
   [0.5, 0xd9a94c],
   [1, 0x9c6f26],
 ]);
+// The shade the wood's edge casts down into a well, fading out
+const WELL_SHADE = new FillGradient({
+  type: 'linear',
+  start: { x: 0, y: 0 },
+  end: { x: 0, y: 1 },
+  colorStops: [
+    { offset: 0, color: 'rgba(0,0,0,0.55)' },
+    { offset: 1, color: 'rgba(0,0,0,0)' },
+  ],
+  textureSpace: 'local',
+});
+const WELL_SHADE_HEIGHT = 10; // pixels
 
 /** Brass-edged buttons and tabs, lit gold when pressed (their labels then THEME.darkText) */
 export const BRASS: TileStyle = {
@@ -128,8 +143,11 @@ export const BRASS: TileStyle = {
   bevel: true,
 };
 
-/** A button in the theme: a brass-edged tile with its label in the middle. size: the label's, in pixels */
-export function brassButton(width: number, height: number, label: string, onTap: () => void, size = 12) {
+/**
+ * A button in the theme: a brass-edged tile with its label in the middle. size: the label's, in pixels; onTap null:
+ * one that does nothing yet, shown disabled
+ */
+export function brassButton(width: number, height: number, label: string, onTap: (() => void) | null, size = 12) {
   const tile = new Tile(width, height, onTap, 5, BRASS);
   const caption = new Text({
     text: label,
@@ -138,6 +156,7 @@ export function brassButton(width: number, height: number, label: string, onTap:
   caption.anchor.set(0.5);
   caption.position.set(width / 2, height / 2);
   tile.content.addChild(caption);
+  if (!onTap) tile.setLook({ disabled: true });
   return { tile, text: caption };
 }
 
@@ -218,24 +237,49 @@ function grain() {
   return grainTexture;
 }
 
-/** A brass bracket over a corner of the frame, its arms along the two edges, a rivet where they meet */
-function bracket(g: Graphics, x: number, y: number, sx: number, sy: number) {
-  const { arm, width, rivet } = BRACKET;
+/**
+ * A brass bracket over a corner of the frame, its arms along the two edges, a rivet where they meet; `k` times
+ * BRACKET's size
+ */
+function bracket(g: Graphics, x: number, y: number, sx: number, sy: number, k: number) {
+  const arm = BRACKET.arm * k;
+  const width = BRACKET.width * k;
+  const bevel = 4 * k;
   // The corner's L, drawn for the top left corner and mirrored by sx, sy
   const p = (dx: number, dy: number) => [x + dx * sx, y + dy * sy];
-  g.poly([...p(0, 0), ...p(arm, 0), ...p(arm - 4, width), ...p(width, width), ...p(width, arm - 4), ...p(0, arm)])
+  g.poly([
+    ...p(0, 0),
+    ...p(arm, 0),
+    ...p(arm - bevel, width),
+    ...p(width, width),
+    ...p(width, arm - bevel),
+    ...p(0, arm),
+  ])
     .fill(BRASS_FILL)
     .stroke({ width: 1, color: THEME.brassDark, alpha: 0.9 });
-  const [cx, cy] = p(width / 2 + 2, width / 2 + 2);
+  const [cx, cy] = p(width / 2 + 2 * k, width / 2 + 2 * k);
+  const rivet = BRACKET.rivet * k;
   g.circle(cx, cy, rivet).fill({ color: THEME.brassDark }).stroke({ width: 1, color: THEME.brassLight, alpha: 0.8 });
-  g.circle(cx - 1, cy - 1, rivet * 0.35).fill({ color: THEME.brassLight, alpha: 0.9 });
+  g.circle(cx - k, cy - k, rivet * 0.35).fill({ color: THEME.brassLight, alpha: 0.9 });
+}
+
+/**
+ * The gold hairline inside a panel `width` × `height` pixels, in `color`: a lit one over a HUD plate (the player's,
+ * when a talent waits; a hostile target's, red) goes where the plain one is
+ */
+export function drawHairline(g: Graphics, width: number, height: number, color: number = THEME.brass, alpha = 0.35) {
+  const inset = RIM + GAP + 6;
+  return g
+    .roundRect(inset, inset, width - inset * 2, height - inset * 2, 6)
+    .stroke({ width: alpha < 0.5 ? 1 : 1.5, color, alpha });
 }
 
 /**
  * A window's panel, `width` × `height` pixels: its shadow, the brass rim, the wood with its grain, a gold hairline
- * inside, brackets on its corners and a stud at the middle of its top edge. Put it first, under the window's content
+ * inside, brackets on its corners and a stud at the middle of its top edge. Put it first, under the window's content.
+ * brackets: their size, BRACKET's times this (a HUD plate's are smaller: a window's would meet on its short sides)
  */
-export function themedPanel(width: number, height: number) {
+export function themedPanel(width: number, height: number, brackets = 1) {
   const panel = new Container();
   const under = new Graphics();
   for (let k = SHADOW.steps; k > 0; k--) {
@@ -256,13 +300,11 @@ export function themedPanel(width: number, height: number) {
   // The grain over the wood (its square corners are under the brackets)
   const wood = new TilingSprite({ texture: grain(), width: width - inset * 2, height: height - inset * 2 });
   wood.position.set(inset, inset);
-  const over = new Graphics()
-    .roundRect(inset + 6, inset + 6, width - (inset + 6) * 2, height - (inset + 6) * 2, 6)
-    .stroke({ width: 1, color: THEME.brass, alpha: 0.35 });
-  bracket(over, 0, 0, 1, 1);
-  bracket(over, width, 0, -1, 1);
-  bracket(over, 0, height, 1, -1);
-  bracket(over, width, height, -1, -1);
+  const over = drawHairline(new Graphics(), width, height);
+  bracket(over, 0, 0, 1, 1, brackets);
+  bracket(over, width, 0, -1, 1, brackets);
+  bracket(over, 0, height, 1, -1, brackets);
+  bracket(over, width, height, -1, -1, brackets);
   diamond(over, width / 2, RIM / 2, 9);
   panel.addChild(under, wood, over);
   return panel;
@@ -274,6 +316,27 @@ export const THEMED_WINDOW: WindowLook = {
   close: (label, onTap) => brassButton(WINDOW_CLOSE.width, WINDOW_CLOSE.height, label, onTap, 13),
   dim: WINDOW_DIM,
 };
+
+/**
+ * A round brass button of `radius` pixels round (0, 0), deep blue inside like the painted slots on the minimap's
+ * frame: what it does is drawn over it, in THEME.brassLight
+ */
+export function drawMedallion(g: Graphics, radius: number) {
+  g.circle(0, 1.5, radius + 1).fill({ color: 0x000000, alpha: 0.45 });
+  g.circle(0, 0, radius).fill(BRASS_FILL).stroke({ width: 1, color: THEME.brassDark });
+  const well = radius * MEDALLION_WELL;
+  g.circle(0, 0, well).fill({ color: THEME.well }).stroke({ width: 1.5, color: THEME.brassDark });
+  // The light on the well's upper left edge
+  g.arc(0, 0, well - 1.5, Math.PI * 1.05, Math.PI * 1.55).stroke({ width: 1, color: 0xffffff, alpha: 0.18 });
+  return g;
+}
+
+/** A chevron round (0, 0), `size` pixels wide, pointing down (a section unfolded) or right (folded) */
+export function drawChevron(g: Graphics, size: number, open: boolean, color: number = THEME.brassLight) {
+  const h = size / 2;
+  const points = open ? [-h, -h / 2, 0, h / 2, h, -h / 2] : [-h / 2, -h, h / 2, 0, -h / 2, h];
+  return g.poly(points, false).stroke({ width: 2, color, cap: 'round', join: 'round' });
+}
 
 /** A small brass diamond round (x, y), `size` pixels across: a stud on the frame, the middle of a divider */
 function diamond(g: Graphics, x: number, y: number, size: number) {
@@ -317,6 +380,40 @@ export function drawCard(g: Graphics, width: number, height: number, accent?: nu
     .lineTo(width - 6, 1.5)
     .stroke({ width: 1, color: 0xffffff, alpha: 0.05 });
   if (accent !== undefined) g.roundRect(0, 3, 3, height - 6, 1.5).fill({ color: accent });
+  return g;
+}
+
+/**
+ * A well sunk into the wood, `width` × `height` pixels at (x, y), as the skill bar's painted ones: deep blue in a
+ * brass edge, a dark line round it and the wood's shade down its top. What it holds (lines of text) reads light on it
+ */
+export function drawWell(g: Graphics, x: number, y: number, width: number, height: number) {
+  g.roundRect(x - 1.5, y - 1.5, width + 3, height + 3, 7.5).stroke({ width: 1, color: 0x000000, alpha: 0.55 });
+  g.roundRect(x, y, width, height, 6)
+    .fill({ color: THEME.well, alpha: 0.97 })
+    .stroke({ width: 1.5, color: THEME.brass, alpha: 0.85 });
+  g.rect(x + 4, y + 1.5, width - 8, Math.min(WELL_SHADE_HEIGHT, height / 2)).fill(WELL_SHADE);
+  return g;
+}
+
+/**
+ * A meter, `width` × `height` pixels: a dark well under a brass edge, `share` of it (0…1) filled in `color` with a
+ * light along the fill's top; notched between `places` (the hold's places), every few of them where a place is
+ * narrower than METER_NOTCH
+ */
+export function drawMeter(g: Graphics, width: number, height: number, share: number, color: number, places = 0) {
+  g.roundRect(0, 0, width, height, 4).fill({ color: 0x0a0705 }).stroke({ width: 1, color: THEME.brass, alpha: 0.7 });
+  const filled = (width - 4) * Math.min(1, Math.max(0, share));
+  if (filled > 0) {
+    g.roundRect(2, 2, filled, height - 4, Math.min(3, (height - 4) / 2)).fill({ color });
+    g.rect(3, 3, Math.max(0, filled - 2), (height - 6) / 2).fill({ color: 0xffffff, alpha: 0.2 });
+  }
+  if (places <= 1) return g;
+  const place = (width - 4) / places;
+  const every = Math.ceil(METER_NOTCH / place);
+  for (let i = every; i < places; i += every) {
+    g.rect(2 + i * place - 0.5, 2, 1, height - 4).fill({ color: 0x000000, alpha: 0.5 });
+  }
   return g;
 }
 

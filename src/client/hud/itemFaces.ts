@@ -4,6 +4,7 @@ import {
   AMMO_PACK,
   CURRENCIES,
   GUNS,
+  MAX_AMMO_DEAL,
   OUTFITS,
   OUTFIT_STATS,
   SHIP_LINES,
@@ -11,11 +12,14 @@ import {
   SHIP_SOURCES,
   WEAPON_IDS,
   ammoPackPrice,
+  ammoPrice,
+  ammoSalePrice,
   averageDamage,
   captainsPath,
   classFigures,
   goalOffer,
   gunPrice,
+  gunSalePrice,
   laidUpLevel,
   lineShip,
   outfitPrice,
@@ -34,6 +38,7 @@ import {
   type ShipStats,
   type WeaponId,
 } from '../../game';
+import type { Question } from './ConfirmDialog';
 import { AMMO_LORE, GUN_LORE } from './arsenalLore';
 import { AMMO_ICONS, GUN_ICONS, OUTFIT_ICONS, SHIP_ICONS } from './iconAtlas';
 import { OUTFIT_LORE } from './outfitLore';
@@ -49,7 +54,11 @@ export type ShopItem =
 /** What buying and fitting do: game methods for the player of this client, each saying whether it worked */
 export interface ShopActions {
   buyGun: (gun: GunId) => boolean;
-  buyAmmo: (ammo: AmmoId) => boolean;
+  /** Buys shots of an ammo: a pack's, or `count` */
+  buyAmmo: (ammo: AmmoId, count?: number) => boolean;
+  /** Sells a gun from the hold, or a pack of an ammo, back to the arsenal */
+  sellGun: (gun: GunId) => boolean;
+  sellAmmo: (ammo: AmmoId, count?: number) => boolean;
   buyOutfit: (id: OutfitId) => boolean;
   /** Fits a piece of outfit from the hold into its slot, or takes the slot's piece off (null) */
   fitOutfit: (slot: OutfitSlot, id: OutfitId | null) => boolean;
@@ -101,6 +110,29 @@ export interface ItemFace {
   button(state: GameState): { readonly short: string; readonly long: string; readonly enabled: boolean };
   /** Presses it: what happened, or null if nothing did */
   press(state: GameState): { readonly message: string; readonly tone: Tone } | null;
+  /** Selling it back, for what the arsenal buys back (guns, ammo): a second button, as `button` and `press` */
+  readonly sell?: ItemButton;
+  /** What the arsenal pays for it, on its card under the price */
+  readonly resale?: string;
+  /** How many its buttons buy and sell, for what is dealt in by count (ammo): the info window picks it */
+  readonly amount?: Amount;
+}
+
+/** A count picked for an item's buttons */
+export interface Amount {
+  get(): number;
+  /** Kept within what can be dealt in at once */
+  set(count: number): void;
+  /** The most the player can buy now: as many as their gold pays for, at least one */
+  most(state: GameState): number;
+}
+
+/** A button of an item's: what it says on a card and in the info window, whether it can be pressed, and pressing it */
+export interface ItemButton {
+  button(state: GameState): { readonly short: string; readonly long: string; readonly enabled: boolean };
+  press(state: GameState): { readonly message: string; readonly tone: Tone } | null;
+  /** What to ask before pressing it does anything that can't be undone; null when it would only say why it can't */
+  confirm?(state: GameState): Question | null;
 }
 
 const WEAPON_NAMES: Readonly<Record<WeaponId, string>> = { cannon: 'Cannons', harpoon: 'Harpoon guns' };
@@ -182,6 +214,7 @@ function volley(ship: Ship, weapon: WeaponId, bonus: number) {
 function gunFace(gun: GunId, actions: ShopActions): ItemFace {
   const g = GUNS[gun];
   const price = gunPrice(gun);
+  const sale = gunSalePrice(gun);
   const name = t(g.name);
   const average = averageDamage(g, 0);
   const crits = g.critFrom < g.die ? `${g.critFrom}–${g.die}` : `${g.die}`;
@@ -221,6 +254,27 @@ function gunFace(gun: GunId, actions: ShopActions): ItemFace {
       actions.buyGun(gun)
         ? { message: t('{name} is in the hold: fit it in the loadout (L)', { name }), tone: 'good' }
         : NOT_ENOUGH(),
+    // Only a gun in the hold: one fitted is taken off in the loadout first, so a player never sells their guns by a slip
+    resale: t('Sells for {n} gold', { n: sale }),
+    sell: {
+      button: ({ player }) => ({
+        short: t('Sell'),
+        long: t('Sell: {n} gold', { n: sale }),
+        enabled: (player.hold[gun] ?? 0) > 0,
+      }),
+      confirm: ({ player }) =>
+        (player.hold[gun] ?? 0) > 0
+          ? {
+              title: t('Sell {name}?', { name }),
+              text: t('The arsenal pays {n} gold for it, a quarter of its price.', { n: sale }),
+              yes: t('Sell: {n} gold', { n: sale }),
+            }
+          : null,
+      press: () =>
+        actions.sellGun(gun)
+          ? { message: t('{name} sold: +{n} gold', { name, n: sale }), tone: 'good' }
+          : { message: t('Only guns in the hold are sold: take it off in the loadout (L)'), tone: 'bad' },
+    },
   };
 }
 
@@ -230,6 +284,8 @@ function ammoFace(ammo: AmmoId, actions: ShopActions): ItemFace {
   const name = t(AMMO[ammo].name);
   const kind = t(weapon === 'cannon' ? 'Tier {tier} cannon ammo' : 'Tier {tier} harpoon ammo', { tier });
   const loaded = (ship: Ship) => ship.loaded[weapon] === ammo;
+  // How many shots the buttons buy and sell: a pack on a card, any count picked in the info window
+  let count = AMMO_PACK;
   return {
     name,
     tier,
@@ -265,17 +321,53 @@ function ammoFace(ammo: AmmoId, actions: ShopActions): ItemFace {
       return loaded(ship) ? t('{n} aboard · loaded', { n }) : t('{n} aboard', { n });
     },
     inUse: ({ ship }) => loaded(ship),
+    amount: {
+      get: () => count,
+      set: (n) => (count = Math.min(Math.max(Math.round(n), 1), MAX_AMMO_DEAL)),
+      // As many as the gold pays for, a part of a coin rounded up on each
+      most: ({ player }) => Math.min(Math.max(Math.floor((player.gold * AMMO_PACK) / price), 1), MAX_AMMO_DEAL),
+    },
     button: ({ player }) => ({
       short: t('Buy'),
-      long: t('Buy {pack}: {n} gold', { pack: AMMO_PACK, n: price }),
-      enabled: player.gold >= price,
+      long: t('Buy {pack}: {n} gold', { pack: count, n: ammoPrice(ammo, count) }),
+      enabled: player.gold >= ammoPrice(ammo, count),
     }),
     press: ({ ship }) => {
-      if (!actions.buyAmmo(ammo)) return NOT_ENOUGH();
+      if (!actions.buyAmmo(ammo, count)) return NOT_ENOUGH();
       const message = loaded(ship)
-        ? `+${AMMO_PACK} ${name}`
-        : t('+{n} {name}: load it in the loadout (L)', { n: AMMO_PACK, name });
+        ? `+${count} ${name}`
+        : t('+{n} {name}: load it in the loadout (L)', { n: count, name });
       return { message, tone: 'good' };
+    },
+    resale: t('Sells {pack} for {n} gold', { pack: AMMO_PACK, n: ammoSalePrice(ammo) }),
+    sell: {
+      button: ({ ship }) => ({
+        short: t('Sell'),
+        // How many is on the row above, and in the question
+        long: t('Sell: {n} gold', { n: ammoSalePrice(ammo, count) }),
+        enabled: ship.ammo[ammo] >= count && ammoSalePrice(ammo, count) >= 1,
+      }),
+      confirm: ({ ship }) =>
+        ship.ammo[ammo] >= count && ammoSalePrice(ammo, count) >= 1
+          ? {
+              title: t('Sell {name}?', { name: `${name} ×${count}` }),
+              text: t('The arsenal pays {n} gold for {pack} shots, a quarter of their price. {left} left aboard.', {
+                n: ammoSalePrice(ammo, count),
+                pack: count,
+                left: ship.ammo[ammo] - count,
+              }),
+              yes: t('Sell {pack}: {n} gold', { pack: count, n: ammoSalePrice(ammo, count) }),
+            }
+          : null,
+      press: ({ ship }) => {
+        const sale = ammoSalePrice(ammo, count);
+        if (actions.sellAmmo(ammo, count)) {
+          return { message: t('{name} sold: +{n} gold', { name: `${name} ×${count}`, n: sale }), tone: 'good' };
+        }
+        const why =
+          ship.ammo[ammo] < count ? t('Fewer than {n} aboard', { n: count }) : t('Too few to fetch a gold coin');
+        return { message: why, tone: 'bad' };
+      },
     },
   };
 }

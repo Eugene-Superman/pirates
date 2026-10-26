@@ -19,9 +19,11 @@ import { GOLD_REASONS, STAT_COUNTS, copyStats, type Stats } from './records/stat
  * 20: older picks are forgotten, the XP kept), the cargo in the hold, the Captain's path. 5: the fleet: the ships laid
  * up in port, and the one sailed of any class a player can own. 6: the stats, the player's and every ship's (an older
 save starts them at 0, but for the quests turned in, which the Captain's path counted). 7: the Corsair renamed the
-Coastal Bark (`coastalBark`), the first of the European line
+Coastal Bark (`coastalBark`), the first of the European line. 8: gold earned at the arsenal in the stats (an older
+save starts it at 0). 9: each ship's ammo at hand on the skill bar, two kinds a weapon (an older save's ship takes the
+one loaded and the next it carries)
  */
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 9;
 /** The first version whose talents fit the tree of now */
 const RANKED_TALENTS = 4;
 /** Classes renamed since a version: an older save's ship of the old name sails as the new one */
@@ -42,6 +44,8 @@ export interface SavedShip {
   readonly guns: Readonly<Record<WeaponId, readonly (GunId | null)[]>>;
   readonly ammo: Partial<Record<AmmoId, number>>;
   readonly loaded: Readonly<Record<WeaponId, AmmoId>>;
+  /** The ammo at hand on the skill bar, two places a weapon */
+  readonly ammoBar: Readonly<Record<WeaponId, readonly (AmmoId | null)[]>>;
   readonly weapon: WeaponId;
   readonly outfit: Readonly<Record<OutfitSlot, OutfitId | null>>;
   readonly xp: number;
@@ -83,6 +87,7 @@ export function saveShip(ship: Ship): SavedShip {
     guns: { cannon: [...ship.guns.cannon], harpoon: [...ship.guns.harpoon] },
     ammo: { ...ship.ammo },
     loaded: { ...ship.loaded },
+    ammoBar: { cannon: [...ship.ammoBar.cannon], harpoon: [...ship.ammoBar.harpoon] },
     weapon: ship.weapon,
     outfit: { ...ship.outfit },
     xp: ship.xp,
@@ -309,6 +314,19 @@ export function loadShip(ship: Ship, data: unknown, version: number) {
   for (const weapon of WEAPON_IDS) {
     const id = loaded?.[weapon];
     if (isAmmo(id) && AMMO[id].weapon === weapon) ship.loadAmmo(id);
+  }
+  // The bar as kept; an older save's (or a place not valid) as a new ship's with this ammo: the loaded one and the next
+  ship.fillAmmoBar();
+  const bar = record(saved.ammoBar);
+  for (const weapon of WEAPON_IDS) {
+    const places: unknown = bar?.[weapon];
+    if (!Array.isArray(places) || places.length !== 2) continue;
+    // Only the weapon's ammo aboard, each kind once. Put straight in, not by setAmmoSlot: that would load another in
+    // place of a loaded one off the bar, and a ship holding fire for want of it must come back holding fire
+    const [first, second] = places.map((id: unknown) =>
+      isAmmo(id) && AMMO[id].weapon === weapon && ship.ammo[id] > 0 ? id : null,
+    );
+    ship.ammoBar[weapon] = [first ?? null, second !== first ? (second ?? null) : null];
   }
   // Straight in, not setWeapon: a loaded game starts with its guns loaded
   if (saved.weapon === 'cannon' || saved.weapon === 'harpoon') ship.weapon = saved.weapon;

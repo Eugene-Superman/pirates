@@ -57,14 +57,15 @@ src/
                        up from the seeded generator); port.ts (the port: its island, a bay with curved harbour walls
                        and the basin inside them; docking)
     ships/Ship.ts      anything that sails under a pilot (the player's ship, bots' ships, sea monsters): target and
-                       route, steering, hull points, guns in slots, ammo, fire lock, combat time, repairs
+                       route, steering, hull points, guns in slots, ammo and the two of each weapon at hand
+                       (ammoBar), fire lock, combat time, repairs
     ships/shipClasses.ts  ship catalog: the classes built, with size, handling, gun slots (or a monster's jaws);
                        the bots' hulls too; STARTER_SHIP (the starter sloop)
     ships/shipLines.ts the lines players sail (the starter, five of six tiers each, the Forbidden Fleets four ships a
                        tier, and the masterworks bought with doubloons) and their ships, built (a class) or planned (a
                        name, a role, provisional figures and how it is got: SHIP_SOURCES), for the shipyard: lineShip
     ships/damage.ts    hull health scale (0–100 %) and the damage stages derived from it
-    ships/repair.ts    the repair skill: 2 % of the hull a second out of combat, paid in gold (1 for 20 hull)
+    ships/repair.ts    the repair skill: 2 % of the hull a second out of combat, paid in gold (1 for 10 hull)
     ships/outfit.ts    the ship's outfit: sails, hull planking or plating, a rudder, a lookout's gear, a piece to a
                        slot, in three tiers, each with sidegrades; what they add to the class's speed, turning, hull
                        and sight (grownStats)
@@ -85,14 +86,18 @@ src/
                        progress), loot.ts (bounties for kills, chests and goods dropped and hauled aboard, a player's
                        cargo lost where their ship sank), cargo.ts (goods, the hold), quests.ts (the tavern's bounty
                        quests), shop.ts (guns, ammo, outfit and repairs bought in port, the outfit fitted there, goods
-                       sold at the market; the prices), shipyard.ts (the ships for sale and their terms: the Captain's
-                       path; tierMastered, a masterwork's term), fleet.ts (a player's ships: buying one, taking the helm
-                       of one laid up in port), currencies.ts (gold, and the currencies to come that the shipyard
-                       already prices ships in)
+                       sold at the market, guns and ammo sold back to the arsenal for a quarter, ammo dealt in by any
+                       count up to MAX_AMMO_DEAL; the prices),
+                       shipyard.ts (the ships for sale and their terms: the Captain's path; tierMastered, a masterwork's
+                       term), fleet.ts (a player's ships: buying one, taking the helm of one laid up in port),
+                       currencies.ts (gold, and the currencies to come that the shipyard already prices ships in)
     navigation/        NavGrid.ts (open water as a grid with clearance from land; routes round islands, A*),
                        pilot.ts (steers each ship along its route, slows for turns, swerves round other ships)
     physics/           hull.ts (hulls as capsules, the Body interface), collisions.ts (ships pushed out of coasts
                        and each other, sliding instead of stopping)
+    account/           mastery.ts (the captain's mastery: the account's own tree of passives, for every ship the player
+                       sails, six branches round the captain out to their keystones; planned: its figures provisional,
+                       nothing taken or done yet, the levels and points come with the online game)
     records/           stats.ts (what a player and each of their ships have done: kills by class, quests, gold
                        earned and spent, chests, the fight, the voyage; for the medals to come), tally.ts (stepStats:
                        counting them from the events)
@@ -100,7 +105,8 @@ src/
   client/              BROWSER: Pixi, DOM, input. Reads GameState, never mutates it except through game methods
     GameClient.ts      wires Game + SceneView + Hud + Sounds + input, runs the frame loop, saves every few seconds
     storage/           Store.ts: the browser's memory until there is a server (IndexedDB, else localStorage): the
-                       progress, the view's settings, the HUD's items, the sound, the combat log, the language
+                       progress, the view's settings, the HUD's items, the quest tracker's folds, the sound, the combat
+                       log, the language
     i18n/              i18n.ts: t(), the player's texts in the language picked in the settings (English, the
                        default, Ukrainian or Russian; a change reloads the page); uk.ts, ru.ts: the dictionaries,
                        keyed by the English text
@@ -109,44 +115,67 @@ src/
     input/             pointerInput.ts: mouse/touch → ship.setTarget; a click picks a unit out (selection.ts,
                        client state), a double click attacks it; keyboardInput.ts (by key code, any layout): Space
                        attacks the unit picked out, Escape stops firing or lets go of it, Q and E pick the cannons
-                       or the harpoons, R repairs, F uses the ship's ability, L the loadout, K the talents, J the
-                       combat log, M the sea chart, I the statistics, H the hold; a click on the port sails into it; cursor.ts (the game's own mouse pointer: an orange arrow, with a ring over
+                       or the harpoons, Z and X load the first or the second ammo at hand, R repairs, F uses the ship's ability, L the loadout, K the talents, J the
+                       combat log, M the sea chart, I the statistics, H the hold, P the captain's mastery; a click on the port sails into it; cursor.ts (the game's own mouse pointer: an orange arrow, with a ring over
                        a neutral unit, a red sight over a hostile one, an orange hand over buttons); hover.ts (the unit
                        under the mouse: the cursor shows it, a click takes it)
-    hud/               Hud.ts (screen-space overlay: the items picked in the settings, a Settings button, and these:)
-                       UnitFrames.ts (the hull, level and experience of the player's ship in the top left corner,
-                       a click on it opens the statistics, and the hull of the unit picked out at the top), FullscreenButton.ts (top right: the game on
-                       the whole screen and back),
-                       SkillBar.ts (at the bottom: the repair skill, the ability, each weapon with its ammo, the
-                       loadout button), TalentPanel.ts (the talent tree, K: pick, and forget them in port),
-                       StatsPanel.ts (the statistics, I: all the player's ships together and each one),
-                       HoldPanel.ts (the hold, H or a click on it: the goods aboard, thrown overboard to make room),
+    hud/               Hud.ts (screen-space overlay: the items picked in the settings, and these:)
+                       UnitFrames.ts (plates in the theme: the player's ship in the top left corner, its hull, level
+                       and experience, and the purse, gold and doubloons (none yet), and the hold, a click on which
+                       opens it, a click on the rest the statistics; and the unit picked out at the top, its hull),
+                       QuestTracker.ts (top right, in the theme: the quests taken, how far each has got, ✕ gives one
+                       up once the player says yes, and the Captain's path to the next ship; each part folds by its
+                       header, the browser keeps the folds), fullscreen.ts (the game on the whole screen and back),
+                       SkillBar.ts (at the bottom, in a painted frame: ten quick slots, 1…0, waiting for what the
+                       hold will carry; the skills, painted: the repair and the ability, locked till its talent is
+                       picked, and two locks on those to come; each weapon's plate with its two ammo at hand, Z and X,
+                       their counts in K and M; ammo dragged out of the loadout drops on them; a tooltip over a skill
+                       or an ammo: all about it), Tooltip.ts (a small panel telling what is under the pointer), TalentPanel.ts (the talent tree, K:
+                       the signature talents and the three branches on boards, each with its emblem; ranks as
+                       diamonds, a glow on what can be taken now, the rows' gates lit as they open; pick, and forget
+                       them in port),
+                       StatsPanel.ts (the statistics, I: all the player's ships together and each one, a tab each with
+                       its picture, the sections on boards),
+                       HoldPanel.ts (the hold, H or a click on it, in the theme like the loadout: how full it is, the goods aboard, thrown overboard to make room),
+                       goodIcons.ts (the goods' colours and pictures, drawn until they are painted, and a good's row
+                       with its buttons: the hold's and the market's),
+                       MasteryPanel.ts (the captain's mastery, P: the account's tree of passives round the captain,
+                       dragged and brought nearer with the wheel, what a passive gives under the pointer; a look
+                       ahead for now),
                        TalentButton.ts (lit beside the player's frame while a talent waits to be picked),
-                       LoadoutPanel.ts (the loadout window: guns from the hold into the slots, which ammo is loaded),
+                       LoadoutPanel.ts (the loadout window, L: the ship's gun slots and ammo at hand, the guns and
+                       ammo in the hold, as icons; a click or a drag fits a gun or puts ammo at hand, here or on the
+                       skill bar),
                        PortScreen.ts (in port: the harbour's picture with a medallion per building, HarbourView.ts,
-                       and the window each opens: the tavern's quests, the market, the workshop's outfit (a tab a
+                       and the window each opens: the tavern's quests (a card each, a dial round how far it has
+                       got), the market (laid out like the hold), the workshop's outfit (a tab a
                        slot) and repairs, the shipyard (the player's ships, a tab a line: its ships, built or planned,
-                       and Buy: the masterworks), the arsenal's guns and ammo; the shop's items as cards with their
+                       and Buy: the masterworks), the arsenal's guns and ammo (bought and sold back); the shop's items as cards with their
                        icons, scrolled when they don't fit; the guild hall and the auction house closed for now; Set
                        sail), itemFaces.ts (what a card and the info window say of a gun, an ammo, a piece of outfit
                        or a ship, and what their button does),
                        ItemInfo.ts (an item up close, from its card's info button: its picture, every figure, its
-                       legend, Buy, Fit or Take the helm), iconAtlas.ts (the guns', the ammo's, the outfit's and the
-                       ships' icons, each atlas loaded once), arsenalLore.ts, outfitLore.ts and shipLore.ts (each one's legend; a
+                       legend, Buy, Fit or Take the helm, Sell; for ammo, how many), ConfirmDialog.ts (a question before what can't be
+                       undone: selling an item back, giving a quest up; one for the whole HUD, over every window), iconAtlas.ts (the guns', the ammo's, the outfit's and the
+                       ships' icons, the minimap's buttons and the skill bar's skills, each atlas loaded once), arsenalLore.ts, outfitLore.ts and shipLore.ts (each one's legend; a
                        line's look),
-                       GoldPanel.ts (top right: the player's gold, hold and quests), PathPanel.ts (under it: the
-                       Captain's path to the next ship),
-                       combatLog.ts + CombatLogPanel.ts (the combat log in the bottom left corner: every blow dealt
-                       and taken with all its dice, kills, repairs, totals; J opens it),
-                       Minimap.ts (bottom right: the sea round the ship, turned like the screen, islands and the units
-                       in sight), SeaChart.ts (the whole world in 8 × 8 squares A1…H8 with the islands and the
-                       ship; the minimap or M opens it), chart.ts (what the two maps share: projection, colors),
+                       ChatPanel.ts (the chat in the bottom left corner, in the theme: a tab for the combat log,
+                       combatLog.ts, every blow dealt and taken with all its dice, kills, repairs, totals, J unfolds it;
+                       and the chat's channels, general, zone, group, guild, private, empty till the online game),
+                       Minimap.ts (bottom right, in a painted frame of wood and brass: the sea round the ship, turned
+                       like the screen, islands and the units in sight; the four slots on top of the frame are
+                       buttons: the hold, the loadout, the talents, the captain's mastery, lit while open; two smaller
+                       brass medallions in its top corners, the settings and the full screen), SeaChart.ts (the whole world in 8 × 8 squares A1…H8 with the islands drawn as
+                       in the game and the ship, in the diamond opening of a painted frame and nothing else; the boss's
+                       lair a medallion, its name and the port's under the pointer, the square under it named; the
+                       minimap or M opens it, the button in the frame's corner closes it), chart.ts (what the two maps share: projection, colors),
                        hudItems.ts (every metric and control the settings can show, grouped), SettingsPanel.ts (dev
                        settings: all controls, and checkboxes for what is also on the screen), ui.ts (the HUD's
                        colors, clickable tiles and buttons, icons, HudWindow: a window over the game, in a look of
                        its choice), theme.ts (the windows' look: dark wood under a brass frame, gold serif titles,
-                       rows on darker boards, brass buttons, icon slots, THEMED_WINDOW: HudWindow's look in it; the
-                       port's windows wear it, the other windows are to follow),
+                       rows on darker boards, brass buttons, icon slots, meters, wells (deep blue, for lines of text),
+                       round brass medallions, THEMED_WINDOW: HudWindow's look in it; the port's windows, every
+                       HudWindow, the chat and the top of the HUD (the plates, the tracker) wear it),
                        FpsMeter.ts, ButtonRow.ts (a row of HUD buttons),
                        Checkbox.ts, DamagePanel.ts (debug buttons that set hull health)
     render/            3D engine with no game knowledge
@@ -169,16 +198,19 @@ src/
                        atlases (dropped, bobbing, blinking before it sinks); PortSprites.ts — the port from its
                        pictures: the ground under the ships, the rest in slices sorted with them
       effects/         client-only decorations with their own state: Wake.ts (wakes of everything that sails, one
-                       shader), foam.ts (what the wakes and the wreck's water share), targetMarker.ts,
+                       shader), foam.ts (what the wakes, the wreck's water and the sea's whitecaps share),
+                       targetMarker.ts (where the ship is heading, once the mouse lets go: a green light coming
+                       up out of the water with a splash, then hanging there with ripples and sparks round it),
                        ShipFire.ts (fire and smoke of a damaged ship), Sinking.ts
                        (the sinking animation, and the water round the wreck: churn, ring waves, bubbles),
                        ShotEffects.ts (muzzle flashes, smoke, splashes, splinters, bites), DamageNumbers.ts (damage
                        and repairs floating up), Wrecks.ts (sunk bots going down), RepairEffect.ts (a ship under
                        repair), LevelUpEffect.ts (a level reached), BarrageMarks.ts (a boss's shells coming down),
                        Trails.ts (where each serpent swam, for its body), targetLock.ts (the rings round the target
-                       fired at and the unit picked out), rangeRings.ts (how far each weapon reaches: where all its guns do, where only
-                       the longest), wind.ts,
+                       fired at and the unit picked out), rangeRings.ts (how far the weapon picked reaches: its guns'
+                       longest and shortest reach, dashed rings running round in its colour), wind.ts,
                        fogOfWar.ts (haze and mist beyond the ship's view range, one shader), FogClouds.ts (its puffs),
+                       SkyClouds.ts (now and then a light cloud drifting over everything, and its shadow),
                        seaSurface.ts (the sea's surface, one shader), seaLook.ts (how it looks: one set of numbers)
 public/sprites/ships/  ship atlases: <line>/<id>/[<look>/]<damage stage>.{webp,json}, rendered in Blender from a
                        source outside this repo — don't edit by hand
@@ -193,8 +225,17 @@ public/sprites/icons/  the guns', the ammo's, the outfit's and the ships' icons 
                        ships.webp; their .json: each one's tile), cut out of painted pictures by
                        blender-assets/icons/build_gun_icons.py, build_ammo_icons.py, build_outfit_icons.py and
                        build_ship_icons.py — don't edit by hand
-public/sprites/sea/    sea wave maps (swell, ripples) and its broad patches (depth, clouds), made by
-                       blender-assets/effects/sea/build_sea.py
+public/sprites/hud/    the minimap's frame (minimap_frame.webp), made from a painted picture by
+                       blender-assets/hud/build_minimap_frame.py, which prints its opening and slots for Minimap.ts's
+                       FRAME; the buttons in the slots (minimap_buttons.webp/json), cut out of painted medallions by
+                       build_minimap_buttons.py; the skill bar's frame (skill_bar.webp), made from a painted picture
+                       by build_skill_bar.py, which prints its wells for SkillBar.ts's FRAME, and its skills
+                       (skill_icons.webp/json), the inside of painted buttons cut by build_skill_icons.py; the sea
+                       chart's frame (chart_frame.webp), from a painted picture by build_chart_frame.py, which prints
+                       its diamond opening and close button's slot for SeaChart.ts's FRAME — don't edit by hand
+public/sprites/sea/    sea wave maps (swell, ripples, chop), the caustics and its broad patches (depth, clouds,
+                       gusts), made by blender-assets/effects/sea/build_sea.py (its wind map the game leaves out)
+public/sprites/sky/    the sky's clouds (clouds.webp/json), made by blender-assets/effects/sky/build_clouds.py
 public/sprites/foam/   foam for the wakes and the water round a wreck, made by blender-assets/effects/foam/build_foam.py
 public/sounds/         the game's sounds (Sounds.ts lists them) made from CC0 recordings by
                        blender-assets/sounds/build_sounds.py; their sources are in CREDITS.md there and here
@@ -233,6 +274,7 @@ lives outside this repo, in a `blender-assets` folder next to it (`ships/<line>/
 - Everything is in **English**: code comments, HUD texts, and Claude context files
   (`CLAUDE.md`, `.claude/rules/`, skills) — whatever language the request is in. Players may read the HUD in
   Ukrainian or Russian too: the translations live only in `client/i18n/uk.ts` and `ru.ts`.
+- `AGENTS.md` is a copy of this file for other coding agents: change `CLAUDE.md`, then copy it over.
 - A comment explains "why", not what the code does.
 - `verbatimModuleSyntax`: type-only imports must use `import type` / inline `type X` inside `{}`.
 - `noUnusedLocals` / `noUnusedParameters` are on — unused code will not compile.

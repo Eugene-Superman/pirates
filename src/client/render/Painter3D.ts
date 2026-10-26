@@ -6,6 +6,8 @@ export const LIGHT = normalize([-0.6, 0.1, 0.8])!;
 const UP: Vec3 = [0, 0, 1];
 const AMBIENT = 0.62; // brightness in shadow
 const DIFFUSE = 0.45; // how much direct sunlight adds
+const ARC_STEP = 3; // world units: a curved dash is drawn as straight pieces this long
+const MIN_DASHES = 6; // a dashed ring this small still reads as a ring
 
 // Draws 3D primitives into Graphics: projection and lighting
 export class Painter3D {
@@ -112,6 +114,34 @@ export class Painter3D {
   ring(x: number, y: number, z: number, radius: number, width: number, color: number, alpha = 1) {
     const e = this.ellipseAt(x, y, z, radius);
     this.g.ellipse(e.x, e.y, e.rx, e.ry).stroke({ width: width * this.camera.zoom, color, alpha });
+  }
+
+  /**
+   * Dashed horizontal circle: dashes `dash` world units long with `gap` between, as many as go round it evenly,
+   * moved on by `phase` world units along it (a phase that changes with time runs them round), in one stroke
+   */
+  dashedRing(
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    look: { dash: number; gap: number; phase: number; width: number; color: number; alpha: number },
+  ) {
+    const { g, camera } = this;
+    const count = Math.max(MIN_DASHES, Math.round((2 * Math.PI * radius) / (look.dash + look.gap)));
+    const step = (2 * Math.PI) / count;
+    const sweep = (step * look.dash) / (look.dash + look.gap);
+    const pieces = Math.max(1, Math.ceil((sweep * radius) / ARC_STEP));
+    const start = look.phase / radius;
+    for (let i = 0; i < count; i++) {
+      for (let k = 0; k <= pieces; k++) {
+        const angle = start + i * step + (sweep * k) / pieces;
+        const s = camera.project(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, z);
+        if (k === 0) g.moveTo(s.x, s.y);
+        else g.lineTo(s.x, s.y);
+      }
+    }
+    g.stroke({ width: look.width * camera.zoom, color: look.color, alpha: look.alpha, cap: 'round' });
   }
 
   private ellipseAt(x: number, y: number, z: number, radius: number) {

@@ -6,7 +6,8 @@ import type { Selection } from './selection';
 
 const DOUBLE_CLICK = 350; // milliseconds between the two clicks of a double click
 
-// Mouse and touch: click or hold the button / finger to steer the ship. Click a ship or a monster to pick it out (its
+// Mouse and touch: click or hold the button / finger to steer the ship; the marker of where it is heading shows once
+// they let go (SceneView.setSteering). Click a ship or a monster to pick it out (its
 // hit points show at the top); double-click it to fire at it until told to stop (Escape, keyboardInput). A click on
 // the port's island, its walls or the water between them sails the ship into port, to the mooring
 export function bindPointerInput(
@@ -18,6 +19,10 @@ export function bindPointerInput(
   port: Port,
 ) {
   let steering = false;
+  const steer = (held: boolean) => {
+    steering = held;
+    view.setSteering(held);
+  };
   let lastClick = { id: -1, at: -Infinity };
   const steerTo = (e: FederatedPointerEvent) => {
     const p = view.screenToWorld(e.global.x, e.global.y);
@@ -41,12 +46,12 @@ export function bindPointerInput(
       ship.setTarget(port.mooring.x, port.mooring.y);
       return;
     }
-    steering = true;
+    steer(true);
     steerTo(e);
   });
   app.stage.on('globalpointermove', (e) => {
     if (steering) steerTo(e);
   });
-  app.stage.on('pointerup', () => (steering = false));
-  app.stage.on('pointerupoutside', () => (steering = false));
+  app.stage.on('pointerup', () => steer(false));
+  app.stage.on('pointerupoutside', () => steer(false));
 }

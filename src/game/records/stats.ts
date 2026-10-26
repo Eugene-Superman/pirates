@@ -2,8 +2,11 @@ import type { Player } from '../economy/player';
 import type { ShipClassId } from '../ships/shipClasses';
 import type { WeaponId } from '../combat/weapons';
 
-/** How gold is earned: a bounty for a kill, a chest hauled aboard, a quest turned in, goods sold at the market */
-export const GOLD_REASONS = ['bounty', 'chest', 'quest', 'market'] as const;
+/**
+ * How gold is earned: a bounty for a kill, a chest hauled aboard, a quest turned in, goods sold at the market, guns and
+ * ammo sold back to the arsenal
+ */
+export const GOLD_REASONS = ['bounty', 'chest', 'quest', 'market', 'arsenal'] as const;
 export type GoldReason = (typeof GOLD_REASONS)[number];
 
 /**
@@ -65,7 +68,7 @@ export function newStats(): Stats {
   return {
     kills: {},
     questsDone: 0,
-    goldEarned: { bounty: 0, chest: 0, quest: 0, market: 0 },
+    goldEarned: { bounty: 0, chest: 0, quest: 0, market: 0, arsenal: 0 },
     goldSpent: 0,
     chests: 0,
     goods: 0,

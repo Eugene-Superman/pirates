@@ -7,13 +7,14 @@ import { WIND_X, WIND_Y } from './wind';
 const WISPS_URL = `${import.meta.env.BASE_URL}sprites/fog/wisps.webp`;
 
 const HAZE_COLOR = 0xdce6eb; // light sea haze
-const HAZE_ALPHA = 0.3; // at full strength, past the edge
-// Shares of the view range: the fog thickens from nothing to full strength between them, smoothly for every pixel
-const EDGE = [1, 1.15] as const;
+const HAZE_ALPHA = 0.22; // at full strength, past the edge
+// Shares of the view range: the fog thickens from nothing to full strength between them, smoothly for every pixel. It
+// starts a little inside the range, so what is about to drop out of sight is already faintly hazed
+const EDGE = [0.92, 1.25] as const;
 /** Two layers of mist lying on the water, drifting with the wind at different speeds for a little depth */
 const MIST_LAYERS = [
-  { tile: 700, drift: 3, alpha: 0.28, mirror: false }, // tile: world units one copy of the texture spans
-  { tile: 430, drift: 5, alpha: 0.2, mirror: true },
+  { tile: 700, drift: 3, alpha: 0.2, mirror: false }, // tile: world units one copy of the texture spans
+  { tile: 430, drift: 5, alpha: 0.14, mirror: true },
 ] as const;
 const SEGMENTS = 64; // of the ring the fog is drawn on
 const MARGIN = 50; // world units the ring reaches past the screen's farthest corner
@@ -90,7 +91,7 @@ export const FOG_LAYERS = ['mist', 'clouds'] as const;
 export type FogLayer = (typeof FOG_LAYERS)[number];
 
 export interface FogOfWar {
-  /** Goes between the sea and the islands, so islands stay clear */
+  /** Goes over everything on the water (islands, the port, ships), so beyond the view they are hazed like the sea */
   readonly mesh: Mesh<Geometry, Shader>;
   readonly uniforms: ReturnType<typeof fogUniforms>['uniforms'];
 }

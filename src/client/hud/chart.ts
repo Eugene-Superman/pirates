@@ -123,10 +123,10 @@ export function drawRoute(g: Graphics, ship: Ship, map: MapProjection, width: nu
 }
 
 /**
- * What a captain keeps on their chart whether they see it or not: their own cargo floating where their ship went down
- * (an orange diamond in a ring), and the boss's lair (a red ring round a dot). `size` scales them, pixels
+ * What a captain keeps on their chart whether they see it or not: their own cargo floating where their ship went down,
+ * an orange diamond in a ring. `size` scales it, pixels
  */
-export function drawLandmarks(g: Graphics, state: GameState, map: MapProjection, size: number) {
+export function drawLostCargo(g: Graphics, state: GameState, map: MapProjection, size: number) {
   for (const chest of state.chests) {
     if (chest.lostBy !== state.ship.id) continue;
     const x = map.x(chest.x, chest.y);
@@ -136,10 +136,13 @@ export function drawLandmarks(g: Graphics, state: GameState, map: MapProjection,
       .fill({ color: CHART.lost })
       .stroke({ width: 1, color: 0x3a1800 });
   }
-  if (BOSS_LAIR) {
-    const x = map.x(BOSS_LAIR.x, BOSS_LAIR.y);
-    const y = map.y(BOSS_LAIR.x, BOSS_LAIR.y);
-    g.circle(x, y, size * 1.8).stroke({ width: 2, color: CHART.boss, alpha: 0.85 });
-    g.circle(x, y, size * 0.6).fill({ color: CHART.boss });
-  }
+}
+
+/** The boss's lair, seen or not: a red ring round a dot. `size` scales it, pixels */
+export function drawBossLair(g: Graphics, map: MapProjection, size: number) {
+  if (!BOSS_LAIR) return;
+  const x = map.x(BOSS_LAIR.x, BOSS_LAIR.y);
+  const y = map.y(BOSS_LAIR.x, BOSS_LAIR.y);
+  g.circle(x, y, size * 1.8).stroke({ width: 2, color: CHART.boss, alpha: 0.85 });
+  g.circle(x, y, size * 0.6).fill({ color: CHART.boss });
 }

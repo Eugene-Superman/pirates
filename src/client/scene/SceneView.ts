@@ -1,6 +1,5 @@
 import { Container, Graphics, type Application } from 'pixi.js';
 import {
-  WEAPON_IDS,
   WORLD_HEIGHT,
   WORLD_WIDTH,
   isAfloat,
@@ -10,7 +9,6 @@ import {
   type GameState,
   type Ship,
   type Unit,
-  type WeaponId,
 } from '../../game';
 import type { Selection } from '../input/selection';
 import { Camera3D, type CameraConfig, type Vec3 } from '../render/Camera3D';
@@ -25,6 +23,7 @@ import { drawRangeRings } from './effects/rangeRings';
 import { RepairEffect } from './effects/RepairEffect';
 import { ShipFire } from './effects/ShipFire';
 import { ShotEffects } from './effects/ShotEffects';
+import { SkyClouds } from './effects/SkyClouds';
 import { Sinking } from './effects/Sinking';
 import { NAV_DEBUG, drawHulls, drawRoute, type NavDebug } from './effects/navDebug';
 import { drawSelection, drawTargetLock } from './effects/targetLock';
@@ -59,8 +58,6 @@ const MAX_ZOOM = 3;
 const ZOOM_EASE = 8;
 const ZOOM_SNAP = 0.001; // pixels per unit: close enough to stop easing
 
-// Range rings, one color per weapon
-const RANGE_COLORS: Readonly<Record<WeaponId, number>> = { cannon: 0xffb347, harpoon: 0x7fe3ff };
 // A unit is easier to pick than it looks: its hull's line, standing from the water up to its hit point bar, with `pad`
 // screen pixels round it; the unit under the mouse last frame keeps `sticky` times that, so one the camera or its own
 // speed carries along doesn't slip out from under the mouse
@@ -68,6 +65,7 @@ const PICK = { pad: 20, sticky: 1.7, far: 400 }; // screen pixels, a share, scre
 // Ships and monsters this far beyond the ship's view range already leave a wake and lay a trail (a serpent's body), so
 // both are there when they come into sight
 const NEAR_MARGIN = 300; // world units
+const GOAL_MOVED = 4; // world units a course's end must move by to count as a new one (the pilot replans round ships)
 // For culling: an island's shallows reach 1.35 times as far out as its coast (island3d), and its hill and palms rise
 // above it by up to ISLAND_MARGIN world units on the screen
 const ISLAND_SHALLOWS = 1.35;
@@ -120,6 +118,8 @@ export class SceneView {
    * them layers (`segments`) of the vector-drawn objects in between, starting with `scene` */
   private readonly layers = new Container();
   private readonly segments: { graphics: Graphics; painter: Painter3D }[] = [];
+  /** Over the fog, under the sky's clouds: the target marker where the ship can't see, so the fog doesn't dim it */
+  private readonly markerLayer = new Graphics();
   /** Over the whole scene: the debug drawings */
   private readonly overlay = new Graphics();
   /** Fire, smoke and shot effects above the player's ship, under whatever is nearer than it */
@@ -147,7 +147,10 @@ export class SceneView {
   private readonly seaSurface: SeaSurface;
   private readonly fog: FogOfWar;
   private readonly fogClouds: FogClouds;
+  /** Now and then a light cloud high over the sea, and its shadow */
+  private readonly sky = new SkyClouds();
   private readonly overlayPainter: Painter3D;
+  private readonly markerPainter: Painter3D;
   private readonly firePainter: Painter3D;
   private readonly shipSprite: ShipSprite;
   private readonly bots: BotSprites;
@@ -160,9 +163,16 @@ export class SceneView {
   /** Whether the HUD outlines the camera's zone */
   private zoneOutlined = false;
   /** Which weapons' range rings are shown */
-  private readonly ranges: Record<WeaponId, boolean> = { cannon: true, harpoon: true };
+  private showRanges = true;
   /** Which parts of the fog are drawn. Hiding them changes only the picture: the ship still sees no farther */
   private readonly fogLayers: Record<FogLayer, boolean> = { mist: true, clouds: false };
+  /** Whether clouds drift over the sea */
+  private skyShown = true;
+  /** Where the ship was heading last frame, and since when: the marker comes up anew for a new course */
+  private goal: { x: number; y: number } | null = null;
+  private goalSince = 0;
+  /** Whether the mouse or finger is held down steering the ship: the course follows it, so no marker shows */
+  private steering = false;
   /** Debug drawings of what the game logic sees */
   private readonly debug: Record<NavDebug, boolean> = { route: false, hulls: false };
 
@@ -178,6 +188,7 @@ export class SceneView {
     this.fog = createFogOfWar();
     this.fogClouds = new FogClouds();
     this.overlayPainter = new Painter3D(this.overlay, this.camera);
+    this.markerPainter = new Painter3D(this.markerLayer, this.camera);
     this.firePainter = new Painter3D(this.fireLayer, this.camera);
     this.shipSprite = new ShipSprite(state.ship.shipClass);
     this.bots = new BotSprites(this.camera);
@@ -186,13 +197,18 @@ export class SceneView {
     this.camera.focusX = state.ship.x;
     this.camera.focusY = state.ship.y;
 
+    // The fog lies over everything on the water, so beyond the view islands, the port and wakes are hazed like the
+    // sea; clouds drift over it all, and their shadows over everything under the fog
     this.container.addChild(
       this.seaSurface.mesh,
-      this.fog.mesh,
-      this.fogClouds.container,
       this.wake.mesh,
       this.sinking.water,
       this.layers,
+      this.sky.shadows,
+      this.fog.mesh,
+      this.fogClouds.container,
+      this.markerLayer,
+      this.sky.clouds,
       this.overlay,
       this.hpBars,
       this.damageNumbers.container,
@@ -232,10 +248,11 @@ export class SceneView {
     camera.originX = width / 2;
     camera.originY = height * CAMERA.originY;
     this.cameraControl.update(camera, ship, dt, width, height);
-    painter.screenWidth = this.overlayPainter.screenWidth = width;
-    painter.screenHeight = this.overlayPainter.screenHeight = height;
+    painter.screenWidth = this.overlayPainter.screenWidth = this.markerPainter.screenWidth = width;
+    painter.screenHeight = this.overlayPainter.screenHeight = this.markerPainter.screenHeight = height;
 
     this.scene.clear();
+    this.markerLayer.clear();
 
     // Everything lying on the water
     updateSeaSurface(this.seaSurface, camera, time, width, height);
@@ -244,6 +261,8 @@ export class SceneView {
     // Hidden clouds aren't updated either: placing them is most of their cost on the CPU
     this.fogClouds.container.visible = this.fogLayers.clouds;
     if (this.fogLayers.clouds) this.fogClouds.update(camera, ship, time, width, height);
+    this.sky.shadows.visible = this.sky.clouds.visible = this.skyShown;
+    this.sky.update(camera, time, width, height);
 
     const islands = world.islands.filter((island) =>
       painter.isVisible(island.x, island.y, 0, island.reach * ISLAND_SHALLOWS + ISLAND_MARGIN),
@@ -259,10 +278,11 @@ export class SceneView {
     // Only the islands on the screen can fade a wake that is: hundreds of them would cost a lot per point
     this.wake.draw(camera, ship, time, islands);
     this.sinking.drawWater(camera, ship, islands);
-    for (const id of WEAPON_IDS) {
-      const range = ship.range(id);
-      if (this.ranges[id] && range > 0)
-        drawRangeRings(painter, ship, ship.fullVolleyRange(id), range, RANGE_COLORS[id]);
+    // The picked weapon's: only its longest and shortest reach, however many lie between
+    const { weapon } = ship;
+    const longest = ship.range(weapon);
+    if (this.showRanges && longest > 0) {
+      drawRangeRings(painter, ship, { shortest: ship.fullVolleyRange(weapon), longest, weapon }, time);
     }
     // Units in the fog of war are not drawn at all, nor wrecks. The serpent is long: it is culled by its body
     const others = near.filter(
@@ -303,7 +323,17 @@ export class SceneView {
     // No ship shadow here: it is baked into the ship's sprite
     // Where the ship will stop: the target, or the nearest open water to it when it is on land
     const goal = ship.route.at(-1) ?? ship.target;
-    if (goal) drawTargetMarker(painter, goal, time);
+    // The marker comes up where the mouse lets go, and again for a new course (not the same one replanned round
+    // something)
+    const last = this.goal;
+    const moved = !last || !goal || Math.hypot(goal.x - last.x, goal.y - last.y) > GOAL_MOVED;
+    if (goal && (this.steering || moved)) this.goalSince = time;
+    this.goal = goal ? { x: goal.x, y: goal.y } : null;
+    // In sight it lies on the water among the rest; beyond, the fog would dim it, and no unit there hides it anyway
+    if (goal && !this.steering) {
+      const p = ship.canSee(goal.x, goal.y) ? painter : this.markerPainter;
+      drawTargetMarker(p, goal, time, this.goalSince);
+    }
 
     // Volumetric objects: from far to near
     const objects: SceneObject[] = drawn.map((island) => ({
@@ -438,8 +468,9 @@ export class SceneView {
       zoom: this.zoomLevel,
       cameraMode: this.cameraControl.mode,
       zone: this.zoneOutlined,
-      ranges: { ...this.ranges },
+      ranges: this.showRanges,
       fog: { ...this.fogLayers },
+      sky: this.skyShown,
       debug: { ...this.debug },
     };
   }
@@ -453,8 +484,10 @@ export class SceneView {
     const mode = 'cameraMode' in saved ? CAMERA_MODES.find((m) => m === saved.cameraMode) : undefined;
     if (mode) this.cameraControl.mode = mode;
     if ('zone' in saved && typeof saved.zone === 'boolean') this.zoneOutlined = saved.zone;
-    if ('ranges' in saved) readFlags(saved.ranges, WEAPON_IDS, this.ranges);
+    // Kept as one flag a weapon before the rings followed the weapon picked: that is left as it is
+    if ('ranges' in saved && typeof saved.ranges === 'boolean') this.showRanges = saved.ranges;
     if ('fog' in saved) readFlags(saved.fog, FOG_LAYERS, this.fogLayers);
+    if ('sky' in saved && typeof saved.sky === 'boolean') this.skyShown = saved.sky;
     if ('debug' in saved) readFlags(saved.debug, NAV_DEBUG, this.debug);
   }
 
@@ -471,6 +504,10 @@ export class SceneView {
 
   setZoom(level: number) {
     this.zoomLevel = level;
+  }
+
+  setSteering(held: boolean) {
+    this.steering = held;
   }
 
   get zoneShown() {
@@ -499,13 +536,13 @@ export class SceneView {
     this.cameraControl.mode = mode;
   }
 
-  /** Which weapons' range rings are shown */
-  get rangesShown(): Readonly<Record<WeaponId, boolean>> {
-    return this.ranges;
+  /** Whether the picked weapon's range rings are shown */
+  get rangesShown() {
+    return this.showRanges;
   }
 
-  toggleRange(weapon: WeaponId) {
-    this.ranges[weapon] = !this.ranges[weapon];
+  toggleRanges() {
+    this.showRanges = !this.showRanges;
   }
 
   /** Which debug drawings are shown */
@@ -524,6 +561,15 @@ export class SceneView {
 
   toggleFog(layer: FogLayer) {
     this.fogLayers[layer] = !this.fogLayers[layer];
+  }
+
+  /** Whether clouds drift over the sea */
+  get skyIsShown() {
+    return this.skyShown;
+  }
+
+  toggleSky() {
+    this.skyShown = !this.skyShown;
   }
 
   /**

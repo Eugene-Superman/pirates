@@ -19,6 +19,8 @@ async function main() {
     autoDensity: true,
   });
   document.getElementById('app')!.appendChild(app.canvas);
+  // The whole page is the game: a right click is a click in it, never the browser's menu
+  window.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // A seed of its own for every game started: the dice and the bots differ each time (online, the server's)
   const game = new Game(Math.floor(Math.random() * 2 ** 32));

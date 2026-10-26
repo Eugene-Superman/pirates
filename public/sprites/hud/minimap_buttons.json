@@ -1,0 +1,22 @@
+{
+ "file": "minimap_buttons.webp",
+ "tile": 128,
+ "icons": {
+  "hold": [
+   0,
+   0
+  ],
+  "loadout": [
+   1,
+   0
+  ],
+  "talents": [
+   2,
+   0
+  ],
+  "mastery": [
+   3,
+   0
+  ]
+ }
+}

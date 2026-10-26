@@ -1,5 +1,4 @@
 import { Container, Graphics, Text, type FillGradient, type Rectangle, type TextStyleOptions } from 'pixi.js';
-import type { AmmoId } from '../../game';
 import { t } from '../i18n/i18n';
 
 /** The HUD's colors, shared by its panels and bars */
@@ -27,23 +26,27 @@ export function tierColor(tier: number) {
   return TIER_COLORS[Math.min(Math.max(tier, 1), TIER_COLORS.length) - 1];
 }
 
-/** A few letters for each ammo, for the chips of the skill bar */
-export const AMMO_LABELS: Readonly<Record<AmmoId, string>> = {
-  ball1: 'I',
-  chainShot: 'Chain',
-  ball2: 'II',
-  ball3: 'III',
-  heatedShot: 'Heat',
-  explosiveShell: 'Shell',
-  royalShot: 'Royal',
-  harpoon1: 'I',
-  barbedHarpoon: 'Barb',
-  harpoon2: 'II',
-  harpoon3: 'III',
-  poisonHarpoon: 'Venom',
-  explosiveHarpoon: 'Blast',
-  leviathanHarpoon: 'Lev.',
-};
+/** A number in whole units, its thousands apart: 1 234 567 */
+export function whole(n: number) {
+  return Math.round(n).toLocaleString('en-US').replaceAll(',', ' ');
+}
+
+/**
+ * A count in four characters at most: 1.2K under ten thousand, 12K, 1.2M…; never rounded up, so it never shows more
+ * than there is
+ */
+export function compact(n: number) {
+  for (const [size, unit] of [
+    [1e6, 'M'],
+    [1e3, 'K'],
+  ] as const) {
+    if (n >= size) {
+      const units = n / size;
+      return `${units < 10 ? Math.floor(units * 10) / 10 : Math.floor(units)}${unit}`;
+    }
+  }
+  return `${n}`;
+}
 
 export function text(value: string, size: number, fill: number = UI.text, extra: TextStyleOptions = {}) {
   return new Text({ text: value, style: { fontFamily: 'Arial', fontSize: size, fill, ...extra } });
@@ -57,6 +60,15 @@ export function show(label: Text, value: string) {
 /** So does assigning its color: only on change too */
 export function tint(label: Text, color: number) {
   if (label.style.fill !== color) label.style.fill = color;
+}
+
+/** Cuts a text of one line short with an ellipsis to fit `width` pixels (a card's: its info window has all of it) */
+export function clip(line: Text, width: number) {
+  let shown = line.text;
+  while (line.width > width && shown.length > 1) {
+    shown = shown.slice(0, -1).trimEnd();
+    line.text = `${shown}…`;
+  }
 }
 
 /** How a tile looks: pressed (lit), disabled (dimmed, not clickable), and its border color */
@@ -184,19 +196,8 @@ export class Tile {
   }
 }
 
-/** A tile with a label in its middle: a button. size: the label's, in pixels */
-export function labelButton(width: number, height: number, label: string, onTap: () => void, size = 12, bold = true) {
-  const tile = new Tile(width, height, onTap, 5);
-  const caption = text(label, size, UI.text, bold ? { fontWeight: 'bold' } : {});
-  caption.anchor.set(0.5);
-  caption.position.set(width / 2, height / 2);
-  tile.content.addChild(caption);
-  return { tile, text: caption };
-}
-
 const WINDOW_MARGIN = 20; // pixels between a window and the screen's edge, at least
-const WINDOW_DIM = 0.5; // how dark the game is behind a window
-const CLOSE = { width: 70, height: 26 } as const; // pixels: a window's Close button
+const GEAR_TEETH = 8;
 
 /** How a window looks: the panel under what it shows, its Close button, and how dark the game gets behind it */
 export interface WindowLook {
@@ -205,21 +206,10 @@ export interface WindowLook {
   readonly dim: number;
 }
 
-/** The HUD's own windows: a plain blue panel */
-const PLAIN_WINDOW: WindowLook = {
-  panel: (width, height) =>
-    new Graphics()
-      .roundRect(0, 0, width, height, 12)
-      .fill({ color: UI.panel, alpha: 0.97 })
-      .stroke({ width: 1.5, color: UI.border, alpha: 0.4 }),
-  close: (label, onTap) => labelButton(CLOSE.width, CLOSE.height, label, onTap, 13, false),
-  dim: WINDOW_DIM,
-};
-
 /**
  * A window over the game (the loadout, the talents, the statistics, an item up close in port): its `panel` centred on
- * the screen and scaled down to fit, the game dimmed behind it, in the HUD's look or another (`look`: the windows'
- * theme is theme.ts's). Clicks on it and round it never reach the stage, which would steer the ship. Close, a click
+ * the screen and scaled down to fit, the game dimmed behind it, in the `look` it is given (the windows' theme is
+ * theme.ts's THEMED_WINDOW). Clicks on it and round it never reach the stage, which would steer the ship. Close, a click
  * beside it and Escape call `onClose`. An Escape another window has taken is left alone: the windows listen in the
  * order the HUD makes them, the one on top first, so one press closes one window
  */
@@ -230,32 +220,37 @@ export class HudWindow {
   private readonly dim = new Graphics();
   private readonly dimAlpha: number;
   private readonly screen: Rectangle;
+  private readonly look: WindowLook;
+  private background: Container;
   private readonly width: number;
-  private readonly height: number;
+  private height: number;
+  /** Pixels at the bottom of the screen it leaves clear: what must show under it (the skill bar under the loadout) */
+  private readonly bottom: number;
   /** The screen size it was fitted to */
   private fittedTo = '';
 
-  /** width, height: the panel's, in pixels; pad: from its top right corner to the Close button */
+  /**
+   * width, height: the panel's, in pixels; pad: from its top right corner to the Close button; bottom: pixels at the
+   * bottom of the screen it leaves clear (none by default)
+   */
   constructor(
     screen: Rectangle,
-    size: { width: number; height: number; pad: number },
+    size: { width: number; height: number; pad: number; bottom?: number },
     onClose: () => void,
-    look: WindowLook = PLAIN_WINDOW,
+    look: WindowLook,
   ) {
     this.screen = screen;
     this.width = size.width;
     this.height = size.height;
+    this.bottom = size.bottom ?? 0;
     this.dimAlpha = look.dim;
+    this.look = look;
     this.container.visible = false;
-    const background = look.panel(size.width, size.height);
-    for (const blocker of [this.dim, background]) {
-      blocker.eventMode = 'static';
-      blocker.on('pointerdown', (e) => e.stopPropagation());
-    }
-    this.dim.on('pointertap', onClose);
+    this.background = blocker(look.panel(size.width, size.height));
+    blocker(this.dim).on('pointertap', onClose);
     const close = look.close(t('Close'), onClose);
     close.tile.container.position.set(size.width - size.pad - close.tile.width, size.pad);
-    this.panel.addChild(background, close.tile.container);
+    this.panel.addChild(this.background, close.tile.container);
     this.container.addChild(this.dim, this.panel);
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape' || !this.isOpen || e.defaultPrevented) return;
@@ -269,6 +264,17 @@ export class HudWindow {
     return this.container.visible;
   }
 
+  /** A window whose contents grow or shrink with what it shows: its panel made again at the new height */
+  resize(height: number) {
+    if (height === this.height) return;
+    this.height = height;
+    const background = blocker(this.look.panel(this.width, height));
+    this.panel.addChildAt(background, 0);
+    this.background.destroy({ children: true });
+    this.background = background;
+    this.fittedTo = '';
+  }
+
   /** Every frame while open: the dim and the panel's place follow the screen's size */
   fit() {
     const { width, height } = this.screen;
@@ -276,13 +282,18 @@ export class HudWindow {
     if (size === this.fittedTo) return;
     this.fittedTo = size;
     this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: this.dimAlpha });
-    const scale = Math.min(1, (width - WINDOW_MARGIN * 2) / this.width, (height - WINDOW_MARGIN * 2) / this.height);
+    const free = height - this.bottom;
+    const scale = Math.min(1, (width - WINDOW_MARGIN * 2) / this.width, (free - WINDOW_MARGIN * 2) / this.height);
     this.panel.scale.set(scale);
-    this.panel.position.set(
-      Math.round((width - this.width * scale) / 2),
-      Math.round((height - this.height * scale) / 2),
-    );
+    this.panel.position.set(Math.round((width - this.width * scale) / 2), Math.round((free - this.height * scale) / 2));
   }
+}
+
+/** A part of a window that takes the clicks on it: they would steer the ship */
+function blocker<T extends Container>(part: T) {
+  part.eventMode = 'static';
+  part.on('pointerdown', (e) => e.stopPropagation());
+  return part;
 }
 
 /** A wrench, its open jaw at the top right: the repair skill. `size` is the icon's width in pixels */
@@ -316,23 +327,56 @@ export function drawHarpoon(g: Graphics, size: number, tier: number) {
     .stroke({ width: 1.5, color: tierColor(tier) });
 }
 
-/** An anchor: the loadout, the shipyard's work */
-export function drawAnchor(g: Graphics, size: number, color: number) {
-  const k = size / 32;
-  g.circle(0, -11 * k, 3 * k).stroke({ width: 2.5 * k, color });
-  g.moveTo(0, -8 * k)
-    .lineTo(0, 12 * k)
-    .stroke({ width: 3 * k, color });
-  g.moveTo(-7 * k, -3 * k)
-    .lineTo(7 * k, -3 * k)
-    .stroke({ width: 3 * k, color, cap: 'round' });
-  g.arc(0, 4 * k, 10 * k, 0.15, Math.PI - 0.15).stroke({ width: 3 * k, color, cap: 'round' });
-}
-
 /** A gold coin round (0, 0): the player's gold */
 export function drawCoin(g: Graphics, radius: number) {
   g.circle(0, 0, radius).fill({ color: 0xe8b52e }).stroke({ width: 1, color: 0x7a5410 });
   g.circle(0, 0, radius * 0.62).stroke({ width: 1, color: 0xfff0a8, alpha: 0.8 });
+}
+
+/** A doubloon round (0, 0): a redder gold than the gold coin, with a cross struck on it */
+export function drawDoubloon(g: Graphics, radius: number) {
+  g.circle(0, 0, radius).fill({ color: 0xd9822b }).stroke({ width: 1, color: 0x6b360b });
+  g.circle(0, 0, radius * 0.72).stroke({ width: 1, color: 0xffd39a, alpha: 0.75 });
+  const arm = radius * 0.4;
+  g.moveTo(-arm, 0).lineTo(arm, 0).moveTo(0, -arm).lineTo(0, arm).stroke({ width: 1.6, color: 0xfff0cc, cap: 'round' });
+}
+
+/** A crate round (0, 0), `size` pixels square, its boards and a brace across: the ship's hold */
+export function drawCrate(g: Graphics, size: number) {
+  const h = size / 2;
+  g.roundRect(-h, -h, size, size, 1.5).fill({ color: 0xa8743d }).stroke({ width: 1, color: 0x3b220e });
+  g.moveTo(-h, -h / 3)
+    .lineTo(h, -h / 3)
+    .moveTo(-h, h / 3)
+    .lineTo(h, h / 3)
+    .stroke({ width: 1, color: 0x5c3816 });
+  g.moveTo(-h + 1.5, h - 1.5)
+    .lineTo(h - 1.5, -h + 1.5)
+    .stroke({ width: 1.6, color: 0x5c3816 });
+}
+
+/** A gear wheel round (0, 0), `size` pixels across, a hole through its middle: the settings */
+export function drawGear(g: Graphics, size: number, color: number) {
+  const outer = size / 2;
+  const inner = outer * 0.72;
+  const half = Math.PI / GEAR_TEETH;
+  const points: number[] = [];
+  for (let i = 0; i < GEAR_TEETH; i++) {
+    const at = i * half * 2;
+    // A tooth: up from the rim at one side, across its top, down at the other
+    for (const [r, da] of [
+      [inner, -half * 0.95],
+      [outer, -half * 0.5],
+      [outer, half * 0.5],
+      [inner, half * 0.95],
+    ] as const) {
+      points.push(Math.cos(at + da) * r, Math.sin(at + da) * r);
+    }
+  }
+  g.poly(points)
+    .fill({ color })
+    .circle(0, 0, outer * 0.34)
+    .cut();
 }
 
 /**

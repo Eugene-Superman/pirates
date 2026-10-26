@@ -35,9 +35,11 @@ import {
   type WeaponId,
 } from '../../game';
 import { BUILDINGS, HarbourView, type BuildingId } from './HarbourView';
+import type { ConfirmDialog } from './ConfirmDialog';
 import { ItemInfo } from './ItemInfo';
 import { AMMO_ICONS, GUN_ICONS, OUTFIT_ICONS, SHIP_ICONS } from './iconAtlas';
-import { KNOT, itemFace, type ItemFace, type ShopItem, type Tone } from './itemFaces';
+import { KNOT, itemFace, type ItemButton, type ItemFace, type ShopItem, type Tone } from './itemFaces';
+import { abandonQuestion } from './QuestTracker';
 import { LINE_STYLE } from './shipLore';
 import {
   BRASS,
@@ -46,18 +48,24 @@ import {
   brassButton,
   drawCard,
   drawDivider,
+  drawMeter,
+  glowFill,
   iconSlot,
   subheading,
   themedPanel,
 } from './theme';
-import { Tile, UI, drawCoin, playTap, show, text, tierColor, tint } from './ui';
+import { GOODS_LIST, goodRow } from './goodIcons';
+import { Tile, UI, clip, drawCoin, playTap, show, text, tierColor, tint } from './ui';
 import { t } from '../i18n/i18n';
 
 /** What the port's menus do: game methods, each saying whether it worked */
 export interface PortActions {
   leavePort: () => void;
   buyGun: (gun: GunId) => boolean;
-  buyAmmo: (ammo: AmmoId) => boolean;
+  buyAmmo: (ammo: AmmoId, count?: number) => boolean;
+  /** Sells a gun from the hold, or a pack of an ammo, back to the arsenal for a quarter of its price */
+  sellGun: (gun: GunId) => boolean;
+  sellAmmo: (ammo: AmmoId, count?: number) => boolean;
   repairInPort: () => boolean;
   buyOutfit: (id: OutfitId) => boolean;
   /** Fits a piece of outfit from the hold into its slot, or takes the slot's piece off (null) */
@@ -85,14 +93,18 @@ const BODY_TOP = { tabs: TABS_TOP + 38, plain: PAD + ICON + 20 }; // where its r
 const BODY_WIDTH = WIDTH - PAD * 2;
 const TAVERN_WIDTH = BODY_WIDTH;
 const SHOP_WIDTH = BODY_WIDTH;
-const QUEST_HEIGHT = 74;
-const QUEST_GAP = 6;
+const QUEST_HEIGHT = 84;
+const QUEST_GAP = 8;
+const DIAL = 28; // pixels: the radius of a quest's dial, how far it has got
+const QUEST_BUTTON = { width: 96, drop: 60, height: 26 } as const; // pixels: Take or Turn in, and Drop
+const QUEST_RIGHT = 190; // pixels at a quest's right end for its reward and buttons, beside its text
+const XP_COLOR = 0x5aa8ff; // a quest's experience, as under the player's frame
+const SELL_ALL = { width: 230, height: 30 } as const; // pixels: the market's Sell everything
 // The guns, the ammo and the outfit, two cards a row (pixels): a card's height, the gaps between them, the icon's
 // slot, the info button
 const CARD = { height: 100, gap: 12, rowGap: 8, slot: 84, inset: 10 } as const;
 const CARD_WIDTH = (BODY_WIDTH - CARD.gap) / 2;
 const INFO = { width: 30, size: 16 } as const;
-const ROW_GAP = 4;
 const BUY = { width: 64, height: 24 };
 const SHIP_BUY = 120; // pixels: a ship's card's button (Take the helm)
 const BACK = { width: 220, height: 30 };
@@ -187,19 +199,10 @@ const LINE_NOTES: Partial<Record<PlayerLineId, string>> = {
     'Bought with doubloons, once you have a ship of the same tier of another line at its last level. As strong as the ships of their tier, no stronger: what you pay for is their looks.',
 };
 const TAB = { pad: 10, gap: 6 } as const; // pixels: inside a tab beside its name, and between two
-const MARKET_ROW = 34;
 const PATH_LINE = 21; // pixels: a term of the shipyard's offer
 const LIST_BOTTOM = HEIGHT - PAD - 20; // pixels: where a tab's rows are cut off, over the message under them
 const SCROLL = { speed: 0.6, bar: 4, margin: 2 } as const; // pixels per unit of the wheel; the scroll bar's width
 const TIER_HEADING = 28; // pixels: a tier's heading over its ships, in a line of several ships a tier
-/** Shortens a text of one line to a width, with an ellipsis (a card's: the info window has all of it) */
-function clip(line: Text, width: number) {
-  let shown = line.text;
-  while (line.width > width && shown.length > 1) {
-    shown = shown.slice(0, -1).trimEnd();
-    line.text = `${shown}…`;
-  }
-}
 
 /** The ship's figures that its outfit changes, in a line */
 function shipFigures(ship: Ship) {
@@ -232,13 +235,21 @@ function fleetKey(state: GameState) {
   return `${ship.shipClass.id}:${player.fleet.map((kept) => kept.shipClass).join()}:${goal?.shipClass ?? ''}`;
 }
 
+/** A tavern quest as the player has it: not offered yet, offered, taken, or done and waiting to be turned in */
+type QuestState = 'locked' | 'offered' | 'taken' | 'done';
+
 interface QuestView {
   readonly id: QuestId;
   readonly background: Graphics;
+  /** How far it has got, round the count in it (or a lock, or a tick) */
+  readonly dial: Graphics;
+  readonly mark: Graphics;
+  readonly count: Text;
+  /** Its words: dimmed while it isn't offered */
+  readonly body: Container;
   readonly about: Text;
-  /** The outline the background was last drawn with (-1: none), null before it was drawn */
-  painted: number | null;
-  readonly progress: Text;
+  /** The state and kills its card and dial were last drawn for, '' before */
+  painted: string;
   readonly button: Tile;
   readonly buttonText: Text;
   readonly drop: Tile;
@@ -254,6 +265,62 @@ interface ShopRow {
   readonly owned: Text;
   readonly button: Tile;
   readonly label: Text;
+  /** Its Sell button, for what the arsenal buys back */
+  readonly sell: { readonly tile: Tile; readonly label: Text } | null;
+}
+
+/**
+ * A quest's dial round (0, 0), `radius` pixels: a brass ring round a dark well lit in `color` (unless it is locked),
+ * and a track round it filled `share` of the way, from the top clockwise
+ */
+function drawDial(g: Graphics, radius: number, share: number, color: number, lit: boolean) {
+  g.circle(0, 0, radius).fill({ color: 0x0a0705 }).stroke({ width: 3, color: THEME.brass });
+  if (lit) g.circle(0, 0, radius - 2).fill(glowFill(color));
+  const track = radius - 8;
+  g.circle(0, 0, track).stroke({ width: 5, color: 0x000000, alpha: 0.5 });
+  if (share <= 0) return;
+  const start = -Math.PI / 2;
+  g.moveTo(0, -track)
+    .arc(0, 0, track, start, start + Math.PI * 2 * Math.min(1, share))
+    .stroke({ width: 5, color, cap: 'round' });
+}
+
+/** A tick round (0, 0), `size` pixels across: a quest done */
+function drawTick(g: Graphics, size: number, color: number) {
+  const h = size / 2;
+  g.moveTo(-h, 0)
+    .lineTo(-h * 0.2, h * 0.75)
+    .lineTo(h, -h * 0.7)
+    .stroke({ width: 4, color, cap: 'round', join: 'round' });
+}
+
+/** A padlock round (0, 0), `size` pixels tall: a quest not offered yet */
+function drawLock(g: Graphics, size: number, color: number) {
+  const h = size / 2;
+  const shackle = h * 0.55;
+  g.moveTo(-shackle, 0)
+    .arc(0, 0, shackle, Math.PI, Math.PI * 2)
+    .stroke({ width: 2.5, color });
+  g.roundRect(-h * 0.8, 0, h * 1.6, h, 2).fill({ color });
+}
+
+/**
+ * A quest's card and dial as the player has it: dim with a lock until it is offered, the count to sink while it is
+ * on offer, the kills so far round the dial once taken (its card edged in brass), and a green tick when done
+ */
+function paintQuest(view: QuestView, look: QuestState, kills: number, count: number) {
+  const done = look === 'done';
+  const color = done ? UI.good : look === 'locked' ? THEME.dim : THEME.title;
+  const share = done ? 1 : look === 'taken' ? kills / count : 0;
+  drawDial(view.dial.clear(), DIAL, share, color, look !== 'locked');
+  view.mark.clear();
+  if (done) drawTick(view.mark, DIAL * 0.8, UI.good);
+  else if (look === 'locked') drawLock(view.mark, DIAL * 0.75, THEME.dim);
+  show(view.count, look === 'taken' ? `${kills}/${count}` : look === 'offered' ? `×${count}` : '');
+  tint(view.count, look === 'taken' ? THEME.text : THEME.title);
+  view.body.alpha = look === 'locked' ? 0.6 : 1;
+  const edge = done ? UI.good : look === 'taken' ? THEME.brassLight : undefined;
+  drawCard(view.background.clear(), TAVERN_WIDTH, QUEST_HEIGHT, done ? UI.good : edge && THEME.brass, edge);
 }
 
 /**
@@ -268,6 +335,8 @@ export class PortScreen {
   private readonly harbour: HarbourView;
   /** A gun, an ammo or a piece of outfit up close, over the arsenal or the workshop */
   private readonly info: ItemInfo;
+  /** The HUD's question before what can't be undone (selling an item back), over every window */
+  private readonly confirm: ConfirmDialog;
   /** A building's window and the dim behind it */
   private readonly building = new Container();
   private readonly dim = new Graphics();
@@ -325,9 +394,10 @@ export class PortScreen {
   /** The screen size the dim and the panel were fitted to */
   private fittedTo = '';
 
-  constructor(actions: PortActions, screen: Rectangle, portName: string) {
+  constructor(actions: PortActions, screen: Rectangle, portName: string, confirm: ConfirmDialog) {
     this.actions = actions;
     this.screen = screen;
+    this.confirm = confirm;
     this.container.visible = false;
     this.harbour = new HarbourView(
       screen,
@@ -336,7 +406,7 @@ export class PortScreen {
       () => this.actions.leavePort(),
     );
     // Made before the port listens for Escape: it closes first
-    this.info = new ItemInfo(screen);
+    this.info = new ItemInfo(screen, this.confirm);
     this.loadIcons();
 
     const background = themedPanel(WIDTH, HEIGHT);
@@ -545,7 +615,7 @@ export class PortScreen {
     }
     const built =
       this.tab === 'market'
-        ? `market:${GOOD_IDS.map((id) => ship.cargo[id] ?? 0).join()}`
+        ? `market:${ship.holdSize}:${GOOD_IDS.map((id) => ship.cargo[id] ?? 0).join()}`
         : this.tab === 'myShips' || LINE_TABS[this.tab]
           ? `${this.tab}:${fleetKey(state)}`
           : this.tab;
@@ -558,6 +628,11 @@ export class PortScreen {
       const { short, enabled } = row.face.button(state);
       show(row.label, short);
       row.button.setLook(enabled ? {} : { disabled: true });
+      if (row.sell && row.face.sell) {
+        const sell = row.face.sell.button(state);
+        show(row.sell.label, sell.short);
+        row.sell.tile.setLook(sell.enabled ? {} : { disabled: true });
+      }
       const inUse = row.face.inUse(state);
       if (row.painted !== inUse) {
         row.painted = inUse;
@@ -575,7 +650,10 @@ export class PortScreen {
     this.figures.visible = outfit && !this.message.visible;
     if (this.market) {
       const value = cargoValue(ship.cargo);
-      show(this.market.hold, t('Hold {cargo} / {size}', { cargo: cargoCount(ship.cargo), size: ship.holdSize }));
+      show(
+        this.market.hold,
+        t('{cargo} of {size} places taken', { cargo: cargoCount(ship.cargo), size: ship.holdSize }),
+      );
       show(this.market.sellText, value > 0 ? t('Sell everything: {n} gold', { n: value }) : t('Nothing to sell'));
       this.market.sellAll.setLook(value > 0 ? { border: GOLD } : { disabled: true });
     }
@@ -597,8 +675,12 @@ export class PortScreen {
       const done = taken !== undefined && questDone(taken);
       const full = player.quests.length >= MAX_QUESTS;
       const offered = questOffered(player, view.id);
-      show(view.progress, taken ? (done ? t('Done!') : `${taken.kills} / ${quest.count}`) : '');
-      tint(view.progress, done ? UI.good : THEME.text);
+      const kills = taken?.kills ?? 0;
+      const look: QuestState = done ? 'done' : taken ? 'taken' : offered ? 'offered' : 'locked';
+      if (view.painted !== `${look}:${kills}`) {
+        view.painted = `${look}:${kills}`;
+        paintQuest(view, look, kills, quest.count);
+      }
       show(
         view.about,
         offered
@@ -615,11 +697,6 @@ export class PortScreen {
       });
       tint(view.buttonText, done ? THEME.darkText : THEME.text);
       view.drop.container.visible = taken !== undefined && !done;
-      const outline = done ? UI.good : taken ? THEME.brassLight : undefined;
-      if (view.painted !== (outline ?? -1)) {
-        view.painted = outline ?? -1;
-        drawCard(view.background.clear(), TAVERN_WIDTH, QUEST_HEIGHT, undefined, outline);
-      }
     }
   }
 
@@ -629,35 +706,63 @@ export class PortScreen {
     this.messageUntil = this.time + MESSAGE_TIME;
   }
 
+  /**
+   * A quest's card, `y` pixels down the tavern: its dial on the left, its title and what it asks, the reward in gold
+   * and experience, and its buttons
+   */
   private questView(id: QuestId, y: number) {
     const quest = QUESTS[id];
     const row = new Container();
     row.position.set(0, y);
     const background = new Graphics();
-    const title = text(t(quest.title), 14, THEME.text, { fontWeight: 'bold' });
-    title.position.set(12, 8);
-    const about = text(t(quest.text), 12, THEME.dim, { wordWrap: true, wordWrapWidth: TAVERN_WIDTH - 150 });
-    about.position.set(12, 28);
-    const reward = text(t('{n} gold', { n: quest.reward }), 13, GOLD, { fontWeight: 'bold' });
-    reward.anchor.set(1, 0);
-    reward.position.set(TAVERN_WIDTH - 12, 8);
-    const progress = text('', 13, THEME.text, { fontWeight: 'bold' });
-    progress.anchor.set(1, 0);
-    progress.position.set(TAVERN_WIDTH - 12, 28);
-    const main = brassButton(84, 24, t('Take'), () => this.questAction(id), 12);
-    main.tile.container.position.set(TAVERN_WIDTH - 12 - 84, QUEST_HEIGHT - 32);
-    const drop = brassButton(50, 24, t('Drop'), () => {
-      this.actions.dropQuest(id);
-      this.say(t('"{title}" dropped', { title: t(quest.title) }), THEME.dim);
+    const dial = new Graphics();
+    dial.position.set(14 + DIAL, QUEST_HEIGHT / 2);
+    const mark = new Graphics();
+    mark.position.copyFrom(dial.position);
+    const count = text('', 14, THEME.text, { fontWeight: 'bold' });
+    count.anchor.set(0.5);
+    count.position.copyFrom(dial.position);
+    const left = 14 + DIAL * 2 + 16;
+    const title = subheading(t(quest.title), 17);
+    title.position.set(left, 9);
+    const about = text(t(quest.text), 12, THEME.dim, {
+      wordWrap: true,
+      wordWrapWidth: TAVERN_WIDTH - left - QUEST_RIGHT,
     });
-    drop.tile.container.position.set(TAVERN_WIDTH - 12 - 84 - 56, QUEST_HEIGHT - 32);
-    row.addChild(background, title, about, reward, progress, main.tile.container, drop.tile.container);
+    about.position.set(left, 37);
+    const reward = text(t('{n} gold', { n: quest.reward }), 14, GOLD, { fontWeight: 'bold' });
+    reward.anchor.set(1, 0);
+    reward.position.set(TAVERN_WIDTH - 14, 11);
+    const coin = new Graphics();
+    drawCoin(coin, 7);
+    coin.position.set(reward.x - reward.width - 12, reward.y + reward.height / 2);
+    const xp = text(t('+{n} XP', { n: quest.xp }), 12, XP_COLOR, { fontWeight: 'bold' });
+    xp.anchor.set(1, 0.5);
+    xp.position.set(coin.x - 16, coin.y);
+    const body = new Container();
+    body.addChild(title, about, reward, coin, xp);
+    const main = brassButton(QUEST_BUTTON.width, QUEST_BUTTON.height, t('Take'), () => this.questAction(id), 12);
+    main.tile.container.position.set(TAVERN_WIDTH - 14 - QUEST_BUTTON.width, QUEST_HEIGHT - 12 - QUEST_BUTTON.height);
+    // Asked first, as the quest tracker at sea does
+    const drop = brassButton(QUEST_BUTTON.drop, QUEST_BUTTON.height, t('Drop'), () => {
+      const taken = this.state?.player.quests.find((q) => q.id === id);
+      if (!taken) return;
+      this.confirm.ask(abandonQuestion(taken), () => {
+        this.actions.dropQuest(id);
+        this.say(t('"{title}" dropped', { title: t(quest.title) }), THEME.dim);
+      });
+    });
+    drop.tile.container.position.set(main.tile.container.x - 6 - QUEST_BUTTON.drop, main.tile.container.y);
+    row.addChild(background, dial, mark, count, body, main.tile.container, drop.tile.container);
     this.quests.push({
       id,
       background,
+      dial,
+      mark,
+      count,
+      body,
       about,
-      painted: null,
-      progress,
+      painted: '',
       button: main.tile,
       buttonText: main.text,
       drop: drop.tile,
@@ -785,16 +890,18 @@ export class PortScreen {
     title.position.set(left, 8);
     clip(title, price.x - price.width - 8 - left);
     // What it is for in a line (the info window has all of it), and its figures under it
+    // What the arsenal pays for it back, under the price
+    const resale = text(face.resale ?? '', 11, THEME.dim);
+    resale.anchor.set(1, 0);
+    resale.position.set(width - 12, 30);
     const about = text(face.about, 11, THEME.dim);
     about.position.set(left, 29);
-    clip(about, width - left - 12);
+    clip(about, width - left - 12 - (face.resale ? resale.width + 8 : 0));
     const stats = text(face.stats, 12, THEME.text);
     stats.position.set(left, 47);
     // A piece of outfit that changes three figures takes a smaller hand before it is cut short
     if (stats.width > width - left - 12) stats.style.fontSize = 11;
     clip(stats, width - left - 12);
-    const owned = text('', 11, THEME.dim);
-    owned.position.set(left, CARD.height - 12 - BUY.height + 5);
     const button = brassButton(buy, BUY.height, this.state ? face.button(this.state).short : t('Buy'), () =>
       this.press(face),
     );
@@ -809,74 +916,115 @@ export class PortScreen {
     info.text.style.fontFamily = TITLE_STYLE.fontFamily ?? 'serif';
     info.text.style.fontStyle = 'italic';
     info.tile.container.position.set(button.tile.container.x - 6 - INFO.width, button.tile.container.y);
+    // What the arsenal buys back has a Sell button too, left of the info button
+    const sell = face.sell ? brassButton(BUY.width, BUY.height, t('Sell'), () => this.press(face, face.sell)) : null;
+    sell?.tile.container.position.set(info.tile.container.x - 6 - BUY.width, button.tile.container.y);
+    // How many the player has, beside the buttons: in two lines where they leave it little room
+    const room = (sell ? sell.tile.container.x : info.tile.container.x) - 8 - left;
+    const owned = text('', 11, THEME.dim, { wordWrap: true, wordWrapWidth: room, lineHeight: 12 });
+    owned.anchor.set(0, 0.5);
+    owned.position.set(left, CARD.height - 12 - BUY.height / 2);
     card.addChild(
       background,
       slot.container,
       title,
       price,
+      resale,
       about,
       stats,
       owned,
       info.tile.container,
       button.tile.container,
     );
-    this.rows.push({ face, background, painted: null, owned, button: button.tile, label: button.text });
+    if (sell) card.addChild(sell.tile.container);
+    this.rows.push({
+      face,
+      background,
+      painted: null,
+      owned,
+      button: button.tile,
+      label: button.text,
+      sell: sell && { tile: sell.tile, label: sell.text },
+    });
     return card;
   }
 
-  /** A card's button: buys the item, fits it or takes it off, and says what happened */
-  private press(face: ItemFace) {
+  /**
+   * A card's button: buys the item, fits it or takes it off, or sells it back (`which`), and says what happened. What
+   * can't be undone is asked about first
+   */
+  private press(face: ItemFace, which: ItemButton = face) {
     if (!this.state) return;
-    const done = face.press(this.state);
-    if (done) this.say(done.message, TONES[done.tone]);
+    const run = () => {
+      const done = this.state && which.press(this.state);
+      if (done) this.say(done.message, TONES[done.tone]);
+    };
+    const question = which.confirm?.(this.state);
+    if (question) this.confirm.ask(question, run);
+    else run();
   }
 
-  /** The market: what the hold carries, by good, each sold apart or all together */
+  /**
+   * The market, like the hold's window: a board with the hold's places taken and Sell everything, then a row for each
+   * good aboard (its picture with how many, its price) with its own Sell
+   */
   private buildMarket() {
     const ship = this.state?.ship;
+    const board = new Container();
     const hold = text('', 15, THEME.text, { fontWeight: 'bold' });
-    const sellAll = brassButton(230, 28, '', () => {
+    hold.position.set(16, 12);
+    const sellAll = brassButton(SELL_ALL.width, SELL_ALL.height, '', () => {
       const value = ship ? cargoValue(ship.cargo) : 0;
       if (this.actions.sellCargo()) this.say(t('Sold everything for {n} gold', { n: value }), GOLD);
     });
-    sellAll.tile.container.position.set(SHOP_WIDTH - 230, -4);
-    this.list.addChild(hold, sellAll.tile.container);
+    const sellX = SHOP_WIDTH - 16 - SELL_ALL.width;
+    sellAll.tile.container.position.set(sellX, (GOODS_LIST.board - SELL_ALL.height) / 2);
+    const meter = new Graphics();
+    meter.position.set(16, 40);
+    if (ship) {
+      const cargo = cargoCount(ship.cargo);
+      const share = ship.holdSize > 0 ? cargo / ship.holdSize : 0;
+      const color = cargo >= ship.holdSize ? UI.bad : THEME.brass;
+      drawMeter(meter, sellX - 32, GOODS_LIST.meter, share, color, ship.holdSize);
+    }
+    board.addChild(drawCard(new Graphics(), SHOP_WIDTH, GOODS_LIST.board), hold, meter, sellAll.tile.container);
+    const heading = subheading(t('Goods aboard'), 18);
+    heading.position.set(0, GOODS_LIST.board + 18);
+    this.list.addChild(board, heading);
     this.market = { hold, sellAll: sellAll.tile, sellText: sellAll.text };
+    const top = heading.y + GOODS_LIST.heading;
     const aboard = GOOD_IDS.filter((id) => (ship?.cargo[id] ?? 0) > 0);
     if (aboard.length === 0) {
       const empty = text(
         t(
           'The hold is empty. Sunk ships and monsters leave goods floating: sail over them to haul them aboard, then sell them here. A ship that goes down loses its cargo where it sank.',
         ),
-        12,
+        13,
         THEME.dim,
-        { wordWrap: true, wordWrapWidth: SHOP_WIDTH },
+        { wordWrap: true, wordWrapWidth: SHOP_WIDTH - 48, align: 'center' },
       );
-      empty.position.set(0, 40);
-      this.list.addChild(empty);
+      empty.anchor.set(0.5);
+      empty.position.set(SHOP_WIDTH / 2, top + GOODS_LIST.empty / 2);
+      const card = drawCard(new Graphics(), SHOP_WIDTH, GOODS_LIST.empty);
+      card.position.set(0, top);
+      this.list.addChild(card, empty);
       return;
     }
     aboard.forEach((id, i) => {
-      const { price } = GOODS[id];
-      const name = t(GOODS[id].name);
-      const count = ship?.cargo[id] ?? 0;
-      const row = new Container();
-      row.position.set(0, 40 + i * (MARKET_ROW + ROW_GAP));
-      const background = drawCard(new Graphics(), SHOP_WIDTH, MARKET_ROW);
-      const title = text(`${name}  ×${count}`, 13, THEME.text, { fontWeight: 'bold' });
-      title.position.set(12, (MARKET_ROW - title.height) / 2);
-      const worth = text(`${t('{n} gold each', { n: price })} · ${t('{n} gold', { n: price * count })}`, 12, GOLD, {
-        fontWeight: 'bold',
-      });
-      worth.anchor.set(1, 0.5);
-      worth.position.set(SHOP_WIDTH - BUY.width - 16, MARKET_ROW / 2);
-      const sell = brassButton(BUY.width, BUY.height, t('Sell'), () => {
-        if (this.actions.sellCargo(id)) this.say(t('{name} sold: +{n} gold', { name, n: price * count }), GOLD);
-      });
-      sell.tile.container.position.set(SHOP_WIDTH - BUY.width - 6, (MARKET_ROW - BUY.height) / 2);
-      row.addChild(background, title, worth, sell.tile.container);
+      const row = this.marketRow(id, ship?.cargo[id] ?? 0);
+      row.position.set(0, top + i * (GOODS_LIST.row + GOODS_LIST.gap));
       this.list.addChild(row);
     });
+  }
+
+  /** A good's row at the market, with its Sell */
+  private marketRow(id: GoodId, count: number) {
+    const { name, price } = GOODS[id];
+    const sell = () => {
+      const n = price * count;
+      if (this.actions.sellCargo(id)) this.say(t('{name} sold: +{n} gold', { name: t(name), n }), GOLD);
+    };
+    return goodRow(id, count, SHOP_WIDTH, [{ label: t('Sell'), onTap: sell }]);
   }
 
   /**
