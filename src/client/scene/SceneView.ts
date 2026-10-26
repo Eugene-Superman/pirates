@@ -21,7 +21,7 @@ import { DamageNumbers } from './effects/DamageNumbers';
 import { FogClouds } from './effects/FogClouds';
 import { FOG_LAYERS, createFogOfWar, type FogLayer, type FogOfWar, updateFogOfWar } from './effects/fogOfWar';
 import { LevelUpEffect } from './effects/LevelUpEffect';
-import { drawRangeRing } from './effects/rangeRings';
+import { drawRangeRings } from './effects/rangeRings';
 import { RepairEffect } from './effects/RepairEffect';
 import { ShipFire } from './effects/ShipFire';
 import { ShotEffects } from './effects/ShotEffects';
@@ -37,6 +37,7 @@ import { createSeaSurface, type SeaSurface, updateSeaSurface } from './effects/s
 import { drawChest, drawChestWater } from './models/chest3d';
 import { drawIslandGround, drawIslandRaised } from './models/island3d';
 import { portPieces } from './models/port3d';
+import { PortSprites } from './models/PortSprites';
 import { BotSprites } from './models/BotSprites';
 import { ChestSprites } from './models/ChestSprites';
 import { botShipTop, drawBotShip } from './models/botShip3d';
@@ -152,6 +153,8 @@ export class SceneView {
   private readonly bots: BotSprites;
   /** The chests afloat in sight, drawn from their atlases */
   private readonly chestSprites: ChestSprites;
+  /** The port from its pictures, once they have loaded */
+  private readonly portSprites = new PortSprites();
   /** Zoom as a multiple of CAMERA.zoom; the camera eases towards it */
   private zoomLevel = 1;
   /** Whether the HUD outlines the camera's zone */
@@ -245,7 +248,11 @@ export class SceneView {
     const islands = world.islands.filter((island) =>
       painter.isVisible(island.x, island.y, 0, island.reach * ISLAND_SHALLOWS + ISLAND_MARGIN),
     );
-    for (const island of islands) drawIslandGround(painter, island);
+    // The port's island is in its pictures once they have loaded; until then it is drawn as an island
+    const { port } = world;
+    const portArt = this.portSprites.loaded;
+    const drawn = portArt ? islands.filter((island) => island !== port.island) : islands;
+    for (const island of drawn) drawIslandGround(painter, island);
 
     this.drawWorldBorder();
 
@@ -254,7 +261,8 @@ export class SceneView {
     this.sinking.drawWater(camera, ship, islands);
     for (const id of WEAPON_IDS) {
       const range = ship.range(id);
-      if (this.ranges[id] && range > 0) drawRangeRing(painter, ship, range, RANGE_COLORS[id]);
+      if (this.ranges[id] && range > 0)
+        drawRangeRings(painter, ship, ship.fullVolleyRange(id), range, RANGE_COLORS[id]);
     }
     // Units in the fog of war are not drawn at all, nor wrecks. The serpent is long: it is culled by its body
     const others = near.filter(
@@ -298,7 +306,7 @@ export class SceneView {
     if (goal) drawTargetMarker(painter, goal, time);
 
     // Volumetric objects: from far to near
-    const objects: SceneObject[] = islands.map((island) => ({
+    const objects: SceneObject[] = drawn.map((island) => ({
       depth: painter.depth([island.x, island.y, island.height / 2]),
       draw: (p: Painter3D) => drawIslandRaised(p, island, time),
     }));
@@ -337,8 +345,8 @@ export class SceneView {
       const depth = painter.depth([chest.x, chest.y, 2]);
       objects.push(layers ? { depth, layers } : { depth, draw: (p) => drawChest(p, chest, time) });
     }
-    const { port } = world;
-    if (painter.isVisible(port.island.x, port.island.y, 0, port.island.reach * ISLAND_SHALLOWS + ISLAND_MARGIN)) {
+    if (portArt) objects.push(...this.portSprites.objects(painter, camera, port, time, width, height));
+    else if (painter.isVisible(port.island.x, port.island.y, 0, port.island.reach * ISLAND_SHALLOWS + ISLAND_MARGIN)) {
       objects.push(...portPieces(painter, port, time));
     }
     for (const projectile of this.state.projectiles) {
@@ -378,22 +386,19 @@ export class SceneView {
   }
 
   /**
-   * Draws the sorted objects, far to near: a sprite can't go inside a Graphics, so each ship's sprite (and its fire)
-   * goes between two layers, the vector-drawn objects farther than it in the one under it, the nearer ones in the next.
-   * Returns the painter of the layer right under the player's ship
+   * Draws the sorted objects, far to near: a sprite can't go inside a Graphics, so each ship's sprite (and its fire),
+   * each slice of the port's pictures, goes between two layers, the vector-drawn objects farther than it in the one
+   * under it, the nearer ones in the next (opened only when there are some: sprites in a row share none). The port's
+   * ground lies under all of it. Returns the painter of the layer right under the player's ship
    */
   private drawLayers(objects: readonly SceneObject[], width: number, height: number) {
-    const order: Container[] = [this.scene];
+    const order: Container[] = this.portSprites.loaded ? [this.portSprites.ground, this.scene] : [this.scene];
     let painter = this.painter;
     let behindShip = this.painter;
     let used = 0;
-    for (const object of objects) {
-      if ('draw' in object) {
-        object.draw(painter);
-        continue;
-      }
-      if (object.layers.includes(this.fireLayer)) behindShip = painter;
-      order.push(...object.layers);
+    // Whether `painter` draws into the topmost layer so far, or a sprite has gone over it since
+    let open = true;
+    const next = () => {
       if (used === this.segments.length) {
         const graphics = new Graphics();
         this.segments.push({ graphics, painter: new Painter3D(graphics, this.camera) });
@@ -404,6 +409,21 @@ export class SceneView {
       segment.painter.screenHeight = height;
       order.push(segment.graphics);
       painter = segment.painter;
+      open = true;
+    };
+    for (const object of objects) {
+      if ('draw' in object) {
+        if (!open) next();
+        object.draw(painter);
+        continue;
+      }
+      if (object.layers.includes(this.fireLayer)) {
+        // Shot effects behind the ship are drawn later, into the layer right under it
+        if (!open) next();
+        behindShip = painter;
+      }
+      order.push(...object.layers);
+      open = false;
     }
     // Layers left over from a frame with more ships in sight stay empty
     for (const segment of this.segments.slice(used)) segment.graphics.clear();

@@ -1,5 +1,6 @@
 import type { GameState } from '../GameState';
 import { SHIP_CLASSES, STARTER_SHIP, type ShipClassId } from '../ships/shipClasses';
+import { levelOf } from '../ships/talents';
 import { shipOf, type Player } from './player';
 
 /**
@@ -20,7 +21,7 @@ export interface ShipOffer {
 // The goal of the starting waters: a couple of hours of play. The level is about where the starting bots stop
 // paying full XP (ships/talents.ts, xpForKill); the gold is some 80 kills with their cargo, less the repairs
 export const SHIP_OFFERS: readonly ShipOffer[] = [
-  { shipClass: 'corsair', price: 3000, level: 7, quests: 5, baron: true },
+  { shipClass: 'coastalBark', price: 3000, level: 7, quests: 5, baron: true },
 ];
 
 /** A step of the path, as the HUD shows it: done or not, and how far for a counted one */
@@ -82,6 +83,21 @@ export function captainsPath(state: GameState, player: Player): PathStep[] {
 /** Whether every term of the goal's offer is met: all the steps of the path done */
 export function termsMet(state: GameState, player: Player) {
   return goalOffer(state, player) !== null && captainsPath(state, player).every((s) => s.done);
+}
+
+/**
+ * Whether the player has mastered a tier: has a ship of it at its class's last level, sailed or laid up, of a line
+ * other than the masterworks (the starter's sloop counts for tier 1). A masterwork of the tier asks for it before it
+ * is sold (ships/shipLines.ts)
+ */
+export function tierMastered(state: GameState, player: Player, tier: number) {
+  const sailed = shipOf(state, player);
+  const owned = player.fleet.map((kept) => ({ id: kept.shipClass, xp: kept.xp }));
+  if (sailed) owned.push({ id: sailed.shipClass.id, xp: sailed.xp });
+  return owned.some(({ id, xp }) => {
+    const { line, tier: its, maxLevel } = SHIP_CLASSES[id];
+    return line !== 'premium' && its === tier && levelOf(xp, maxLevel) >= maxLevel;
+  });
 }
 
 /** The offer's ship's name, for the HUD */

@@ -233,13 +233,23 @@ export class Ship implements Body {
    */
   private refit() {
     const before = this.figures.maxHp;
-    const bonuses: OutfitBonus[] = fittedPieces(this.outfit).map(({ bonus }) => bonus);
+    this.figures = this.grown(this.outfit);
+    if (this.figures.maxHp !== before) this.hp = Math.round((this.hp / before) * this.figures.maxHp);
+  }
+
+  /** What its figures would be with a piece in a slot instead of the one there (null: the slot empty), for the shop */
+  figuresWith(slot: OutfitSlot, id: OutfitId | null): ShipStats {
+    return this.grown({ ...this.outfit, [slot]: id });
+  }
+
+  /** Its class's figures (as tuned) grown by an outfit and the talents taken */
+  private grown(outfit: Readonly<Record<OutfitSlot, OutfitId | null>>) {
+    const bonuses: OutfitBonus[] = fittedPieces(outfit).map(({ bonus }) => bonus);
     for (const [id, rank] of this.ranks) {
       const { bonus } = TALENTS[id];
       if (bonus) bonuses.push(scaledBonus(bonus, rank));
     }
-    this.figures = grownStats(this.tuned, addShares(bonuses));
-    if (this.figures.maxHp !== before) this.hp = Math.round((this.hp / before) * this.figures.maxHp);
+    return grownStats(this.tuned, addShares(bonuses));
   }
 
   /** The fastest the ship can go now: between maxSpeed and minSpeed, by how much hull is left */
@@ -368,6 +378,15 @@ export class Ship implements Body {
   /** How far the farthest-reaching fitted gun of a weapon reaches, world units; 0 with none fitted */
   range(weapon: WeaponId = this.weapon) {
     return this.fittedGuns(weapon).reduce((longest, { gun }) => Math.max(longest, this.reach(gun)), 0);
+  }
+
+  /**
+   * How far every fitted gun of a weapon reaches, world units: the shortest gun's reach. Within it a volley fires all
+   * the loaded guns; beyond it, out to `range`, only the guns that reach that far. 0 with none fitted
+   */
+  fullVolleyRange(weapon: WeaponId = this.weapon) {
+    const guns = this.fittedGuns(weapon);
+    return guns.length === 0 ? 0 : Math.min(...guns.map(({ gun }) => this.reach(gun)));
   }
 
   /** How far a gun of this ship reaches, world units: the gun's own reach, more with Long guns */

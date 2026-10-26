@@ -1,0 +1,14 @@
+{
+ "file": "ships.webp",
+ "tile": 256,
+ "icons": {
+  "sloop": [
+   0,
+   0
+  ],
+  "coastalBark": [
+   1,
+   0
+  ]
+ }
+}

@@ -58,8 +58,8 @@ export const RU: Readonly<Record<string, string>> = {
   'FPS: {fps}   longest frame: {ms} ms': 'FPS: {fps}   самый долгий кадр: {ms} мс',
   "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings":
     'Нет графического ускорения: игру рисует процессор, в меньшем разрешении. Включите его в настройках браузера',
-  'Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics':
-    'Клик по морю — плыть, по порту — зайти в него · клик по кораблю или чудовищу — выбрать цель, двойной клик или Пробел — огонь, Esc — стоп · Q/E оружие, R ремонт (за золото), F умение, K таланты, I статистика',
+  'Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold':
+    'Клик по морю — плыть, по порту — зайти в него · клик по кораблю или чудовищу — выбрать цель, двойной клик или Пробел — огонь, Esc — стоп · Q/E оружие, R ремонт (за золото), F умение, K таланты, I статистика, H трюм',
   'Intact 100%': 'Целый 100%',
   'Minor 70%': 'Поцарапан 70%',
   'Heavy 45%': 'Побит 45%',
@@ -113,25 +113,38 @@ export const RU: Readonly<Record<string, string>> = {
   Cannonballs: 'Ядра',
   Harpoons: 'Гарпуны',
   'Saltwind Harbour': 'Гавань Солёного Ветра',
-  '{label} {theirs} (yours {ours})': '{label} {theirs} (у вас {ours})',
   '{speed} kn': '{speed} уз.',
   'Speed {speed} kn · Turn {turn}°/s · Hull {hull} · Sight {sight}':
     'Скорость {speed} уз. · Поворот {turn}°/с · Корпус {hull} · Обзор {sight}',
-  'Leave port  (Esc)': 'Выйти из порта  (Esc)',
   Tavern: 'Таверна',
   'Bounties: up to {n} at a time. Sink what they ask, then come back':
     'Заказы: до {n} одновременно. Потопите, что просят, и возвращайтесь',
-  Shop: 'Лавка',
-  Ammo: 'Боеприпасы',
-  Outfit: 'Оснастка',
-  Shipwright: 'Корабел',
   Market: 'Рынок',
   Shipyard: 'Верфь',
+  'Set sail  (Esc)': 'Поднять паруса  (Esc)',
+  'Back to the harbour  (Esc)': 'Назад в гавань  (Esc)',
+  Workshop: 'Мастерская',
+  Arsenal: 'Арсенал',
+  'Guild hall': 'Штаб гильдии',
+  'Auction house': 'Аукционный дом',
+  Repairs: 'Ремонт',
+  'Bounties: sink what they ask and come back for the gold': 'Заказы: потопите, что просят, и возвращайтесь за золотом',
+  'Buys the goods in your hold': 'Покупает товары из вашего трюма',
+  'Sails, planking, rudders and lookouts for your ship, and hull repairs':
+    'Паруса, обшивка, рули и снаряжение дозорного для корабля, ремонт корпуса',
+  'New ships, and your ships laid up in port': 'Новые корабли и ваши корабли, стоящие в порту',
+  'Cannons, harpoon guns and their ammo': 'Пушки, гарпунные пушки и боеприпасы к ним',
+  'Where captains band together': 'Здесь капитаны объединяются',
+  'Where captains trade with one another': 'Здесь капитаны торгуют между собой',
+  'Closed for now': 'Пока закрыто',
+  'Captains will band together here: found a guild, share its treasury, sail out and fight side by side. It opens with the online game.':
+    'Здесь капитаны будут объединяться: основывать гильдии, вести общую казну, выходить в море и сражаться плечом к плечу. Откроется вместе с онлайн-игрой.',
+  'Captains will sell one another guns, outfit and goods here, each at their own price. It opens with the online game.':
+    'Здесь капитаны будут продавать друг другу пушки, оснастку и товары, каждый по своей цене. Откроется вместе с онлайн-игрой.',
   Sails: 'Паруса',
   Rudder: 'Руль',
   Lookout: 'Дозор',
   speed: 'скорости',
-  'speed when holed': 'скорости с пробоинами',
   acceleration: 'разгона',
   braking: 'торможения',
   turning: 'поворота',
@@ -139,8 +152,6 @@ export const RU: Readonly<Record<string, string>> = {
   sight: 'обзора',
   Hold: 'Трюм',
   Sight: 'Обзор',
-  'Welcome ashore. The tavern has work, the shop has guns and shot, the market buys cargo':
-    'Добро пожаловать на берег. В таверне есть работа, в лавке — пушки и ядра, рынок покупает груз',
   'Done!': 'Выполнено!',
   'Turn in {n} more tavern quest to hear of it|Turn in {n} more tavern quests to hear of it':
     'Сдайте ещё {n} задание таверны, чтобы услышать об этом|Сдайте ещё {n} задания таверны, чтобы услышать об этом|Сдайте ещё {n} заданий таверны, чтобы услышать об этом',
@@ -167,8 +178,6 @@ export const RU: Readonly<Record<string, string>> = {
   Buy: 'Купить',
   '{name} is in the hold: fit it in the loadout (L)': '{name}: в трюме, установите в вооружении (L)',
   'Not enough gold': 'Не хватает золота',
-  'The shipwright fits it here, in port; the piece taken off goes to the hold':
-    'Корабел ставит это здесь, в порту; снятое идёт в трюм',
   '{name} taken off: it is in the hold': '{name}: снято, лежит в трюме',
   '{name} fitted': '{name}: установлено',
   '{name} bought and fitted': '{name}: куплено и установлено',
@@ -182,10 +191,6 @@ export const RU: Readonly<Record<string, string>> = {
   '{n} gold each': '{n} золотой за шт.|{n} золотых за шт.|{n} золотых за шт.',
   Sell: 'Продать',
   '{name} sold: +{n} gold': '{name}: продано, +{n} золотой|{name}: продано, +{n} золотых|{name}: продано, +{n} золотых',
-  'European line · tier {tier} · {n} gold':
-    'Европейская линия · ранг {tier} · {n} золотой|Европейская линия · ранг {tier} · {n} золотых|Европейская линия · ранг {tier} · {n} золотых',
-  'The first ship of the European line: all round, like its line. A new ship starts at level 1 with talents of its own.':
-    'Первый корабль европейской линии: универсальный, как и вся линия. Новый корабль начинает с 1 уровня, со своими талантами.',
   "The shipwright's terms: the Captain's path": 'Условия корабела: путь капитана',
   '{pack} for {n} gold': '{pack} за {n} золотой|{pack} за {n} золотых|{pack} за {n} золотых',
   'to creatures': 'существам',
@@ -307,12 +312,7 @@ export const RU: Readonly<Record<string, string>> = {
   Miss: 'Промах',
   '−{n} gold': '−{n} золотой|−{n} золотых|−{n} золотых',
   '+{n} gold': '+{n} золотой|+{n} золотых|+{n} золотых',
-  'Buy the {name}: {n} gold': 'Купить {name}: {n} золотой|Купить {name}: {n} золотых|Купить {name}: {n} золотых',
-  'Every term met: the {name} is yours to buy': 'Все условия выполнены: {name} можно купить',
   'Meet every term to buy it': 'Выполните все условия, чтобы купить',
-  'You own every ship the shipyard sells for now: more of the line come with the next waters':
-    'У вас уже есть все корабли, которые продаёт верфь: новые корабли линии появятся в следующих водах',
-  'Your ships': 'Ваши корабли',
   'Lv {level} · hull {hp}': 'Ур. {level} · корпус {hp}',
   'At the helm': 'За штурвалом',
   'Take the helm': 'Встать за штурвал',
@@ -338,7 +338,7 @@ export const RU: Readonly<Record<string, string>> = {
   '+5% turning a rank': '+5% поворота за очко',
   '+5% sight a rank': '+5% обзора за очко',
   Quartermaster: 'Квартирмейстер',
-  '+3 places in the hold a rank': '+3 места в трюме за очко',
+  '+10 places in the hold a rank': '+10 мест в трюме за очко',
   'Bounty hunter': 'Ловец наград',
   '+7% gold for every kill a rank': '+7% золота за каждую добычу, за очко',
   'Treasure hunter': 'Искатель сокровищ',
@@ -442,6 +442,59 @@ export const RU: Readonly<Record<string, string>> = {
   'Fast, light hits': 'Быстрые лёгкие попадания',
   'Leviathan lance': 'Копьё левиафана',
   'Kraken bane': 'Погибель кракена',
+  Legend: 'Легенда',
+  'Misses on': 'Промах на',
+  'Critical hit': 'Критический удар',
+  'Average hit': 'Средний выстрел',
+  'Damage a second': 'Повреждения в секунду',
+  Reach: 'Дальность',
+  Reload: 'Перезарядка',
+  Price: 'Цена',
+  '{n} s': '{n} с',
+  'Tier {tier} cannon': 'Пушка {tier} уровня',
+  'Tier {tier} harpoon gun': 'Гарпунная пушка {tier} уровня',
+  'on {faces}: {n}': 'на {faces}: {n}',
+  'Buy: {n} gold': 'Купить: {n} золотых',
+  'Cast by the dozen in the Saltwind foundry, it has fired at every foe the sea has to offer. Captains call it the only hand aboard who never asks for a share.':
+    'Её отливают дюжинами в литейной Солёного Ветра, и она уже стреляла по всем врагам, каких только знает море. Капитаны говорят, что это единственный член команды, который никогда не просит своей доли.',
+  "Pinned to the rail on an iron fork, the swivel gun turns faster than the bosun's temper. Fishermen keep one aboard to see off gulls and smugglers alike.":
+    'Посаженный на железную вилку у борта, фальконет поворачивается быстрее, чем вспыхивает боцман. Рыбаки держат такой на борту, чтобы отгонять и чаек, и контрабандистов.',
+  'Its bronze came from the bells of a drowned chapel. Old gunners swear that after a good volley it still rings at midnight.':
+    'Её бронзу отлили из колоколов затонувшей часовни. Старые канониры клянутся: после хорошего залпа она до сих пор звонит в полночь.',
+  'Sailors call it the smasher: short, fat and furious, made for an enemy close enough to spit at. It misses often, but a ship it hits remembers it.':
+    'Матросы зовут её «крушилкой»: короткая, толстая и яростная, она для врага, подошедшего на расстояние плевка. Попадает она нечасто, но корабль, в который попала, её запомнит.',
+  'A slender nine-pounder bored true by a gunsmith who never touched rum. In steady hands it brings down a topmast at three cables.':
+    'Стройную девятифунтовую пушку рассверлил оружейник, ни разу не бравший в рот рома. В твёрдых руках она сбивает стеньгу за три кабельтова.',
+  'Banded in blue steel in the Admiralty yards, it was made for ships of the line. It is the gun a captain fits when he means to stay.':
+    'Её опоясали синей сталью на верфях Адмиралтейства для линейных кораблей. Такую пушку капитан ставит, когда собирается задержаться надолго.',
+  'Too heavy for most decks, it is hauled aboard by forty hands and a prayer. A pair of them settled the battle of the Grey Shoals in a single broadside.':
+    'Слишком тяжёлую для большинства палуб, её поднимают на борт сорок рук и одна молитва. Пара таких решила битву у Серых Отмелей одним бортовым залпом.',
+  'Long and chased in silver, the culverin was made for duels at the edge of sight. Its makers etched the name of every ship it sank along the barrel, until they ran out of room.':
+    'Длинная, чеканенная серебром кулеврина создана для дуэлей на пределе видимости. Мастера вырезали на стволе название каждого потопленного ею корабля, пока не кончилось место.',
+  "Cast for a governor's flagship and lost at cards the night it was finished. Wherever it fires, some harbour goes quiet.":
+    'Её отлили для флагмана губернатора и проиграли в карты в ту же ночь, когда закончили. Где бы она ни выстрелила, в какой-нибудь гавани наступает тишина.',
+  "Only three were ever cast, and the queen's goldsmith gilded each one. Sailors say its roar calms storms: the thunder simply keeps away.":
+    'Таких отлили всего три, и королевский ювелир позолотил каждую. Моряки говорят, что её рёв успокаивает бури: гром просто держится подальше.',
+  'A whaler’s gun turned to war when the sea began to bite back. Its line is spliced by hand, and every crew swears by its own knots.':
+    'Китобойное оружие, ушедшее на войну, когда море начало кусаться в ответ. Её линь сплетают вручную, и каждая команда клянётся своими узлами.',
+  'Light enough for one sailor to swing on its pin, the crossbow shoots before a serpent has finished rising. Fishermen keep it oiled under a tarpaulin.':
+    'Палубный арбалет так лёгок, что один матрос развернёт его на штыре, и стреляет он раньше, чем змей успеет вынырнуть. Рыбаки держат его смазанным под брезентом.',
+  'Its iron was quenched in water drawn from the deepest trench on the charts. Harpooners say it pulls towards whatever lives down there.':
+    'Её железо закаляли в воде из самой глубокой впадины на картах. Гарпунёры говорят, что она тянется к тому, что там живёт.',
+  'Built to stop a bull whale with one shot, it kicks like a mule and misses as often. When it does bite, nothing swims away.':
+    'Сделанная, чтобы остановить кашалота одним выстрелом, она лягается, как мул, и так же часто мажет. Но если уж вцепится, никто не уплывёт.',
+  "Blued and balanced in the Admiralty yards, it was the first harpoon gun to fly the navy's colours. Its barbs are numbered, and every one is accounted for.":
+    'Воронёная и выверенная на верфях Адмиралтейства, это первая гарпунная пушка под флагом флота. Её наконечники пронумерованы, и за каждый кто-то отвечает.',
+  'An old siege engine taught to fish: long arms, tarred ropes and a bolt that flies farther than any harpoon. Its crew winds it to a sea shanty, a verse a turn.':
+    'Старая осадная машина, которую научили рыбачить: длинные плечи, смолёные канаты и болт, летящий дальше любого гарпуна. Команда взводит её под морскую песню, по куплету на оборот.',
+  'Every barb on its heads was filed by hand, and no two point the same way. What it catches stays caught.':
+    'Каждый зубец на его наконечниках подпилен вручную, и никакие два не смотрят в одну сторону. Что он поймал, то уже не вырвется.',
+  'Two spears ride its rack: one is in the air while the next drops into place, and the gunner never has to wait. A smith made it after losing a bet to a sea serpent, and wanted a rematch.':
+    'На его стойке лежат два копья: одно ещё летит, а второе уже встаёт на место, так что наводчику никогда не приходится ждать. Его сделал кузнец, проигравший пари морскому змею и захотевший реванша.',
+  'A lance as long as a longboat, flung by black powder. It was made to hunt the leviathan that sank half the fishing fleet, and it found it.':
+    'Копьё длиной с баркас, которое мечет чёрный порох. Его сделали, чтобы охотиться на левиафана, потопившего пол-рыбацкого флота, и оно того левиафана нашло.',
+  'Forged from the anchor chain of a ship the kraken took, it is the only weapon the kraken is said to fear. Sailors touch it for luck before a long voyage.':
+    'Её выковали из якорной цепи корабля, который забрал кракен, и говорят, это единственное оружие, которого кракен боится. Моряки касаются её на удачу перед дальним плаванием.',
   'Cannonball I': 'Ядро I',
   'Cannonball II': 'Ядро II',
   'Cannonball III': 'Ядро III',
@@ -532,4 +585,532 @@ export const RU: Readonly<Record<string, string>> = {
   '{m} min': '{m} мин',
   '{s} s': '{s} с',
   '{km} km': '{km} км',
+  // The hold window
+  'Throw goods overboard to make room for better ones: what goes over the side sinks':
+    'Выбрасывай товары за борт, чтобы освободить место для лучших: что за бортом, то тонет',
+  '{cargo} of {size} places taken': 'Занято {cargo} из {size} мест',
+  'Worth {n} gold at the market': 'На рынке стоит {n} золотой|На рынке стоит {n} золотых|На рынке стоит {n} золотых',
+  'The hold is empty: sunk ships leave goods floating, sail over them to haul them aboard':
+    'Трюм пуст: потопленные корабли оставляют товары на воде, проплыви над ними, чтобы поднять на борт',
+  'Throw 1': 'Выбросить 1',
+  'Throw all': 'Выбросить всё',
+  'Bonus to every hit': 'Бонус к каждому попаданию',
+  'Fired by': 'Чем стреляют',
+  'Your volley': 'Ваш залп',
+  '{next} (now {now})': '{next} (сейчас {now})',
+  'Loaded now': 'Заряжено сейчас',
+  Pack: 'Пачка',
+  '{n} shot|{n} shots': '{n} выстрел|{n} выстрела|{n} выстрелов',
+  'Tier {tier} cannon ammo': 'Пушечные боеприпасы {tier} уровня',
+  'Tier {tier} harpoon ammo': 'Гарпуны {tier} уровня',
+  'Buy {pack}: {n} gold': 'Купить {pack}: {n} золотой|Купить {pack}: {n} золотых|Купить {pack}: {n} золотых',
+  '+{n} {name}: load it in the loadout (L)': '+{n} {name}: заряди в оснащении (L)',
+  '{n} aboard · loaded': '{n} на борту · заряжено',
+  '+{n} to every hit': '+{n} к каждому попаданию',
+  "Rough iron from the bottom of the foundry's ladle, left to rust in the rain until a ship needs it. It isn't pretty, but it still knocks a hole in a plank.":
+    'Грубое железо со дна литейного ковша, ржавеющее под дождём, пока не понадобится кораблю. Красотой не блещет, но дыру в доске пробьёт.',
+  'Two half-balls in iron bands that spring apart in flight, a fathom of chain between them. They were made for masts and rigging, and gunners swear they hum as they fly.':
+    'Две половинки ядра в железных обручах, разлетающиеся в полёте, а между ними — сажень цепи. Их сделали для мачт и такелажа, и канониры клянутся, что в полёте они гудят.',
+  "Turned smooth on a lathe and blacked with oil, it flies truer than the foundry's rough shot. Quartermasters count them like coins.":
+    'Обточенное на токарном станке и зачернённое маслом, оно летит точнее грубого литейного ядра. Интенданты считают их, как монеты.',
+  "The Admiralty's own shot, its anchor stamped deep in the bronze. Every one is weighed twice before it leaves the arsenal.":
+    'Собственное ядро Адмиралтейства с глубоко выбитым в бронзе якорем. Каждое дважды взвешивают, прежде чем оно покинет арсенал.',
+  'Heated in a furnace below decks until it glows, then rammed home on wet wadding. Tar and canvas catch at the first touch.':
+    'Их раскаляют в горне под палубой, пока не засветятся, и загоняют в ствол на мокром пыже. Смола и парусина вспыхивают от первого касания.',
+  'A shell of black glass in a brass cage, packed with powder and a slow fuse. When the cage gives way, the glass does the rest.':
+    'Оболочка из чёрного стекла в латунной клетке, начинённая порохом, с медленным фитилём. Когда клетка поддаётся, остальное делает стекло.',
+  "A sapphire as big as a fist, banded with the compass star of the royal fleet. It was once the crown's alone; now any captain with the gold can fire a jewel.":
+    'Сапфир величиной с кулак в обруче с компасной звездой королевского флота. Когда-то такие были только у короны; теперь стрелять драгоценностями может любой капитан с золотом.',
+  'A plain iron head on an ash shaft, the harpoon whalers have thrown for a hundred years. It holds as long as the rope does.':
+    'Простое железное остриё на ясеневом древке — такой гарпун китобои бросают уже сотню лет. Он держит, пока держит линь.',
+  "Barbs all along its head, filed back like a fish's fins. Once it is in, the only way out is through.":
+    'Зубцы вдоль всего острия, загнутые назад, как плавники рыбы. Если он вошёл, назад дороги нет — только насквозь.',
+  'A tempered head on a shaft bound in braided leather, so it never slips from a wet hand. Harpooners hand them down from father to son.':
+    'Закалённое остриё на древке, оплетённом кожей, чтобы не выскальзывал из мокрой руки. Гарпунёры передают такие от отца к сыну.',
+  "Bronze-headed and chased with sea vines in the navy's workshops. It is heavy enough to drive through a turtle's shell.":
+    'Бронзовое остриё, украшенное морскими лозами в мастерских флота. Оно достаточно тяжёлое, чтобы пробить панцирь черепахи.',
+  'Its head is steeped in the ink of a deep-sea squid, and its marks glow violet in the dark. Sailors wash their hands twice after loading one.':
+    'Его остриё пропитано чернилами глубоководного кальмара, и знаки на нём светятся фиолетовым в темноте. Зарядив такой, матросы дважды моют руки.',
+  'A hollow head packed with powder, its fuse lit by the shot itself. It bursts a moment after it strikes.':
+    'Полое остриё, начинённое порохом, с фитилём, который поджигает сам выстрел. Оно взрывается через миг после попадания.',
+  'Forged from the bronze of a sunken temple, its head sprouts tentacles of verdigris. Old hands say the deep knows its own, and lets it through.':
+    'Выкованный из бронзы затонувшего храма, его остриё прорастает щупальцами зелёной патины. Старые моряки говорят, что бездна узнаёт своих и пропускает его.',
+  'Tier {tier} sails': 'Паруса {tier} уровня',
+  'Tier {tier} hull': 'Корпус {tier} уровня',
+  'Tier {tier} rudder': 'Руль {tier} уровня',
+  'Tier {tier} lookout': 'Дозор {tier} уровня',
+  'Top speed': 'Наибольшая скорость',
+  'Speed when holed': 'Скорость с пробоинами',
+  Acceleration: 'Разгон',
+  Braking: 'Торможение',
+  Turning: 'Поворот',
+  'Fitted now': 'Стоит сейчас',
+  Nothing: 'Ничего',
+  '{n} kn/s': '{n} уз./с',
+  '{n}°/s': '{n}°/с',
+  'Buy and fit: {n} gold':
+    'Купить и поставить: {n} золотой|Купить и поставить: {n} золотых|Купить и поставить: {n} золотых',
+  'Your ship: {figures}': 'Ваш корабль: {figures}',
+  holed: 'с пробоинами',
+  'Patched jib': 'Латаный кливер',
+  'Slower, but quick into a turn and off the mark': 'Медленнее, но быстро поворачивает и трогается',
+  'Admiralty sails': 'Адмиралтейские паруса',
+  'Fast, and keep their way when the hull is holed': 'Быстрые и держат ход с пробоинами',
+  'Dragon sails': 'Драконьи паруса',
+  'Fast and quick off the mark': 'Быстрые и легко трогаются',
+  'Kraken sails': 'Паруса кракена',
+  'Turn well, and keep their way when holed': 'Хорошо поворачивают и держат ход с пробоинами',
+  'Pine planking': 'Сосновая обшивка',
+  'Light: a little stouter, a little faster': 'Лёгкая: чуть крепче и чуть быстрее',
+  'Tarred planking': 'Просмолённая обшивка',
+  'Leaks little: keeps its way when holed': 'Почти не течёт: держит ход с пробоинами',
+  'Steel plates': 'Стальные плиты',
+  'Lighter armour: a little slower': 'Лёгкая броня: чуть медленнее',
+  'Brass plating': 'Латунная обшивка',
+  'Stout, and keeps its way when holed': 'Крепкая и держит ход с пробоинами',
+  'Kraken plating': 'Обшивка кракена',
+  'Stout, and slips through the water': 'Крепкая и легко скользит по воде',
+  'Sea anchor': 'Морской якорь',
+  'A canvas drogue: stops shorter': 'Парусиновый плавучий якорь: останавливает короче',
+  'Iron rudder': 'Железный руль',
+  'Turns quicker and guards the stern': 'Поворачивает быстрее и бережёт корму',
+  "Captain's wheel": 'Капитанский штурвал',
+  'Turns quick and stops short': 'Быстро поворачивает и резко останавливает',
+  'Kraken wheel': 'Штурвал кракена',
+  'Grips the sea: stops shortest, turns well': 'Держит море: останавливает короче всех, хорошо поворачивает',
+  'Leviathan rudder': 'Руль левиафана',
+  'Turns quick and guards the stern': 'Быстро поворачивает и бережёт корму',
+  'Brass spyglass': 'Латунная подзорная труба',
+  'Sees a little farther, and the helm answers sooner': 'Видно чуть дальше, и руль слушается раньше',
+  "Sheltered crow's nest": 'Марс с навесом',
+  'A lookout who reads the wind: quick off the mark': 'Дозорный, читающий ветер: легко трогается',
+  "Officer's glass": 'Офицерская труба',
+  'Sees farther, and the helm answers sooner': 'Видно дальше, и руль слушается раньше',
+  "Admiral's glass": 'Адмиральская труба',
+  'Sees far, and the shoals ahead: stops shorter': 'Видно далеко, и мели впереди: останавливает короче',
+  'Star telescope': 'Звёздный телескоп',
+  'Reads the wind by day and by night: sees far, quick off the mark':
+    'Читает ветер днём и ночью: видно далеко, легко трогается',
+  'Kraken eye': 'Око кракена',
+  'Sees far, and the helm answers sooner': 'Видно далеко, и руль слушается раньше',
+  'Plain canvas, sewn by the sailmakers of Saltwind from flax grown on the island. Every ship starts with it, and plenty never need more.':
+    'Простая парусина, которую шьют парусники Солёного Ветра из льна, выращенного на острове. С неё начинает каждый корабль, и многим большего не нужно.',
+  'Cut down from a sail that lost to a storm and patched where the shot went through. Small, but it swings round quicker than any square sail.':
+    'Вырезан из паруса, проигравшего шторму, и залатан там, где прошло ядро. Маленький, зато разворачивается быстрее любого прямого паруса.',
+  'Woven from cotton brought up from the south and stiffened with leather at the corners. It takes the lightest breeze and asks for more.':
+    'Сотканы из хлопка, привезённого с юга, и укреплены кожей по углам. Ловят самый лёгкий бриз и просят ещё.',
+  "A junk's sail, ribbed with bamboo battens: holed in ten places, it still keeps its shape and draws. The rig came from the far east with a trader who never went home.":
+    'Парус джонки с бамбуковыми рейками: пробитый в десяти местах, он держит форму и тянет. Эту оснастку привёз с востока торговец, так и не вернувшийся домой.',
+  "Violet silk from a merchant prince's wedding fleet, still sewn with his crescent moon. Light as air, it catches every breath of wind.":
+    'Фиолетовый шёлк со свадебного флота купеческого князя, до сих пор расшитый его полумесяцем. Лёгкий, как воздух, ловит каждое дуновение ветра.',
+  'A triangle of red canvas on a long slanting yard, the rig of the southern raiders. It turns on a coin and gathers way in a heartbeat.':
+    'Треугольник красной парусины на длинной косой рее — оснастка южных рейдеров. Разворачивается на пятачке и набирает ход в мгновение.',
+  "The navy's own canvas, doubled and bound with gold thread round the compass rose. The Admiralty swears none of its ships was ever left dead in the water.":
+    'Собственная парусина флота, двойная и прошитая золотой нитью вокруг розы ветров. Адмиралтейство клянётся, что ни один его корабль не стоял без хода.',
+  'Green as deep water, with a golden dragon that seems to uncoil when the wind fills it. Crews say it pulls the ship along by itself.':
+    'Зелёные, как глубокая вода, с золотым драконом, который будто разворачивается, когда ветер наполняет парус. Моряки говорят, что он сам тянет корабль.',
+  'Woven with the kraken in gold thread by a sailmaker who swore he had seen it. Ships under it turn as if something steered them from below.':
+    'Сотканы с золотым кракеном парусником, который клялся, что видел его. Корабли под ними поворачивают, будто кто-то правит ими снизу.',
+  "Seasoned oak from the island's own hills, bound in bundles and fitted plank by plank. Solid, honest wood.":
+    'Выдержанный дуб с холмов самого острова, связанный в пучки и подогнанный доска к доске. Крепкое, честное дерево.',
+  'Pale pine, quick to work and light to carry. It gives a little where oak would hold, but the ship rides higher and runs a little faster.':
+    'Светлая сосна, лёгкая в работе и по весу. Она поддаётся там, где дуб устоял бы, зато корабль сидит выше и бежит чуть быстрее.',
+  'Two skins of planking with iron strips between them. A ball that breaks the first has little left for the second.':
+    'Две шкуры обшивки с железными полосами между ними. Ядру, пробившему первую, на вторую почти ничего не остаётся.',
+  'Copper sheets nailed below the waterline keep the weed and the worm off. A clean bottom slips through the water, and to a sailor the green on it is only polish.':
+    'Медные листы, прибитые ниже ватерлинии, не подпускают водоросли и древоточцев. Чистое днище легко скользит по воде, а зелень на нём для моряка лишь блеск.',
+  'Black with pine tar boiled in until the wood could drink no more. It hardly leaks, so a holed ship keeps more of its way.':
+    'Чёрная от сосновой смолы, которую вваривали, пока дерево могло пить. Почти не течёт, так что пробитый корабль сохраняет больше хода.',
+  "Red teak from the far south, so hard it blunts the shipwright's tools. It shrugs off shot that would splinter oak.":
+    'Красный тик с далёкого юга, такой твёрдый, что тупит инструмент корабела. Он не замечает ядер, от которых разлетелся бы дуб.',
+  'Rough iron plates riveted over the hull. Nothing short of a heavy gun dents them, but the ship sits low and answers the helm slowly.':
+    'Грубые железные плиты, приклёпанные поверх корпуса. Их берёт только тяжёлая пушка, но корабль сидит низко и неохотно слушается руля.',
+  'Blued steel, thinner than iron and just as hard: the armour of captains who still mean to catch what they chase.':
+    'Воронёная сталь, тоньше железа и так же тверда: броня капитанов, которые всё ещё хотят догнать того, за кем гонятся.',
+  'Brass plates stamped with the compass rose, bolted over tarred planking. Holed, the ship still keeps its way, as if the compass held it on course.':
+    'Латунные листы с выбитой розой ветров, прикрученные поверх просмолённой обшивки. Даже с пробоинами корабль держит ход, будто его ведёт компас.',
+  'Black plates inlaid with a turquoise kraken, from a forge nobody will name. The sea seems to part for the hull that wears them.':
+    'Чёрные плиты с бирюзовым кракеном, из кузницы, которую никто не назовёт. Море будто расступается перед корпусом, что их носит.',
+  'A plain rudder and a long oak tiller. The helmsman leans on it with all his weight, and the ship comes round.':
+    'Простой руль и длинный дубовый румпель. Рулевой налегает на него всем весом — и корабль поворачивает.',
+  'A canvas cone on a line, thrown over the stern: it fills with water and drags the ship to a stop. Fishermen ride out gales on one.':
+    'Парусиновый конус на лине, брошенный за корму: он набирает воду и тянет корабль к остановке. Рыбаки пережидают на нём штормы.',
+  'A wheel and ropes to the rudder, so one hand does what took two men on a tiller. Iron at the joints, oak everywhere else.':
+    'Колесо с тросами к рулю: одна рука делает то, что на румпеле делали двое. Железо на соединениях, дуб повсюду.',
+  'A great red drogue of sailcloth and iron hoops. Let go, it stops the ship short, and its broadside stays where it was aimed.':
+    'Большой красный плавучий якорь из парусины и железных обручей. Брошенный, он резко останавливает корабль, и борт остаётся там, куда целился.',
+  'An iron-plated rudder hung on brass hinges. Shot that would shatter a wooden blade glances off it, and the stern is the safer for it.':
+    'Окованный железом руль на латунных петлях. Ядро, что разбило бы деревянное перо, отскакивает от него, и корма от этого в безопасности.',
+  'Part of its blade stands ahead of the hinge, so the water itself helps to turn it. The helm is light, and the ship turns quickest of all.':
+    'Часть пера стоит перед осью, так что вода сама помогает его поворачивать. Руль лёгкий, и корабль поворачивает быстрее всех.',
+  'Mahogany and brass, with a compass set in its hub. It was made for a captain who liked to turn and stop in the same breath.':
+    'Красное дерево и латунь, компас в ступице. Сделан для капитана, который любил повернуть и остановиться на одном дыхании.',
+  'Brass tentacles wind round its spokes and a turquoise star burns in its hub. Turn it hard and the sea seems to grip the hull.':
+    'Латунные щупальца обвивают спицы, а в ступице горит бирюзовая звезда. Крутани его резко — и море будто хватает корпус.',
+  'An iron blade inlaid with sea serpents, forged for a ship that hunted the leviathan. It turns quick and takes a beating.':
+    'Железное перо, инкрустированное морскими змеями, выкованное для корабля, охотившегося на левиафана. Быстро поворачивает и выдерживает удары.',
+  'A wooden spyglass with one good lens. The lookout sees a sail a little sooner, and that is often enough.':
+    'Деревянная подзорная труба с одной хорошей линзой. Дозорный видит парус чуть раньше, и часто этого хватает.',
+  'Brass and stitched leather, three draws long. Through it the lookout reads the water ahead and calls the helm before the waves do.':
+    'Латунь и прошитая кожа, три колена. В неё дозорный читает воду впереди и кричит рулевому раньше, чем подойдут волны.',
+  'A railed platform high on the mast, with a ladder and a rope to hold on to. From up there the horizon moves back a long way.':
+    'Площадка с поручнем высоко на мачте, с лестницей и тросом, чтобы держаться. Оттуда горизонт отступает далеко.',
+  "A crow's nest with a canvas roof, so the lookout stays up through rain and sun. He calls the gusts before they reach the sails.":
+    'Марс с парусиновой крышей, так что дозорный сидит наверху и в дождь, и в зной. Он кричит о порывах раньше, чем они дойдут до парусов.',
+  "An officer's glass of brass and red wood, polished every watch. It sees far, and its owner calls the turns before the danger shows.":
+    'Офицерская труба из латуни и красного дерева, начищенная каждую вахту. Видит далеко, и её владелец командует поворот раньше, чем покажется опасность.',
+  'A long navy telescope on a brass tripod, a compass at its foot. It shows what the long guns can reach, and a little more.':
+    'Длинный флотский телескоп на латунной треноге с компасом у ног. Показывает то, куда достают дальнобойные пушки, и немного больше.',
+  'A heavy red glass with a gold anchor on it, carried by admirals who never ran aground. It finds the shoals before the keel does.':
+    'Тяжёлая красная труба с золотым якорем, которую носят адмиралы, ни разу не севшие на мель. Она находит мели раньше киля.',
+  'Engraved with the stars it was made to follow. By night it steers by them, and by day it reads the wind on the water.':
+    'Гравирован звёздами, за которыми его сделали следить. Ночью по ним правят курс, а днём он читает ветер на воде.',
+  'Gold tentacles hold a lens of turquoise glass. Through it, they say, the sea hides nothing, and the helm never answers late.':
+    'Золотые щупальца держат линзу из бирюзового стекла. Говорят, сквозь неё море ничего не скрывает, а руль никогда не опаздывает.',
+  'Coastal Bark': 'Прибрежный барк',
+  'My ships': 'Мои корабли',
+  European: 'Европейская',
+  Eastern: 'Азиатская',
+  'Free pirates': 'Вольные пираты',
+  Northern: 'Северная',
+  Legendary: 'Легендарная',
+  'Starter ships': 'Стартовые корабли',
+  'Royal Navies': 'Королевские флоты',
+  'Empires of the East': 'Империи Востока',
+  'Brotherhood of the Black Flag': 'Братство Чёрного Флага',
+  'Clans of the Frozen Seas': 'Кланы ледяных морей',
+  'Forbidden Fleets': 'Запретные флоты',
+  'The first ship of every captain': 'Первый корабль каждого капитана',
+  'All-rounders: guns, speed and hull in balance': 'Универсальные: пушки, скорость и прочность в равновесии',
+  'Agile and fast, with special abilities': 'Манёвренные и быстрые, с особыми способностями',
+  'Heavy broadsides, ambushes and aggressive play': 'Мощные залпы, засады и агрессивный бой',
+  'Tough hulls, rams and fierce attacks up close': 'Крепкие корпуса, тараны и яростные атаки вблизи',
+  'Unique effects and rare abilities, hard to obtain': 'Уникальные эффекты и редкие способности, трудно добыть',
+  'Small, plain and light: the ship every captain learns the sea on.':
+    'Маленький, простой и лёгкий: корабль, на котором каждый капитан учится ходить по морю.',
+  'Spain, England, France and the Netherlands: classic sailing ships, heavy guns, bronze ornaments and royal crests.':
+    'Испания, Англия, Франция, Нидерланды: классические парусники, тяжёлые пушки, бронзовые украшения и королевские гербы.',
+  'China, Japan and Southeast Asia: junks, decks in tiers, red sails, dragons and lacquered wood.':
+    'Китай, Япония, Юго-Восточная Азия: джонки, многоярусные палубы, красные паруса, драконы и лакированное дерево.',
+  'The Caribbean and the pirate republics: rebuilt ships, black sails, trophies, uneven sides and odd weapons.':
+    'Карибское море и пиратские республики: переделанные корабли, чёрные паруса, трофеи, неровные борта и необычное оружие.',
+  'Norse myth and the northern seas: long hulls, carved beast heads, fur, runes and steel.':
+    'Скандинавская мифология и северные моря: длинные корпуса, резные головы зверей, мех, руны и сталь.',
+  'Powers beyond nature and civilisations older than history: ghostly hulls, glowing runes, cursed guns, strange silhouettes.':
+    'Сверхъестественные силы и цивилизации старше истории: призрачные корпуса, светящиеся руны, проклятые пушки, необычные силуэты.',
+  Frigate: 'Фрегат',
+  'Royal Galleon': 'Королевский галеон',
+  Admiral: 'Адмирал',
+  'Imperial Ship of the Line': 'Имперский линкор',
+  'River Junk': 'Речная джонка',
+  'Sea Merchant': 'Морской торговец',
+  'Dragon Sentinel': 'Страж дракона',
+  'Celestial Frigate': 'Небесный фрегат',
+  'Imperial Junk': 'Имперская джонка',
+  'Dragon Armada': 'Драконья армада',
+  Smuggler: 'Контрабандист',
+  'Sea Wolf': 'Морской волк',
+  'Black Corsair': 'Чёрный корсар',
+  Avenger: 'Мститель',
+  'Storm Phantom': 'Призрак шторма',
+  'Lord of the Abyss': 'Владыка бездны',
+  Breaker: 'Прибой',
+  'Sea Raider': 'Морской рейдер',
+  'Wolf Ship': 'Волчий корабль',
+  'Ice Jarl': 'Ледяной ярл',
+  'Storm Petrel': 'Буревестник',
+  Jörmungandr: 'Ёрмунганд',
+  'The Forgotten': 'Забытый',
+  'Cursed Galleon': 'Проклятый галеон',
+  'Soul Reaper': 'Душегуб',
+  'Black Oracle': 'Чёрный оракул',
+  'Sea Devourer': 'Пожиратель морей',
+  'Throne of the Abyss': 'Трон бездны',
+  'Small and light: a ship to learn the sea on': 'Маленький и лёгкий: корабль, чтобы освоить море',
+  'A sturdy all-rounder of the coastal patrols': 'Крепкий универсал береговых патрулей',
+  'A royal raider, quick for its guns': 'Королевский рейдер, быстрый для своих пушек',
+  "Fast and far-sighted: the navy's eyes": 'Быстрый и зоркий: глаза флота',
+  'Treasure and guns in one deep hull': 'Сокровища и пушки в одном глубоком корпусе',
+  'A flagship that leads a squadron': 'Флагман, ведущий эскадру',
+  'Three gun decks of royal thunder': 'Три пушечные палубы королевского грома',
+  'Nimble in shallows and along the coast': 'Проворная на мелководье и у берега',
+  'A trader with the deepest hold of its line': 'Торговец с самым глубоким трюмом своей линии',
+  'Guards the straits: tough for its line': 'Стережёт проливы: крепкий для своей линии',
+  'Swift, keen-eyed and quick to turn': 'Стремительный, зоркий и вёрткий',
+  "An emperor's warship, many decks high": 'Боевой корабль императора во много палуб',
+  'The flagship of the dragon fleets': 'Флагман драконьих флотов',
+  'Fast, with a hold the customs never see': 'Быстрый, с трюмом, которого не видит таможня',
+  'Hunts in packs, strikes from ambush': 'Охотится стаей, бьёт из засады',
+  'A heavy broadside under black sails': 'Тяжёлый залп под чёрными парусами',
+  'Built for a grudge: hits hard, never lets go': 'Построен для мести: бьёт сильно и не отпускает',
+  'Out of the storm, a broadside, and gone': 'Из шторма — залп — и исчез',
+  'The heaviest broadside on the seas': 'Самый тяжёлый залп на морях',
+  'A sturdy longship that rides the surf': 'Крепкий длинный корабль, идущий по волнам прибоя',
+  'Raids the coasts, fights up close': 'Грабит побережья, бьётся вблизи',
+  'A beast head at the bow, a ram under it': 'Голова зверя на носу, таран под ней',
+  "A jarl's hall afloat, shod in steel": 'Плавучий зал ярла, окованный сталью',
+  'The fastest of the north, ahead of the storm': 'Самый быстрый на севере, впереди шторма',
+  'The world serpent: the toughest hull afloat': 'Мировой змей: самый крепкий корпус на воде',
+  'A ghost ship that sees through the fog': 'Корабль-призрак, видящий сквозь туман',
+  'Cursed gold, cursed guns': 'Проклятое золото, проклятые пушки',
+  'Its sunk foes sail on in its wake': 'Потопленные им враги плывут в его кильватере',
+  'Sees what is coming, far over the sea': 'Видит грядущее далеко над морем',
+  'Harpoons like teeth, a bow like jaws': 'Гарпуны как зубы, нос как челюсти',
+  'The throne of the deep, risen to the surface': 'Трон глубин, поднявшийся на поверхность',
+  'Tier {tier}': 'Ранг {tier}',
+  '{next} (yours {now})': '{next} (у вас {now})',
+  'Hull {hp} · {speed} kn · guns {cannons} + {harpoons} · hold {hold}':
+    'Корпус {hp} · {speed} уз. · пушки {cannons} + {harpoons} · трюм {hold}',
+  'Coming later': 'Появится позже',
+  'Every term met': 'Все условия выполнены',
+  "Captain's path: {done} / {all}": 'Путь капитана: {done} / {all}',
+  'You take the helm of the {name}': 'Вы встаёте за штурвал: {name}',
+  'The {name} is yours: you take its helm': 'Куплено: {name}. Вы встаёте за штурвал',
+  'Every line has a tab of its ships: the shipyard sells the {name} now, the others come later':
+    'У каждой линии своя вкладка с кораблями: сейчас верфь продаёт {name}, остальные появятся позже',
+  'Every line has a tab of its ships: the others come later':
+    'У каждой линии своя вкладка с кораблями: остальные появятся позже',
+  'One mast, a handful of guns and a crew that has just signed on. Every captain of Saltwind starts on one, and the old ones still speak of theirs fondly.':
+    'Одна мачта, горстка пушек и команда, только что нанявшаяся на борт. С такого шлюпа начинает каждый капитан Солёного Ветра, и старые морские волки до сих пор вспоминают свой с теплом.',
+  'Built in the yards of Saltwind for the coastal patrols: twice the guns of a sloop behind a stout oak hull, two masts and the royal crest on the main course. Not the fastest on the sea, but it answers for itself.':
+    'Построен на верфях Солёного Ветра для береговых патрулей: вдвое больше пушек, чем у шлюпа, за крепким дубовым корпусом, две мачты и королевский герб на гроте. Не самый быстрый на море, но за себя постоит.',
+  "A raider under a royal letter of marque: lean, quick for its guns and painted in the king's blue. Its captains take what the crown's enemies carry and keep a share of it.":
+    'Рейдер с королевским каперским патентом: стройный, быстрый для своих пушек, выкрашенный в королевскую синь. Его капитаны забирают всё, что везут враги короны, и оставляют себе долю.',
+  'The eyes of the navy: a long, fast hull with one gun deck and the tallest masts in the fleet. It finds the enemy first, and when it must, it fights well above its size.':
+    'Глаза флота: длинный быстрый корпус с одной пушечной палубой и самыми высокими мачтами во флоте. Он первым находит врага, а когда нужно, дерётся так, будто вдвое больше.',
+  'A deep hull with gilded galleries that brings the treasure fleets home. Its holds are full of silver and its decks bristle with guns, for every pirate knows what it carries.':
+    'Глубокий корпус с позолоченными галереями, ведущий домой серебряные флоты. Его трюмы полны серебра, а палубы ощетинились пушками, ведь каждый пират знает, что он везёт.',
+  "The flagship of a squadron, the admiral's pennant at the main and a band playing on the quarterdeck. Its signals move whole fleets, and its broadsides end the battles they start.":
+    'Флагман эскадры: адмиральский вымпел на грот-мачте и оркестр на юте. Его сигналы двигают целые флоты, а его залпы заканчивают битвы, которые начинают.',
+  "Three gun decks, a hundred ports and the emperor's arms carved across the stern. When it opens fire the sea itself seems to shake. There are few of them, and fewer captains who have faced one.":
+    'Три пушечные палубы, сотня портов и императорский герб, вырезанный на корме. Когда он открывает огонь, кажется, дрожит само море. Таких кораблей мало, а капитанов, что стояли против них, ещё меньше.',
+  'A flat-bottomed junk from the great rivers, with ribbed red sails and an eye painted on its bow to see the way. It slips through shallows where deeper keels run aground.':
+    'Плоскодонная джонка с великих рек, с ребристыми красными парусами и глазом, нарисованным на носу, чтобы видеть путь. Она проскальзывает по мелям, где более глубокие кили садятся на грунт.',
+  'A merchant junk whose hold is built in watertight compartments: holed in one, it sails on the rest. It trades silk and porcelain and carries just enough guns to make pirates think twice.':
+    'Торговая джонка, трюм которой разделён на водонепроницаемые отсеки: с пробоиной в одном она плывёт на остальных. Она торгует шёлком и фарфором и несёт ровно столько пушек, чтобы пираты дважды подумали.',
+  'A coastguard junk with a dragon carved round its stern and lacquered shields along its sides. It watches the straits of the empire, and few who sail them unasked sail out again.':
+    'Сторожевая джонка с драконом, вырезанным вокруг кормы, и лакированными щитами вдоль бортов. Она стережёт проливы империи, и мало кто из зашедших туда без спроса выплывает обратно.',
+  "Slender and swift, its red sails battened like a dragon's wings. Its navigators read the stars as other captains read charts, and nothing its size turns faster.":
+    'Стройный и стремительный, с красными парусами на рейках, словно крылья дракона. Его штурманы читают звёзды, как другие капитаны — карты, и ничто его размера не поворачивает быстрее.',
+  "A floating palace of five decks in red and gold lacquer, built for the emperor's own admirals. Fire lances, rockets and rows of guns wait behind its painted shields.":
+    'Плавучий дворец в пять палуб в красном и золотом лаке, построенный для адмиралов самого императора. За его расписными щитами ждут огненные копья, ракеты и ряды пушек.',
+  'The flagship of the dragon fleets, so great that whole squadrons sail in its shadow. Its sails bear the golden dragon, and coasts that see it on the horizon surrender without a shot.':
+    'Флагман драконьих флотов, такой огромный, что в его тени плывут целые эскадры. На его парусах золотой дракон, и побережья, увидевшие его на горизонте, сдаются без единого выстрела.',
+  'A quick little ship with a false bottom and a hold that never shows on the papers. Its captain knows every hidden cove and is long gone before the customs cutter rounds the cape.':
+    'Быстрый кораблик с двойным дном и трюмом, которого никогда нет в бумагах. Его капитан знает каждую укромную бухту и исчезает задолго до того, как таможенный катер обогнёт мыс.',
+  "A rebuilt sloop of war with patched black sails and a crew that hunts in packs. It waits behind the islands for a fat merchant and is on it before the merchant's crew reaches the guns.":
+    'Переделанный военный шлюп с латаными чёрными парусами и командой, что охотится стаей. Он ждёт за островами жирного купца и налетает раньше, чем купеческая команда добежит до пушек.',
+  'A captured warship, its colours burnt and its sails dyed black. Trophies from every prize hang from its rails, and its broadside is heavier than any honest ship of its size dares to carry.':
+    'Захваченный военный корабль с сожжённым флагом и выкрашенными в чёрное парусами. С его поручней свисают трофеи с каждой добычи, а его залп тяжелее, чем осмелится нести любой честный корабль такого размера.',
+  'Built by a captain with a score to settle, from the timbers of the ships that wronged her. It hits hard, holds on, and never lets go of the one it hunts.':
+    'Построен капитаншей, которой было с кем поквитаться, из древесины кораблей, что её обидели. Он бьёт сильно, держится цепко и никогда не отпускает того, на кого охотится.',
+  'It comes out of the rain under black sails and no lights, fires once and is gone into the storm again. Sailors swear it has no crew, and its captain lets them think so.':
+    'Он выныривает из дождя под чёрными парусами и без единого огня, даёт один залп и снова исчезает в шторме. Моряки божатся, что на нём нет команды, и капитан не спешит их разубеждать.',
+  'The flagship of the pirate republics, a fortress of black wood and stolen bronze. Its broadside is the heaviest on the seas, and every captain of the Brotherhood answers its signal.':
+    'Флагман пиратских республик, крепость из чёрного дерева и краденой бронзы. Его залп самый тяжёлый на морях, и каждый капитан Братства отвечает на его сигнал.',
+  'A long, low ship of the northern clans that rides the breakers instead of fighting them. Its oak keel takes a beating that would split a southern hull, and its crew sings while it bails.':
+    'Длинный низкий корабль северных кланов, что идёт по волнам прибоя, а не бьётся с ними. Его дубовый киль выдерживает удары, которые раскололи бы южный корпус, а команда поёт, вычерпывая воду.',
+  'A raider of the fjords with shields along its rails and a carved head at its bow. It runs up on a coast at dawn, and by noon it is out at sea again with whatever it came for.':
+    'Рейдер фьордов со щитами вдоль бортов и резной головой на носу. На рассвете он вылетает на берег, а к полудню снова в море со всем, за чем приходил.',
+  "A wolf's head snarls at its bow and an iron ram waits under it. The clans steer it straight at their enemies: what the ram doesn't break, the axes on its deck do.":
+    'На носу скалится волчья голова, а под ней ждёт железный таран. Кланы правят им прямо на врагов: что не сломает таран, то доломают топоры на палубе.',
+  "A jarl's hall made into a ship: a hull shod in steel, cabins lined with fur and runes of warding cut into every beam. It breaks the pack ice in winter and the enemy's line in summer.":
+    'Зал ярла, превращённый в корабль: корпус, окованный сталью, каюты, обитые мехом, и охранные руны, вырезанные на каждой балке. Зимой он ломает паковый лёд, а летом — вражеский строй.',
+  'Named after the bird that flies ahead of a storm, it is the fastest ship of the north. The clans send it out when the sky turns black, and it is home before the storm breaks.':
+    'Названный в честь птицы, что летит впереди бури, это самый быстрый корабль севера. Кланы отправляют его, когда небо чернеет, и он возвращается домой раньше, чем грянет буря.',
+  "Named after the serpent that circles the world. Its hull is plated in steel, its ram is a serpent's head, and the skalds say its keel was laid on the bones of a sea dragon.":
+    'Назван в честь змея, опоясывающего мир. Его корпус покрыт стальными плитами, таран — голова змея, а скальды говорят, что его киль заложили на костях морского дракона.',
+  'A ship that went down a hundred years ago and came back up with its lanterns lit. Its pale crew see through fog and darkness, and nobody remembers the name on its stern.':
+    'Корабль, ушедший на дно сто лет назад и поднявшийся с зажжёнными фонарями. Его бледная команда видит сквозь туман и тьму, а имени на его корме не помнит никто.',
+  'A galleon that robbed a drowned temple and has carried its gold ever since. The gold glows green in its hold, and its guns fire shot that never cools.':
+    'Галеон, ограбивший затонувший храм и с тех пор везущий его золото. Золото светится зелёным в трюме, а его пушки стреляют ядрами, которые никогда не остывают.',
+  'Its sails are grey as the mist and its hull is cold to the touch. Of the ships it sinks, only their crews come back up, and they sail on in its wake.':
+    'Его паруса серы, как туман, а корпус холоден на ощупь. С кораблей, которые он топит, обратно поднимаются лишь команды — и плывут дальше в его кильватере.',
+  'Carved from the black stone of an island that sank before history began. Its runes glow when danger is near, and its captain sees a battle before it begins.':
+    'Высечен из чёрного камня острова, затонувшего ещё до начала истории. Его руны светятся, когда рядом опасность, а капитан видит бой раньше, чем тот начнётся.',
+  'Its bow opens like jaws and its harpoons fire from its sides like teeth. What it catches, it drags under, and only the bubbles show where.':
+    'Его нос раскрывается, словно челюсти, а гарпуны вылетают из бортов, словно зубы. Что он поймает, то утаскивает под воду, и лишь пузыри показывают где.',
+  'The throne of the drowned kings, raised from the deepest trench of the sea. Its runes burn like coals, its guns were cast in no forge of this world, and the sea itself makes way for it.':
+    'Трон утонувших королей, поднятый из глубочайшей впадины моря. Его руны тлеют, как угли, его пушки отлиты не в кузне этого мира, и само море расступается перед ним.',
+  'Cannons + harpoon guns': 'Пушки + гарпунные пушки',
+  Obtained: 'Как получить',
+  Free: 'Бесплатно',
+  'to be set': 'определится позже',
+  'provisional figures': 'характеристики условные',
+  '✓ Tier {tier} mastered': '✓ Ранг {tier} освоен',
+  'Needs tier {tier} mastered': 'Нужно освоить ранг {tier}',
+  'You have a tier {tier} ship of another line at its last level':
+    'У вас есть корабль {tier} ранга другой линии на высшем уровне',
+  'Needs a tier {tier} ship of another line at its last level':
+    'Нужен корабль {tier} ранга другой линии на высшем уровне',
+  '{n} pearl|{n} pearls': '{n} жемчужина|{n} жемчужины|{n} жемчужин',
+  '{n} seal|{n} seals': '{n} печать|{n} печати|{n} печатей',
+  '{n} relic|{n} relics': '{n} реликвия|{n} реликвии|{n} реликвий',
+  '{n} glory': '{n} славы',
+  '{n} token|{n} tokens': '{n} жетон|{n} жетона|{n} жетонов',
+  '{n} honour': '{n} чести',
+  '{n} doubloon|{n} doubloons': '{n} дублон|{n} дублона|{n} дублонов',
+  "Every captain's first ship": 'Первый корабль каждого капитана',
+  'The shipyard': 'Верфь',
+  'Sea monster hunts': 'Охота на чудовищ',
+  'Boss fights': 'Бои с боссами',
+  'Treasure maps': 'Карты сокровищ',
+  'The arena': 'Арена',
+  Events: 'События',
+  'Guild battles': 'Битвы гильдий',
+  Doubloons: 'Дублоны',
+  Masterworks: 'Шедевры',
+  'Bought with doubloons: as strong as their tier, finer to look at': 'За дублоны: сильны как свой ранг, но красивее',
+  'The finest work of the master shipwrights, each in the manner of a line: gilded, carved, set with gems and painted to be envied in every port.':
+    'Лучшая работа мастеров-корабелов, каждый в манере одной из линий: позолоченные, резные, украшенные самоцветами и расписанные на зависть каждому порту.',
+  'Each is won its own way and paid in its own currency: sea monster hunts, boss fights, treasure maps, the arena, events and guild battles.':
+    'Каждый добывается по-своему и за свою валюту: охота на чудовищ, бои с боссами, карты сокровищ, арена, события и битвы гильдий.',
+  'Bought with doubloons, once you have a ship of the same tier of another line at its last level. As strong as the ships of their tier, no stronger: what you pay for is their looks.':
+    'Покупаются за дублоны, когда у вас есть корабль того же ранга другой линии на высшем уровне. Сильны, как корабли своего ранга, не больше: вы платите за их красоту.',
+  Shellback: 'Панцирник',
+  Duelist: 'Дуэлянт',
+  "Will-o'-the-Wisp": 'Блуждающий огонёк',
+  "Baron's Shadow": 'Тень барона',
+  Oathkeeper: 'Хранитель клятвы',
+  Aurora: 'Аврора',
+  Gladiator: 'Гладиатор',
+  "Serpent's Spine": 'Хребет змея',
+  'Iron Covenant': 'Железный союз',
+  "Siren's Song": 'Песнь сирены',
+  Conqueror: 'Завоеватель',
+  Bastion: 'Бастион',
+  'Pale Admiral': 'Бледный адмирал',
+  Phoenix: 'Феникс',
+  Champion: 'Чемпион',
+  'Eternal Armada': 'Вечная армада',
+  Leviathan: 'Левиафан',
+  Starfall: 'Звездопад',
+  'Gilded Swallow': 'Золотая ласточка',
+  'Jade Lotus': 'Нефритовый лотос',
+  'Velvet Rose': 'Бархатная роза',
+  'Silver Fjord': 'Серебряный фьорд',
+  'Crown Jewel': 'Жемчужина короны',
+  'Moonlit Dragon': 'Лунный дракон',
+  'Ruby Corsair': 'Рубиновый корсар',
+  Valhalla: 'Вальхалла',
+  'Sun King': 'Король-Солнце',
+  'Empress of the Waves': 'Императрица волн',
+  'Midnight Sun': 'Полуночное солнце',
+  Mirage: 'Мираж',
+  "Built on a giant turtle's shell: tough and slow": 'Построен на панцире гигантской черепахи: крепкий и медленный',
+  'Quick and nimble, made for fights one on one': 'Быстрый и ловкий, создан для поединков',
+  'Sails by its own light, far into the fog': 'Плывёт за собственным светом далеко в туман',
+  "The Baron's brig, risen from its wreck": 'Бриг барона, поднятый из обломков',
+  "A guild's sworn guardian": 'Присягнувший страж гильдии',
+  'Its sails glow with the northern lights': 'Его паруса сияют северным сиянием',
+  'An arena fighter, at its best up close': 'Боец арены, лучший вблизи',
+  "Built on a sea serpent's spine: a monster hunter": 'Построен на хребте морского змея: охотник на чудовищ',
+  "A guild's warship, armoured in iron": 'Боевой корабль гильдии в железной броне',
+  'Its song draws foes onto its guns': 'Его песнь ведёт врагов прямо под пушки',
+  "A heavy broadside for the arena's top leagues": 'Тяжёлый залп для высших лиг арены',
+  'A floating fortress of a guild': 'Плавучая крепость гильдии',
+  "A drowned admiral's flagship": 'Флагман утонувшего адмирала',
+  'Burns, and rises again from its ashes': 'Сгорает и вновь восстаёт из пепла',
+  "The arena's crowned champion": 'Коронованный чемпион арены',
+  "A guild's flagship that never stays sunk": 'Флагман гильдии, который никогда не остаётся на дне',
+  'The greatest monster hunter afloat': 'Величайший охотник на чудовищ на плаву',
+  'Forged of a fallen star: fast and far-sighted': 'Выкован из упавшей звезды: быстрый и зоркий',
+  'A gilded European yacht, quick and graceful': 'Позолоченная европейская яхта, быстрая и грациозная',
+  'An Eastern junk in jade-green lacquer': 'Восточная джонка в нефритово-зелёном лаке',
+  "A pirate queen's brig in crimson velvet": 'Бриг пиратской королевы в багряном бархате',
+  'A northern longship chased in silver': 'Северный драккар, отделанный серебром',
+  'A royal frigate set with gems': 'Королевский фрегат, украшенный самоцветами',
+  'An Eastern frigate that glows under the moon': 'Восточный фрегат, сияющий под луной',
+  'A pirate warship in ruby red and gold': 'Пиратский боевой корабль в рубиновом и золотом',
+  'A hall of heroes on a northern hull': 'Зал героев на северном корпусе',
+  'A European flagship of gold, a sun on every sail': 'Золотой европейский флагман, солнце на каждом парусе',
+  "An empress's junk of silk and gold": 'Джонка императрицы из шёлка и золота',
+  'A northern giant lit by the midnight sun': 'Северный великан, озарённый полуночным солнцем',
+  'A ship of glass and starlight': 'Корабль из стекла и звёздного света',
+  'During the Night of Drowned Lanterns, in autumn': 'Во время Ночи утонувших фонарей, осенью',
+  'Sink 100 giant turtles': 'Потопить 100 гигантских черепах',
+  'Win 25 arena duels': 'Выиграть 25 дуэлей на арене',
+  'And 5,000 gold to the shipwright': 'И 5 000 золотых корабелу',
+  'Follow the map to the drowned temple, and 15,000 gold to the shipwright':
+    'Дойти по карте до затонувшего храма, и 15 000 золотых корабелу',
+  'Sink the Smuggler Baron 25 times': 'Потопить Барона контрабандистов 25 раз',
+  'A month in a guild': 'Месяц в гильдии',
+  'During the Long Night, in winter': 'Во время Долгой ночи, зимой',
+  'Sink the Reaper, the ghost ship of the southern fogs': 'Потопить Жнеца, корабль-призрак южных туманов',
+  'Reach the Silver league of the arena': 'Дойти до Серебряной лиги арены',
+  'Sink 150 sea serpents': 'Потопить 150 морских змеев',
+  'Win 10 guild battles': 'Выиграть 10 битв гильдий',
+  'Find the sunken island, and 40,000 gold to the shipwright': 'Найти затонувший остров, и 40 000 золотых корабелу',
+  "During the Siren's Moon, in spring": 'Во время Луны сирен, весной',
+  'Reach the Gold league of the arena': 'Дойти до Золотой лиги арены',
+  'Your guild holds a sea fort for a week': 'Ваша гильдия удерживает морской форт неделю',
+  'Sink 25 krakens': 'Потопить 25 кракенов',
+  'Sink the Pale Admiral in the northern waters': 'Потопить Бледного адмирала в северных водах',
+  'During the Festival of Suns, in summer': 'Во время Праздника солнц, летом',
+  'Finish an arena season in the top hundred': 'Завершить сезон арены в первой сотне',
+  'Sink the Drowned King with your guild': 'Потопить Утонувшего короля вместе с гильдией',
+  'Your guild wins a season of guild battles': 'Ваша гильдия выигрывает сезон битв гильдий',
+  'Sink the Leviathan, the oldest thing in the sea': 'Потопить Левиафана, древнейшее существо моря',
+  'Piece together the star map, and 150,000 gold to the shipwright':
+    'Собрать звёздную карту, и 150 000 золотых корабелу',
+  'Its hull is the shell of a giant turtle older than the port, hollowed out and decked over by a shipwright who never said where he found it. Shot glances off it, and it carries its crew as calmly as it once carried the turtle.':
+    'Его корпус — панцирь гигантской черепахи, что старше порта: корабел выдолбил его и настелил палубу, но так и не сказал, где нашёл. Ядра скользят по нему, а команду он несёт так же спокойно, как когда-то нёс черепаху.',
+  'A slim black brig whose captain fought a hundred duels at sea and never lost one. They say she still stands at its helm, and the brig turns to face every ship that challenges it.':
+    'Стройный чёрный бриг капитанши, что провела сотню морских дуэлей и ни одной не проиграла. Говорят, она до сих пор стоит у штурвала, и бриг разворачивается навстречу каждому кораблю, бросившему ему вызов.',
+  'A small ship that sails by its own lantern, a blue flame no rain puts out. Sailors who followed that light into the fog came out in waters no chart knew; its captain goes wherever the flame leads, and always finds the way back.':
+    'Маленький корабль, что плывёт за собственным фонарём — синим огнём, который не гасит ни один дождь. Моряки, шедшие за этим светом в туман, выплывали в водах, которых нет ни на одной карте; его капитан идёт, куда ведёт огонь, и всегда находит дорогу назад.',
+  "Rebuilt from the timbers of the Smuggler Baron's brig, hauled up after it went down for the twenty-fifth time. His red sails came with it, and on foggy nights his old mortar still coughs at the stern all by itself.":
+    'Перестроен из древесины брига Барона контрабандистов, поднятого со дна после двадцать пятого раза. Вместе с ним вернулись красные паруса барона, а туманными ночами его старая мортира до сих пор сама кашляет на корме.',
+  "Its crew are sworn on their guild's banner, and the oath is cut into its mainmast in a hundred hands. As long as one of them is aboard, the ship will not strike its colours.":
+    'Его команда присягала на знамени своей гильдии, и слова клятвы вырезаны на грот-мачте сотней разных рук. Пока на борту остаётся хоть один из них, корабль не спустит флага.',
+  'Built in the far north for the Long Night, when the sun does not rise for a month. Its sails catch the northern lights and glow green and violet in the dark, and ships lost in the polar night steer home by it.':
+    'Построена на далёком севере для Долгой ночи, когда солнце не восходит целый месяц. Её паруса ловят северное сияние и светятся в темноте зелёным и фиолетовым, и корабли, заблудившиеся в полярной ночи, правят домой по ней.',
+  'A galley built for the arena of the free ports, its sides scarred by a thousand fights. The crowd roars when it comes in, and its captain fights best with the enemy close enough to see their eyes.':
+    'Галера, построенная для арены вольных портов, её борта исполосованы тысячей боёв. Толпа ревёт, когда она входит, а её капитан бьётся лучше всего, когда враг так близко, что видно его глаза.',
+  "Its keel is the spine of a sea serpent the hunters chased for a week, and its ribs are the serpent's own. Serpents still sense their kin in it and come close, which is what its harpoons are for.":
+    'Его киль — хребет морского змея, за которым охотники гнались неделю, а рёбра — рёбра самого змея. Змеи до сих пор чуют в нём своего и подплывают ближе — для того и гарпуны.',
+  "Three guilds that fought each other for years paid for it together and swore never to fight again. Its iron plates are riveted with all three guilds' marks, and so far the covenant holds.":
+    'Три гильдии, годами воевавшие между собой, оплатили его вместе и поклялись больше не воевать. Его железные плиты склёпаны с клеймами всех трёх, и пока что союз держится.',
+  'A siren is carved at its bow, and when the wind is right her song carries across the water. Crews who hear it steer towards it without knowing why, straight into the reach of its guns.':
+    'На его носу вырезана сирена, и при попутном ветре её песнь разносится над водой. Команды, что её слышат, сами не зная почему, поворачивают к ней — прямо под его пушки.',
+  'A heavy warship the arena gives to the captains of its gold league. Its broadside has ended more arena fights than anyone has counted, and its sails carry the laurel of every season it won.':
+    'Тяжёлый боевой корабль, который арена дарит капитанам своей золотой лиги. Его залп закончил больше боёв арены, чем кто-либо считал, а на парусах — лавры каждого выигранного сезона.',
+  'Less a ship than a fort that learned to sail: stone-grey plates, towers fore and aft, and guns enough to hold a harbour. A guild that keeps a sea fort for a week is given one to keep the next.':
+    'Не столько корабль, сколько форт, научившийся плавать: серые, как камень, плиты, башни на носу и корме и довольно пушек, чтобы удержать гавань. Гильдия, что неделю удерживает морской форт, получает такой, чтобы удерживать следующий.',
+  'The flagship of an admiral who drowned with his whole squadron in the northern ice. He still sails it, pale as frost; sink him, and the ship is left to whoever dares to take its helm.':
+    'Флагман адмирала, утонувшего со всей эскадрой в северных льдах. Он до сих пор водит его, бледный как иней; потопите его — и корабль достанется тому, кто осмелится встать за штурвал.',
+  "Its sails are dyed the colours of fire, and every summer, at the Festival of Suns, it burns to the waterline and rises from the ashes newer than before. Its crew don't fear a burning deck.":
+    'Его паруса окрашены в цвета огня, и каждое лето, на Празднике солнц, он сгорает до ватерлинии и восстаёт из пепла новее прежнего. Его команда не боится горящей палубы.',
+  "The arena's crown, given to the captains who finish a season among its hundred best. Gold letters on its stern list every champion who sailed it, and there is room for many more.":
+    'Корона арены, которую получают капитаны, завершившие сезон среди её лучшей сотни. Золотые буквы на корме перечисляют каждого чемпиона, ходившего на нём, и места там ещё много.',
+  "The flagship of a guild that won a whole season of battles. Every time it sinks, the guild's shipwrights raise it again, so its hull is a patchwork of a hundred victories and of every defeat it came back from.":
+    'Флагман гильдии, выигравшей целый сезон битв. Всякий раз, как он тонет, корабелы гильдии поднимают его снова, так что его корпус — заплаты сотни побед и каждого поражения, из которого он вернулся.',
+  "Built inside the ribs of the Leviathan itself, the oldest creature in the sea, after a hunt the taverns still sing about. Monsters flee from its shadow, and those that don't are what its harpoons are for.":
+    'Построен внутри рёбер самого Левиафана, древнейшего существа моря, после охоты, о которой до сих пор поют в тавернах. Чудовища бегут от его тени, а для тех, кто не бежит, у него есть гарпуны.',
+  'Forged of a star that fell into the sea, found by piecing together thirty torn treasure maps. Its hull shines faintly at night, it sails faster than the wind should allow, and it sees farther than any lookout.':
+    'Выкован из звезды, что упала в море и нашлась по тридцати рваным картам сокровищ, сложенным вместе. Его корпус едва светится ночью, он идёт быстрее, чем позволяет ветер, и видит дальше любого марсового.',
+  'A European yacht with gilded rails and swallow-tailed pennants, built for a duke who wanted to be the fastest guest at every regatta. It sails as gracefully as it looks.':
+    'Европейская яхта с позолоченными поручнями и вымпелами-ласточками, построенная для герцога, который хотел быть самым быстрым гостем на каждой регате. Она плывёт так же грациозно, как и выглядит.',
+  'A pleasure junk of the Eastern court, lacquered jade green, with lotus flowers carved along its galleries. Princes sailed it on the palace lakes; its new captains take it out to sea.':
+    'Прогулочная джонка восточного двора в нефритово-зелёном лаке, с лотосами, вырезанными вдоль галерей. Принцы плавали на ней по дворцовым озёрам; новые капитаны выводят её в море.',
+  'The brig of a pirate queen who wore crimson velvet to every boarding. Its sails are dyed rose red, and the rose painted on its stern is the last thing many merchants ever saw.':
+    'Бриг пиратской королевы, надевавшей багряный бархат на каждый абордаж. Его паруса окрашены в цвет розы, и роза на корме — последнее, что видели многие купцы.',
+  "A northern longship whose beast head and shield rims are chased in silver. It was a jarl's wedding gift, and it still flashes in the sun like a fjord in spring.":
+    'Северный драккар, чья голова зверя и ободы щитов отделаны серебром. Это свадебный подарок ярла, и он до сих пор сияет на солнце, как фьорд весной.',
+  "A royal frigate set with gems where other ships have brass, its figurehead wearing a crown of real gold. The king's own jeweller fitted it out, and every port stares when it comes in.":
+    'Королевский фрегат, украшенный самоцветами там, где у других латунь, а его носовая фигура носит корону из настоящего золота. Его оснащал сам королевский ювелир, и каждый порт замирает, когда он входит.',
+  "An Eastern frigate whose dragon-scale lacquer glows silver under the moon. In the court's legends it carried the moon princess home, and it still sails best at night.":
+    'Восточный фрегат, чей лак, словно драконья чешуя, сияет серебром под луной. По придворным легендам, он привёз домой лунную принцессу и до сих пор лучше всего идёт ночью.',
+  "A pirate warship painted ruby red and trimmed with stolen gold, its broadside as heavy as its owner's purse. Pirates salute it, and merchants pay before it asks.":
+    'Пиратский боевой корабль, выкрашенный в рубиновый цвет и отделанный краденым золотом, а его залп тяжёл, как кошелёк владельца. Пираты салютуют ему, а купцы платят прежде, чем он попросит.',
+  'A northern hull built like a hall of heroes, its shields painted with the deeds of every jarl who sailed it. The clans say the fallen feast aboard it and fight beside its crew.':
+    'Северный корпус, построенный как зал героев: на его щитах нарисованы подвиги каждого ярла, ходившего на нём. Кланы говорят, что павшие пируют на борту и бьются плечом к плечу с командой.',
+  'A European flagship covered in gold leaf, a golden sun on every sail. It was built for a king who wanted the sea itself to see him coming, and it does.':
+    'Европейский флагман, покрытый сусальным золотом, с золотым солнцем на каждом парусе. Его построили для короля, который хотел, чтобы само море видело, как он приближается, — и оно видит.',
+  "The flagship of an empress, its silk sails embroidered with golden cranes and its decks hung with lanterns. The empire's admirals bowed to it, and its guns were as fine as its silks.":
+    'Флагман императрицы: шёлковые паруса, вышитые золотыми журавлями, и палубы, увешанные фонарями. Адмиралы империи кланялись ему, а пушки у него были так же изысканны, как шелка.',
+  'A giant of the northern clans, built where the sun never sets in summer. Its gilded shields catch the midnight sun and blind its enemies, and its steel hull fears no ice.':
+    'Великан северных кланов, построенный там, где летом солнце не заходит. Его позолоченные щиты ловят полуночное солнце и слепят врагов, а стальной корпус не боится льда.',
+  'A ship of glass and starlight that seems to shimmer in and out of the air. Nobody knows who built it; those who sail it say it is real enough, and its guns certainly are.':
+    'Корабль из стекла и звёздного света, что словно мерцает в воздухе, то появляясь, то исчезая. Никто не знает, кто его построил; те, кто на нём ходит, говорят, что он вполне настоящий, а его пушки — тем более.',
 };

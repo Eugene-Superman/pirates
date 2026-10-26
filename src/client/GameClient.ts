@@ -15,6 +15,7 @@ import {
   repairInPort,
   resetTalents,
   sellCargo,
+  throwOverboard,
   takeHelm,
   takeQuest,
   takeTalent,
@@ -108,6 +109,8 @@ export class GameClient {
         // The loadout: guns from the hold, bought in port
         fitGun: (weapon, slot, gun) => this.cue(fitFromHold(game.state.player, ship, weapon, slot, gun), 'equip'),
         loadAmmo: (ammo) => ship.loadAmmo(ammo),
+        // Goods thrown overboard, at sea or in port: they splash down and sink
+        throwCargo: (good, count) => this.cue(throwOverboard(ship, good, count), 'splash'),
         changeMaxSpeed: (delta) => ship.tuneSpeeds(delta, 0),
         changeMinSpeed: (delta) => ship.tuneSpeeds(0, delta),
         changeViewRange: (delta) => ship.tuneViewRange(delta),
@@ -156,6 +159,7 @@ export class GameClient {
       toggleMap: () => this.hud.toggleMap(),
       toggleTalents: () => this.hud.toggleTalents(),
       toggleStats: () => this.hud.toggleStats(),
+      toggleHold: () => this.hud.toggleHold(),
       useAbility: () => this.cue(useAbility(game.state, ship)),
       repair: () => this.cue(orderRepair(game.state, ship)),
     });

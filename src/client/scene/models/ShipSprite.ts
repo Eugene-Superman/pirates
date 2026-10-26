@@ -74,7 +74,7 @@ const DEG = Math.PI / 180;
 // A class not here would be vector-drawn
 const ART: Readonly<Partial<Record<ShipClassId, ShipArt>>> = {
   sloop: { stages: DAMAGE_STAGES },
-  corsair: { stages: DAMAGE_STAGES },
+  coastalBark: { stages: DAMAGE_STAGES },
   fishingBoat: { stages: DAMAGE_STAGES, looks: ['nets', 'barrels', 'pots'] },
   merchantSloop: { stages: DAMAGE_STAGES, looks: ['crates', 'bales'] },
   smugglerSloop: { stages: DAMAGE_STAGES },

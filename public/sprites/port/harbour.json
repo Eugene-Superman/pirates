@@ -1,0 +1,62 @@
+{
+ "picture": {
+  "file": "harbour.webp",
+  "w": 1586,
+  "h": 992
+ },
+ "medallions": {
+  "file": "medallions.webp",
+  "size": 256
+ },
+ "buildings": {
+  "guild": {
+   "at": [
+    0.555,
+    0.215
+   ],
+   "medallion": 0
+  },
+  "auction": {
+   "at": [
+    0.265,
+    0.38
+   ],
+   "medallion": 1
+  },
+  "workshop": {
+   "at": [
+    0.16,
+    0.485
+   ],
+   "medallion": 2
+  },
+  "market": {
+   "at": [
+    0.475,
+    0.49
+   ],
+   "medallion": 3
+  },
+  "tavern": {
+   "at": [
+    0.635,
+    0.47
+   ],
+   "medallion": 4
+  },
+  "shipyard": {
+   "at": [
+    0.945,
+    0.545
+   ],
+   "medallion": 5
+  },
+  "arsenal": {
+   "at": [
+    0.826,
+    0.875
+   ],
+   "medallion": 6
+  }
+ }
+}

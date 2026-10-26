@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, type Rectangle, type TextStyleOptions } from 'pixi.js';
+import { Container, Graphics, Text, type FillGradient, type Rectangle, type TextStyleOptions } from 'pixi.js';
 import type { AmmoId } from '../../game';
 import { t } from '../i18n/i18n';
 
@@ -66,11 +66,43 @@ export interface TileLook {
   readonly border?: number;
 }
 
+/**
+ * How a tile is painted: its fill as it rests, under the pointer and pressed (a colour, or a gradient over the tile),
+ * how solid it is, its border, and a light line along its top edge (bevel) or not
+ */
+export interface TileStyle {
+  readonly idle: number;
+  readonly hover: number;
+  readonly pressed: number | FillGradient;
+  readonly alpha: number;
+  readonly border: number;
+  readonly borderAlpha: number;
+  readonly pressedBorder: number;
+  readonly bevel: boolean;
+}
+
+/** The HUD's own tiles: blue, lit gold when pressed */
+export const PLAIN: TileStyle = {
+  idle: UI.idle,
+  hover: UI.hover,
+  pressed: UI.active,
+  alpha: 0.92,
+  border: UI.border,
+  borderAlpha: 0.45,
+  pressedBorder: UI.border,
+  bevel: false,
+};
+
 let tapSound = () => {};
 
 /** Sets what a tap on any of the HUD's tiles sounds like: the client's sounds, once they are made */
 export function setTapSound(play: () => void) {
   tapSound = play;
+}
+
+/** A tap's sound, for what the HUD makes clickable without a Tile (the harbour's medallions) */
+export function playTap() {
+  tapSound();
 }
 
 /**
@@ -88,11 +120,13 @@ export class Tile {
   width: number;
   height: number;
   private readonly radius: number;
+  private readonly style: TileStyle;
 
-  constructor(width: number, height: number, onTap: (() => void) | null, radius = 6) {
+  constructor(width: number, height: number, onTap: (() => void) | null, radius = 6, style: TileStyle = PLAIN) {
     this.width = width;
     this.height = height;
     this.radius = radius;
+    this.style = style;
     this.container.addChild(this.background, this.content);
     this.container.eventMode = 'static';
     this.container.on('pointerdown', (e) => e.stopPropagation());
@@ -127,16 +161,25 @@ export class Tile {
   }
 
   private paint() {
-    const { pressed = false, disabled = false, border = UI.border } = this.look;
+    const { style } = this;
+    const { pressed = false, disabled = false } = this.look;
+    const border = this.look.border ?? (pressed ? style.pressedBorder : style.border);
     const key = `${pressed}${disabled}${border}${this.hovered}${this.width}x${this.height}`;
     if (key === this.painted) return;
     this.painted = key;
-    const fill = pressed ? UI.active : this.hovered && !disabled ? UI.hover : UI.idle;
+    const fill = pressed ? style.pressed : this.hovered && !disabled ? style.hover : style.idle;
+    const alpha = disabled ? style.alpha * 0.55 : style.alpha;
+    const { width, height, radius } = this;
     this.background
       .clear()
-      .roundRect(0, 0, this.width, this.height, this.radius)
-      .fill({ color: fill, alpha: disabled ? 0.5 : 0.92 })
-      .stroke({ width: pressed ? 2 : 1, color: border, alpha: pressed ? 0.9 : 0.45 });
+      .roundRect(0, 0, width, height, radius)
+      .fill(typeof fill === 'number' ? { color: fill, alpha } : { fill, alpha })
+      .stroke({ width: pressed ? 2 : 1, color: border, alpha: pressed ? 0.9 : style.borderAlpha });
+    if (style.bevel)
+      this.background
+        .moveTo(radius, 1.5)
+        .lineTo(width - radius, 1.5)
+        .stroke({ width: 1, color: 0xffffff, alpha: pressed ? 0.35 : 0.1 });
     this.content.alpha = disabled ? 0.45 : 1;
   }
 }
@@ -155,17 +198,37 @@ const WINDOW_MARGIN = 20; // pixels between a window and the screen's edge, at l
 const WINDOW_DIM = 0.5; // how dark the game is behind a window
 const CLOSE = { width: 70, height: 26 } as const; // pixels: a window's Close button
 
+/** How a window looks: the panel under what it shows, its Close button, and how dark the game gets behind it */
+export interface WindowLook {
+  readonly panel: (width: number, height: number) => Container;
+  readonly close: (label: string, onTap: () => void) => { readonly tile: Tile };
+  readonly dim: number;
+}
+
+/** The HUD's own windows: a plain blue panel */
+const PLAIN_WINDOW: WindowLook = {
+  panel: (width, height) =>
+    new Graphics()
+      .roundRect(0, 0, width, height, 12)
+      .fill({ color: UI.panel, alpha: 0.97 })
+      .stroke({ width: 1.5, color: UI.border, alpha: 0.4 }),
+  close: (label, onTap) => labelButton(CLOSE.width, CLOSE.height, label, onTap, 13, false),
+  dim: WINDOW_DIM,
+};
+
 /**
- * A window over the game (the loadout, the talents, the statistics): its `panel` centred on the screen and scaled
- * down to fit, the game dimmed behind it. Clicks on it and round it never reach the stage, which would steer the
- * ship. Close, a click beside it and Escape call `onClose`. An Escape another window has taken is left alone: the
- * windows listen in the order the HUD makes them, the one on top first, so one press closes one window
+ * A window over the game (the loadout, the talents, the statistics, an item up close in port): its `panel` centred on
+ * the screen and scaled down to fit, the game dimmed behind it, in the HUD's look or another (`look`: the windows'
+ * theme is theme.ts's). Clicks on it and round it never reach the stage, which would steer the ship. Close, a click
+ * beside it and Escape call `onClose`. An Escape another window has taken is left alone: the windows listen in the
+ * order the HUD makes them, the one on top first, so one press closes one window
  */
 export class HudWindow {
   readonly container = new Container();
   /** What the window shows, in pixels before scaling: the owner adds to it */
   readonly panel = new Container();
   private readonly dim = new Graphics();
+  private readonly dimAlpha: number;
   private readonly screen: Rectangle;
   private readonly width: number;
   private readonly height: number;
@@ -173,22 +236,25 @@ export class HudWindow {
   private fittedTo = '';
 
   /** width, height: the panel's, in pixels; pad: from its top right corner to the Close button */
-  constructor(screen: Rectangle, size: { width: number; height: number; pad: number }, onClose: () => void) {
+  constructor(
+    screen: Rectangle,
+    size: { width: number; height: number; pad: number },
+    onClose: () => void,
+    look: WindowLook = PLAIN_WINDOW,
+  ) {
     this.screen = screen;
     this.width = size.width;
     this.height = size.height;
+    this.dimAlpha = look.dim;
     this.container.visible = false;
-    const background = new Graphics()
-      .roundRect(0, 0, size.width, size.height, 12)
-      .fill({ color: UI.panel, alpha: 0.97 })
-      .stroke({ width: 1.5, color: UI.border, alpha: 0.4 });
+    const background = look.panel(size.width, size.height);
     for (const blocker of [this.dim, background]) {
       blocker.eventMode = 'static';
       blocker.on('pointerdown', (e) => e.stopPropagation());
     }
     this.dim.on('pointertap', onClose);
-    const close = labelButton(CLOSE.width, CLOSE.height, t('Close'), onClose, 13, false);
-    close.tile.container.position.set(size.width - size.pad - CLOSE.width, size.pad);
+    const close = look.close(t('Close'), onClose);
+    close.tile.container.position.set(size.width - size.pad - close.tile.width, size.pad);
     this.panel.addChild(background, close.tile.container);
     this.container.addChild(this.dim, this.panel);
     window.addEventListener('keydown', (e) => {
@@ -209,7 +275,7 @@ export class HudWindow {
     const size = `${width}x${height}`;
     if (size === this.fittedTo) return;
     this.fittedTo = size;
-    this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: WINDOW_DIM });
+    this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: this.dimAlpha });
     const scale = Math.min(1, (width - WINDOW_MARGIN * 2) / this.width, (height - WINDOW_MARGIN * 2) / this.height);
     this.panel.scale.set(scale);
     this.panel.position.set(
