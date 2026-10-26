@@ -111,8 +111,13 @@ paths:
 - `ship.attack(id)` makes the ship fire at a unit every time a gun of its selected weapon is loaded, until `ceaseFire`
   or the unit is gone. The player attacks with a double click, Space or the Fire button on the unit picked out (the
   pick itself is client state); bots attack from their brain. While it can't fire, combat sets `ship.holdReason` every
-  update: no guns of the weapon fitted, out of the loaded ammo, the target hidden in the fog of war (`ship.canSee`),
-  or beyond every fitted gun's reach. The HUD tells the player.
+  update: no guns of the weapon fitted, out of the loaded ammo, the loaded ammo not at hand, the target hidden in the
+  fog of war (`ship.canSee`), or beyond every fitted gun's reach. The HUD tells the player.
+- A player's ship fires only the ammo at hand: its two places a weapon on the skill bar (`ammoBar`), put there from
+  the hold (`setAmmoSlot`, only ammo aboard). Ammo that runs out (`addAmmo`, fired or sold) leaves its place; loaded,
+  it stays loaded, and the ship holds fire till the player loads another — never one picked for them, it might be dear
+  — or buys more of it, which goes back to an empty place. A save puts the bar back as it was, not through
+  `setAmmoSlot`, so a ship holding fire comes back holding fire.
 - A ship class has gun `slots` per weapon; `ship.guns` holds the gun fitted in each (`fitGun`), one of `GUNS` in
   `arsenal.ts`. Every gun has its own `range` and `reload` (`ship.reloads[weapon][slot]`). A volley fires every fitted
   gun of the selected weapon that is loaded, within reach of the target and has a shot of the loaded ammo (`loadAmmo`,
@@ -180,9 +185,11 @@ paths:
   Quartermaster. `throwOverboard` empties some of a good out of the hold, anywhere, to make room: it sinks.
 - `quests.ts`: the tavern's `QUESTS` (sink `count` of a hull class for a `reward` and `xp`, offered once `after` quests
   have been turned in); at most `MAX_QUESTS` taken at once, taken and turned in only in port. `shop.ts`, only in port:
-  guns and outfit into the hold, packs of `AMMO_PACK` shots, the outfit fitted (`fitOutfit`), the shipwright's full
-  repair and his forgetting the talents (`resetTalents`), goods sold at the market (`sellCargo`); priced by tier. A gun
-  is fitted from the hold anywhere (`fitFromHold`).
+  guns and outfit into the hold, ammo by any count up to `MAX_AMMO_DEAL` (priced by packs of `AMMO_PACK` shots), the
+  outfit fitted (`fitOutfit`), the shipwright's full repair and his forgetting the talents (`resetTalents`), goods
+  sold at the market (`sellCargo`); priced by tier. The arsenal buys guns from the hold and ammo back for a quarter of
+  their price (`sellGun`, `sellAmmo`, `SELL_BACK`: gold earned as `'arsenal'`), so buying and selling never pays. A
+  gun is fitted from the hold anywhere (`fitFromHold`).
 - `shipyard.ts`: the ships for sale (`SHIP_OFFERS`) and their terms, the Captain's path (`captainsPath`): a first kill,
   a talent, a repair at sea, a sale (marked once, `markStep`), then quests turned in, a level, the Baron sunk, the
   price. `tierMastered`: whether the player has a ship of a tier at its last level, which a masterwork of that tier
@@ -196,12 +203,23 @@ paths:
   entrance to the `roadstead`; `mayDock` keeps it from docking again until it has sailed `UNDOCK_MARGIN` beyond the
   basin. No bot spawns or wanders within `HARBOUR_CLEAR` of the basin (`nearHarbour`), so the way in stays clear.
 - `save.ts`: `saveGame` makes plain `SaveData` of a player's progress (the purse, the hold of guns and outfit, quests,
-  the Captain's path, the fleet laid up in port, the stats, and the ship: its class, place, hull, guns, ammo, weapon,
-  outfit, XP and talents, cargo, stats, whether it is in port); `loadGame` checks every field and keeps only the valid
+  the Captain's path, the fleet laid up in port, the stats, and the ship: its class, place, hull, guns, ammo, the ammo
+  loaded and at hand, weapon, outfit, XP and talents, cargo, stats, whether it is in port); `loadGame` checks every field and keeps only the valid
   ones (a ship on land or off the map comes back at `START`; talents are put back through `learnTalent`, so only what
   the rules allow). No bots, chests or time: the sea is made afresh. Bump `SAVE_VERSION` when the shape changes (an
   older save is read field by field); a class renamed goes in `RENAMED_CLASSES`, so an older save's ship sails on
   under its new id. The client keeps the save until there is a server.
+
+## The captain's mastery (`account/mastery.ts`)
+
+- The account's own tree of passives, for every ship the player sails (a ship's talents are that ship's): the captain
+  in the middle (`MASTERY_ROOT`), six branches round them (`MASTERY_BRANCH_IDS`), each in rings out to its keystone.
+  A passive is minor (a little a rank), notable or a keystone (one rank, the keystone with a price); it opens from
+  the passives it `links` to nearer the middle, worked out from its place across its ring. `MASTERY_PASSIVES` is the
+  whole tree, built from `PLANS` (a passive's text, value a rank, ranks, name).
+- Planned: nothing is taken or does anything yet, the figures are provisional. The captain's levels, the points they
+  give and the ranks taken belong to the player (and their save) once the online game brings them; the passives'
+  effects then go where the talents' do (`PERKS`, `grownStats`, combat, loot).
 
 ## Records (`records/`)
 

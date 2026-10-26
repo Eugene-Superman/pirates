@@ -90,7 +90,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     radius: 9,
     // Measured on the model: stem to transom at deck level, widest beam
     hull: { bow: 15, stern: -14.5, halfBeam: 5.6 },
-    viewRange: 520, // twice the cannons' range
+    viewRange: 360, // twice its swivel guns' reach
     maxSpeed: 120, // 12 knots
     minSpeed: 60, // 6 knots
     acceleration: 50,
@@ -139,7 +139,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     radius: 12.5,
     // Measured on the model: stem to transom at the gun deck, widest beam
     hull: { bow: 21.5, stern: -19.7, halfBeam: 7.3 },
-    viewRange: 600,
+    viewRange: 420,
     maxSpeed: 125,
     minSpeed: 65,
     acceleration: 48,
@@ -195,7 +195,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     radius: 6,
     // The deck outline of its model (client/scene/models/botShip3d.ts)
     hull: { bow: 10, stern: -8.8, halfBeam: 4.1 },
-    viewRange: 400,
+    viewRange: 280,
     maxSpeed: 75,
     minSpeed: 40,
     acceleration: 40,
@@ -218,7 +218,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     radius: 9,
     // The deck outline of its model, like the fishing boat's
     hull: { bow: 14.5, stern: -13.8, halfBeam: 5.6 },
-    viewRange: 450,
+    viewRange: 320,
     maxSpeed: 85,
     minSpeed: 45,
     acceleration: 40,
@@ -242,7 +242,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     height: 7,
     radius: 9.5,
     hull: { bow: 15.5, stern: -14.5, halfBeam: 5.8 },
-    viewRange: 480,
+    viewRange: 340,
     maxSpeed: 100,
     minSpeed: 55,
     acceleration: 50,
@@ -268,7 +268,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     height: 10,
     radius: 15,
     hull: { bow: 22, stern: -20.5, halfBeam: 7.6 },
-    viewRange: 560,
+    viewRange: 390,
     maxSpeed: 65,
     minSpeed: 45,
     acceleration: 32,
@@ -284,7 +284,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: { cannon: ['swivelGun', 'swivelGun'], harpoon: [] },
     bite: null,
     barrage: {
-      range: 420,
+      range: 300,
       cooldown: 8,
       shells: 4,
       radius: 24,
@@ -310,7 +310,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     radius: 8,
     // The shell, nearly round, and the head in front of it
     hull: { bow: 9, stern: -7, halfBeam: 6 },
-    viewRange: 350,
+    viewRange: 250,
     maxSpeed: 55,
     minSpeed: 35,
     acceleration: 30,
@@ -334,7 +334,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     // Its body, about 42 long (client/scene/models/serpent3d.ts): its position is the middle of it, the head ahead.
     // A straight capsule, though the body bends along where it swam
     hull: { bow: 21, stern: -21, halfBeam: 4 },
-    viewRange: 450,
+    viewRange: 320,
     // A little slower than an intact sloop: a player can get away from it, unless badly damaged
     maxSpeed: 105,
     minSpeed: 70,

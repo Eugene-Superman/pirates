@@ -11,19 +11,19 @@ export interface Good {
   readonly price: number;
 }
 
-// Every piece takes one place in the hold. A merchant's cargo is worth about two thirds of its bounty again, a
-// smuggler's about half: carrying it home is a good part of the loot, and what a player risks when they push their
-// luck at sea. Holds are roomy (botKinds.ts drops little at a time), so a full one is a long voyage's haul
+// Every piece takes one place in the hold. Goods are a small extra next to a bounty: what a wreck drops is worth
+// about a tenth of it on average (botKinds.ts drops a piece or two now and then), so carrying it home is worth the
+// trip but never the point of a fight. Holds are roomy, so a full one is a long voyage's haul
 // prettier-ignore
 export const GOODS: Readonly<Record<GoodId, Good>> = {
-  fish: { id: 'fish', name: 'Fish', price: 3 },
-  cloth: { id: 'cloth', name: 'Cloth', price: 7 },
-  spices: { id: 'spices', name: 'Spices', price: 12 },
-  rum: { id: 'rum', name: 'Rum', price: 8 },
-  contraband: { id: 'contraband', name: 'Contraband', price: 14 },
-  turtleShell: { id: 'turtleShell', name: 'Turtle shell', price: 9 },
-  serpentScale: { id: 'serpentScale', name: 'Serpent scales', price: 12 },
-  baronsStrongbox: { id: 'baronsStrongbox', name: "Baron's strongbox", price: 150 },
+  fish: { id: 'fish', name: 'Fish', price: 1 },
+  cloth: { id: 'cloth', name: 'Cloth', price: 2 },
+  spices: { id: 'spices', name: 'Spices', price: 4 },
+  rum: { id: 'rum', name: 'Rum', price: 3 },
+  contraband: { id: 'contraband', name: 'Contraband', price: 5 },
+  turtleShell: { id: 'turtleShell', name: 'Turtle shell', price: 3 },
+  serpentScale: { id: 'serpentScale', name: 'Serpent scales', price: 4 },
+  baronsStrongbox: { id: 'baronsStrongbox', name: "Baron's strongbox", price: 50 },
 };
 
 export const GOOD_IDS: readonly GoodId[] = [

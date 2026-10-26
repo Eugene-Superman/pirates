@@ -24,6 +24,12 @@ import { PERKS, TALENTS, levelOf, reloadShare, talentBlock, type TalentId } from
 import type { ShipClass } from './shipClasses';
 import { newStats, type Stats } from '../records/stats';
 
+/**
+ * A weapon's two places for ammo on the skill bar (Ship.ammoBar): an ammo kind each, or null for an empty one. Only
+ * ammo aboard: one that runs out leaves its place
+ */
+export type AmmoBar = [AmmoId | null, AmmoId | null];
+
 // Bounds for tuning the top speeds, world units per second (1 to 40 knots)
 const MIN_TOP_SPEED = 10;
 const MAX_TOP_SPEED = 400;
@@ -108,6 +114,11 @@ export class Ship implements Body {
   readonly ammo: Record<AmmoId, number> = { ...STARTING_AMMO };
   /** The ammo each weapon fires */
   readonly loaded: Record<WeaponId, AmmoId> = { cannon: AMMO_IDS.cannon[0], harpoon: AMMO_IDS.harpoon[0] };
+  /**
+   * The ammo the crew keeps at hand, two kinds a weapon (the skill bar's): what the player switches between in a fight.
+   * The rest stays in the hold until put here (the loadout). Null for a place left empty
+   */
+  readonly ammoBar: Record<WeaponId, AmmoBar> = { cannon: [null, null], harpoon: [null, null] };
   /** The target the ship fires at, volley after volley, until told to stop or the target is gone; null for none */
   attackTarget: number | null = null;
   /** Why it isn't firing at its target right now (set by combat every update); null when it is, or has no target */
@@ -148,6 +159,7 @@ export class Ship implements Body {
     if (this.guns.cannon.every((gun) => gun === null) && this.guns.harpoon.some((gun) => gun !== null)) {
       this.weapon = 'harpoon';
     }
+    this.fillAmmoBar();
   }
 
   get heading() {
@@ -448,9 +460,60 @@ export class Ship implements Body {
     this.loaded[AMMO[ammo].weapon] = ammo;
   }
 
-  /** Puts ammo in the hold (or takes it out, for a negative count). For testing now; bought later */
+  /** Loads the ammo in one of the picked weapon's two places on the bar (0 or 1), if there is one there */
+  loadBarAmmo(index: number) {
+    const ammo = this.ammoBar[this.weapon][index];
+    if (ammo) this.loadAmmo(ammo);
+  }
+
+  /**
+   * Puts an ammo of the weapon's in one of its two places on the bar (0 or 1), or empties it (null); if it was in the
+   * other place, the two swap. The ammo loaded stays loaded while it is on the bar; taken off, the one put in its place
+   * is loaded instead (or the other place's). An ammo with no shots aboard isn't put at hand
+   */
+  setAmmoSlot(weapon: WeaponId, index: number, ammo: AmmoId | null) {
+    if (index !== 0 && index !== 1) return;
+    if (ammo !== null && (AMMO[ammo].weapon !== weapon || this.ammo[ammo] <= 0)) return;
+    const bar = this.ammoBar[weapon];
+    const other = 1 - index;
+    if (ammo !== null && bar[other] === ammo) bar[other] = bar[index];
+    bar[index] = ammo;
+    if (!bar.includes(this.loaded[weapon])) {
+      const next = bar[index] ?? bar[other];
+      if (next) this.loaded[weapon] = next;
+    }
+  }
+
+  /**
+   * Fills the bar as a new ship's: for each weapon, the ammo loaded (if there is any aboard) and the next kind it
+   * carries (by tier), so a ship that comes with several kinds has two at hand. A saved ship's bar is put back over it
+   * (save.ts)
+   */
+  fillAmmoBar() {
+    for (const weapon of WEAPON_IDS) {
+      const loaded = this.loaded[weapon];
+      const next = AMMO_IDS[weapon].find((id) => id !== loaded && this.ammo[id] > 0) ?? null;
+      this.ammoBar[weapon] = [this.ammo[loaded] > 0 ? loaded : null, next];
+    }
+  }
+
+  /**
+   * Puts ammo in the hold (bought), or takes it out for a negative count (fired, sold). One that runs out leaves its
+   * place at hand empty; loaded, it stays loaded, and the ship holds fire till the player loads another (none is
+   * loaded for them: it might be a dear one) or buys more of it, which goes back to an empty place
+   */
   addAmmo(ammo: AmmoId, count: number) {
     this.ammo[ammo] = Math.max(0, this.ammo[ammo] + count);
+    const weapon = AMMO[ammo].weapon;
+    const bar = this.ammoBar[weapon];
+    if (this.ammo[ammo] > 0) {
+      const empty = bar.indexOf(null);
+      if (ammo === this.loaded[weapon] && !bar.includes(ammo) && empty >= 0) bar[empty] = ammo;
+      return;
+    }
+    bar.forEach((id, index) => {
+      if (id === ammo) bar[index] = null;
+    });
   }
 
   /** Sends the ship somewhere; the pilot finds the way round islands and other ships */

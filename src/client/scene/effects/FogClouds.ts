@@ -10,10 +10,10 @@ const CELL = 120; // world units: puffs sit one per cell of a grid on the water,
 const PUFF_CHANCE = 0.8; // share of cells with a puff
 const PUFF_SIZE = [200, 320] as const; // width of a puff's frame, world units
 const PUFF_Z = 6; // world units above the water
-const PUFF_ALPHA = 0.55;
+const PUFF_ALPHA = 0.42;
 const PUFF_DRIFT = 2; // times the wind's speed
 // Shares of the view range over which puffs fade in. They start a little inside it, so the edge isn't a clean line
-const PUFF_FADE = [0.93, 1.2] as const;
+const PUFF_FADE = [0.92, 1.3] as const;
 const PUFF_BAND = 1.8; // share of the view range: farther out there are no puffs, only the haze and mist (puffs cost fill rate)
 const BREATHE = 0.05; // puffs swell and shrink by this share, slowly
 const MAX_PUFFS = 700;
@@ -32,7 +32,7 @@ function cellRandom(i: number, j: number, salt: number) {
 
 /**
  * The fog of war's puffs: clouds on a world grid in a band around the clear water, fading in near its edge.
- * Its container goes over the haze and mist (fogOfWar.ts) and under the islands, so islands stay clear
+ * Its container goes over the haze and mist (fogOfWar.ts), over everything on the water as they are
  */
 export class FogClouds {
   readonly container = new Container({ sortableChildren: true });

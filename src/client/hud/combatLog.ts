@@ -293,7 +293,9 @@ export class CombatLog {
               ? t('Quest "{title}" turned in', { title: t(QUESTS[event.quest].title) })
               : event.reason === 'market'
                 ? t('Goods sold at the market')
-                : t('A chest hauled aboard');
+                : event.reason === 'arsenal'
+                  ? t('Sold to the arsenal')
+                  : t('A chest hauled aboard');
         this.add('gold', state.time, t('{why}: +{n} gold', { why, n: event.amount }), [], 'plain');
         break;
       }
@@ -387,16 +389,21 @@ export class CombatLog {
 
   /**
    * Puts a kept log back (what is valid of it), with a note where it ends: the next entries are this visit's. Their
-   * times are each visit's own game time
+   * times are each visit's own game time. A visit that left nothing in the log left only its note: one note between
+   * two visits is enough, so a note right after another (or first) is dropped, and none is added after one
    */
   restore(data: unknown) {
     if (!isRecord(data)) return;
     if (Array.isArray(data.entries)) {
       for (const item of data.entries) {
         const entry = readEntry(item);
-        if (entry) this.entries.push(entry);
+        if (!entry) continue;
+        const last = this.entries.at(-1);
+        if (isVisitNote(entry) && (!last || isVisitNote(last))) continue;
+        this.entries.push(entry);
       }
-      if (this.entries.length > 0) {
+      const last = this.entries.at(-1);
+      if (last && !isVisitNote(last)) {
         this.push({ kind: 'note', time: 0, summary: t('— a new visit —'), details: [], tone: 'plain' });
       }
     }
@@ -417,6 +424,11 @@ export class CombatLog {
     if (this.entries.length > MAX_ENTRIES) this.entries.shift();
     this.version++;
   }
+}
+
+/** The note where a visit's entries start: the only one at game time 0, before the visit's first update */
+function isVisitNote(entry: LogEntry) {
+  return entry.kind === 'note' && entry.time === 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

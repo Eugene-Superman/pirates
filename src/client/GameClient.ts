@@ -14,7 +14,9 @@ import {
   orderRepair,
   repairInPort,
   resetTalents,
+  sellAmmo,
   sellCargo,
+  sellGun,
   throwOverboard,
   takeHelm,
   takeQuest,
@@ -22,7 +24,7 @@ import {
   turnInQuest,
   useAbility,
   type Game,
-  type WeaponId,
+  type QuestId,
 } from '../game';
 import { Sounds, type SoundName } from './audio/Sounds';
 import { Hud } from './hud/Hud';
@@ -82,6 +84,11 @@ export class GameClient {
       };
     };
     const { ship } = game.state;
+    // Given up at the tavern or from the quest tracker, at sea too, once the player has said yes
+    const giveUpQuest = (id: QuestId) => {
+      dropQuest(game.state.player, id);
+      this.sounds.ui('quest');
+    };
     // The HUD's buttons act through the game's methods like any player action (the damage ones are for testing)
     this.hud = new Hud(
       {
@@ -90,10 +97,11 @@ export class GameClient {
         // Zoom, range rings and how the fog looks are view state, not game state: they go to the scene,
         // the game never knows about them
         setZoom: view((level: number) => this.view.setZoom(level)),
-        toggleRange: view((weapon: WeaponId) => this.view.toggleRange(weapon)),
+        toggleRanges: view(() => this.view.toggleRanges()),
         setCameraMode: view((mode: CameraMode) => this.view.setCameraMode(mode)),
         toggleZone: view(() => this.view.toggleZone()),
         toggleFog: view((layer: FogLayer) => this.view.toggleFog(layer)),
+        toggleSky: view(() => this.view.toggleSky()),
         toggleDebug: view((kind: NavDebug) => this.view.toggleDebug(kind)),
         toggleSound: () => this.sounds.toggle(),
         changeVolume: (steps) => this.sounds.changeVolume(steps),
@@ -106,9 +114,14 @@ export class GameClient {
           else ship.attack(id);
         },
         repair: () => this.cue(orderRepair(game.state, ship)),
+        dropQuest: giveUpQuest,
         // The loadout: guns from the hold, bought in port
         fitGun: (weapon, slot, gun) => this.cue(fitFromHold(game.state.player, ship, weapon, slot, gun), 'equip'),
         loadAmmo: (ammo) => ship.loadAmmo(ammo),
+        setAmmoSlot: (weapon, index, ammo) => {
+          ship.setAmmoSlot(weapon, index, ammo);
+          this.sounds.ui('equip');
+        },
         // Goods thrown overboard, at sea or in port: they splash down and sink
         throwCargo: (good, count) => this.cue(throwOverboard(ship, good, count), 'splash'),
         changeMaxSpeed: (delta) => ship.tuneSpeeds(delta, 0),
@@ -132,23 +145,22 @@ export class GameClient {
           leavePort: () => leavePort(game.state, ship),
           // What it sounds like: a purchase rings, a refusal thuds; gold paid out sounds from the game's events
           buyGun: (gun) => this.cue(buyGun(game.state, game.state.player, gun), 'coins'),
-          buyAmmo: (ammo) => this.cue(buyAmmo(game.state, game.state.player, ammo), 'coinsSmall'),
+          buyAmmo: (ammo, count) => this.cue(buyAmmo(game.state, game.state.player, ammo, count), 'coinsSmall'),
+          sellGun: (gun) => this.cue(sellGun(game.state, game.state.player, gun)),
+          sellAmmo: (ammo, count) => this.cue(sellAmmo(game.state, game.state.player, ammo, count)),
           repairInPort: () => this.cue(repairInPort(game.state, game.state.player), 'repair'),
           buyOutfit: (id) => this.cue(buyOutfit(game.state, game.state.player, id), 'coins'),
           fitOutfit: (slot, id) => this.cue(fitOutfit(game.state, game.state.player, slot, id), 'equip'),
           takeQuest: (id) => this.cue(takeQuest(game.state, game.state.player, id), 'quest'),
           turnInQuest: (id) => this.cue(turnInQuest(game.state, game.state.player, id)),
-          dropQuest: (id) => {
-            dropQuest(game.state.player, id);
-            this.sounds.ui('quest');
-          },
+          dropQuest: giveUpQuest,
           sellCargo: (good) => this.cue(sellCargo(game.state, game.state.player, good)),
           // The HUD and the ship's sprite are made for one class of ship: a ship changed reloads the page with it
           buyShip: () => this.reloadIf(buyShip(game.state, game.state.player)),
           takeHelm: (index) => this.reloadIf(takeHelm(game.state, game.state.player, index)),
         },
       },
-      { hud: store.slot('hud'), log: store.slot('log') },
+      { hud: store.slot('hud'), log: store.slot('log'), tracker: store.slot('tracker') },
     );
     app.stage.addChild(this.view.container, this.hud.container);
     bindPointerInput(app, this.view, ship, this.selection, this.hover, game.state.world.port);
@@ -160,6 +172,7 @@ export class GameClient {
       toggleTalents: () => this.hud.toggleTalents(),
       toggleStats: () => this.hud.toggleStats(),
       toggleHold: () => this.hud.toggleHold(),
+      toggleMastery: () => this.hud.toggleMastery(),
       useAbility: () => this.cue(useAbility(game.state, ship)),
       repair: () => this.cue(orderRepair(game.state, ship)),
     });
@@ -193,6 +206,7 @@ export class GameClient {
           zoneShown: this.view.zoneShown,
           zoneBox: this.view.zoneBox,
           fog: this.view.fogShown,
+          sky: this.view.skyIsShown,
           debug: this.view.debugShown,
           sound: this.sounds.settings,
           renderer: this.renderer,

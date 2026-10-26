@@ -12,10 +12,11 @@ export const REPAIR_TICK = 1;
 export const COMBAT_TIME = 5;
 /**
  * Hull points the crew mends at sea for one gold of timber and pitch: a quarter of the shipwright's price (economy/
- * shop.ts), who does it all at once. A fight with a smuggler costs a sloop about half its hull, some 12 gold at sea,
- * a third of what the fight pays; a turtle kept off with harpoons, 2 or 3
+ * shop.ts), who does it all at once. A fight with a smuggler costs a sloop about half its hull, some 20 gold at sea,
+ * two thirds of what the fight pays; a turtle kept off with harpoons, 5 or 6. A fight is won by taking little damage,
+ * not only by sinking the foe
  */
-export const REPAIR_HP_PER_GOLD = 20;
+export const REPAIR_HP_PER_GOLD = 10;
 
 /** Hull points one repair step mends on this ship: more with Carpenters */
 export function repairStep(ship: Ship) {

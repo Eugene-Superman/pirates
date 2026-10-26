@@ -37,7 +37,8 @@ export function damageShare(weapon: WeaponId, nature: TargetNature) {
 }
 
 /**
- * Why a ship told to attack isn't firing: no guns of the selected weapon fitted, none of its ammo left, the target
- * hidden in the fog of war, or beyond every fitted gun's range. The client tells the player
+ * Why a ship told to attack isn't firing: no guns of the selected weapon fitted, none of its ammo left, the ammo
+ * loaded not at hand (a player's ship fires only what is on its bar, not straight from the hold), the target hidden in
+ * the fog of war, or beyond every fitted gun's range. The client tells the player
  */
-export type HoldReason = 'noGuns' | 'noAmmo' | 'sight' | 'range';
+export type HoldReason = 'noGuns' | 'noAmmo' | 'notAtHand' | 'sight' | 'range';

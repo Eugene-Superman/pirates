@@ -56,8 +56,8 @@ export interface Boss {
 // Balanced against the starter sloop with its starting guns (two cannons I, two harpoon guns I): each fight costs it
 // a share of its hull that the repair skill brings back in half a minute or so. pirate-balance.xlsx, Plan bots, has
 // the first numbers. The loot is kept lean: about 7 gold a fishing boat, 15 a turtle, 22–29 the rest (bounty + chests
-// on average); chests of gold only from ships, a monster leaves only what its body is worth. Their goods sell for
-// about a third as much again at the market (economy/cargo.ts), once carried home
+// on average); chests of gold only from ships, a monster leaves only what its body is worth. Goods drop now and then,
+// a piece or two, and sell for about a tenth as much again at the market (economy/cargo.ts), once carried home
 export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
   // Nets and fish, no guns: it runs from whoever attacks it
   fisher: {
@@ -73,7 +73,7 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     level: 1,
     xp: 10,
     chest: { chance: 0.15, gold: [3, 6] },
-    cargo: [{ good: 'fish', count: [1, 3], chance: 0.6 }],
+    cargo: [{ good: 'fish', count: [1, 2], chance: 0.35 }],
     boss: null,
   },
   // A swivel gun that reaches less far than the player's cannons: keep your distance and it can't answer
@@ -91,8 +91,8 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     xp: 30,
     chest: { chance: 0.4, gold: [10, 25] },
     cargo: [
-      { good: 'cloth', count: [1, 3], chance: 0.7 },
-      { good: 'spices', count: [1, 1], chance: 0.3 },
+      { good: 'cloth', count: [1, 2], chance: 0.4 },
+      { good: 'spices', count: [1, 1], chance: 0.15 },
     ],
     boss: null,
   },
@@ -101,7 +101,7 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     shipClass: 'smugglerSloop',
     behaviour: 'aggressive',
     ammo: 'ball1',
-    aggroRange: 300,
+    aggroRange: 210,
     cruise: 0.5,
     perSquare: 1,
     respawnTime: 25,
@@ -110,8 +110,8 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     xp: 40,
     chest: { chance: 0.3, gold: [8, 20] },
     cargo: [
-      { good: 'rum', count: [1, 2], chance: 0.6 },
-      { good: 'contraband', count: [1, 1], chance: 0.3 },
+      { good: 'rum', count: [1, 1], chance: 0.35 },
+      { good: 'contraband', count: [1, 1], chance: 0.15 },
     ],
     boss: null,
   },
@@ -129,7 +129,7 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     level: 2,
     xp: 20,
     chest: null,
-    cargo: [{ good: 'turtleShell', count: [1, 1], chance: 0.5 }],
+    cargo: [{ good: 'turtleShell', count: [1, 1], chance: 0.3 }],
     boss: null,
   },
   serpent: {
@@ -137,7 +137,7 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     shipClass: 'seaSerpent',
     behaviour: 'aggressive',
     ammo: null,
-    aggroRange: 240,
+    aggroRange: 170,
     cruise: 0.45,
     perSquare: 1,
     respawnTime: 25,
@@ -145,7 +145,7 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     level: 4,
     xp: 35,
     chest: null,
-    cargo: [{ good: 'serpentScale', count: [1, 1], chance: 0.5 }],
+    cargo: [{ good: 'serpentScale', count: [1, 1], chance: 0.3 }],
     boss: null,
   },
   // The boss of the starting waters (ships/shipClasses.ts, baronBrig): its lair is far from the port, and it sails
@@ -155,7 +155,7 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     shipClass: 'baronBrig',
     behaviour: 'aggressive',
     ammo: 'ball1',
-    aggroRange: 380,
+    aggroRange: 270,
     cruise: 0.4,
     perSquare: 0,
     respawnTime: 240,
@@ -164,7 +164,7 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     xp: 450,
     chest: { chance: 1, gold: [60, 120] },
     cargo: [
-      { good: 'contraband', count: [4, 6], chance: 1 },
+      { good: 'contraband', count: [2, 3], chance: 1 },
       { good: 'baronsStrongbox', count: [1, 1], chance: 1 },
     ],
     boss: { lair: { x: 6500, y: 1500 }, escorts: { kind: 'smuggler', count: 2 } },

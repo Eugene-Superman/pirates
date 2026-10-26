@@ -10,13 +10,18 @@ import { spend } from '../records/stats';
 // grows; ammo is cheap next to what a kill pays (bots/botKinds.ts), so a player never gets stuck without shot
 const GUN_PRICES = [0, 80, 250, 600, 1400, 3000, 6000]; // gold, by the gun's tier
 const AMMO_PACK_PRICES = [0, 10, 30, 70, 150, 300, 600]; // gold for AMMO_PACK shots, by the ammo's tier
-/** Shots in one pack of ammo */
+/** Shots in one pack of ammo: what the arsenal's cards buy and sell at a click; any count from 1 is bought too */
 export const AMMO_PACK = 20;
+/** The most shots of an ammo bought or sold at once */
+export const MAX_AMMO_DEAL = 1000;
 // The shipwright's rate: hull points mended for one gold, all at once. Four times the crew's at sea (ships/repair.ts)
-const SHIPWRIGHT_HP_PER_GOLD = 5;
+const SHIPWRIGHT_HP_PER_GOLD = 2.5;
 // Gold, by the piece of outfit's tier: a little dearer than a gun of the tier, as it serves every fight
 const OUTFIT_PRICES = [0, 120, 400, 1000];
 const RESPEC_PRICE = 20; // gold for every talent point and signature forgotten: cheap, so a player tries other builds
+// Share of its price the arsenal pays for a gun or ammo sold back: a quarter, so a gun bought and sold again is a loss,
+// and selling what the player has outgrown helps a little towards the next, never more than the hunting does
+const SELL_BACK = 0.25;
 
 export function gunPrice(gun: GunId) {
   return GUN_PRICES[GUNS[gun].tier] ?? GUN_PRICES[GUN_PRICES.length - 1];
@@ -28,6 +33,26 @@ export function outfitPrice(id: OutfitId) {
 
 export function ammoPackPrice(ammo: AmmoId) {
   return AMMO_PACK_PRICES[AMMO[ammo].tier] ?? AMMO_PACK_PRICES[AMMO_PACK_PRICES.length - 1];
+}
+
+/** What the arsenal pays for a gun sold back */
+export function gunSalePrice(gun: GunId) {
+  return Math.floor(gunPrice(gun) * SELL_BACK);
+}
+
+/** What `count` shots of an ammo cost: its pack's price by the shot, a part of a gold coin rounded up */
+export function ammoPrice(ammo: AmmoId, count: number) {
+  return Math.ceil((ammoPackPrice(ammo) * count) / AMMO_PACK);
+}
+
+/** What the arsenal pays for `count` shots of an ammo sold back (a pack's by default), a part of a coin rounded down */
+export function ammoSalePrice(ammo: AmmoId, count: number = AMMO_PACK) {
+  return Math.floor((ammoPackPrice(ammo) * SELL_BACK * count) / AMMO_PACK);
+}
+
+/** Whether a count of shots can be dealt in at once: a whole number from 1 to MAX_AMMO_DEAL */
+function dealable(count: number) {
+  return Number.isInteger(count) && count >= 1 && count <= MAX_AMMO_DEAL;
 }
 
 /** What mending the whole hull costs at the shipwright's; 0 when it is whole */
@@ -54,11 +79,11 @@ export function buyGun(state: GameState, player: Player, gun: GunId) {
   return true;
 }
 
-/** Buys a pack of AMMO_PACK shots into the ship's hold */
-export function buyAmmo(state: GameState, player: Player, ammo: AmmoId) {
+/** Buys `count` shots of an ammo into the ship's hold (a pack's by default), up to MAX_AMMO_DEAL at once */
+export function buyAmmo(state: GameState, player: Player, ammo: AmmoId, count: number = AMMO_PACK) {
   const ship = dockedShip(state, player);
-  if (!ship || !pay(player, ammoPackPrice(ammo))) return false;
-  ship.addAmmo(ammo, AMMO_PACK);
+  if (!ship || !dealable(count) || !pay(player, ammoPrice(ammo, count))) return false;
+  ship.addAmmo(ammo, count);
   return true;
 }
 
@@ -99,6 +124,37 @@ export function fitOutfit(state: GameState, player: Player, slot: OutfitSlot, id
 }
 
 /**
+ * Sells a gun from the hold back to the arsenal for a quarter of its price (a `gold` event). Only a gun in the hold: a
+ * fitted one is taken off in the loadout first. False if not in port or there is none in the hold
+ */
+export function sellGun(state: GameState, player: Player, gun: GunId) {
+  const ship = dockedShip(state, player);
+  const stock = player.hold[gun] ?? 0;
+  if (!ship || stock <= 0) return false;
+  player.hold[gun] = stock - 1;
+  earn(state, player, { amount: gunSalePrice(gun), reason: 'arsenal', kind: null, quest: null, at: shipTop(ship) });
+  return true;
+}
+
+/**
+ * Sells `count` shots of an ammo (a pack's by default) back to the arsenal for a quarter of their price (a `gold`
+ * event); the one loaded too, if the player wants. False if not in port, short of them, or if they'd fetch nothing
+ */
+export function sellAmmo(state: GameState, player: Player, ammo: AmmoId, count: number = AMMO_PACK) {
+  const ship = dockedShip(state, player);
+  const amount = ammoSalePrice(ammo, count);
+  if (!ship || !dealable(count) || ship.ammo[ammo] < count || amount < 1) return false;
+  ship.addAmmo(ammo, -count);
+  earn(state, player, { amount, reason: 'arsenal', kind: null, quest: null, at: shipTop(ship) });
+  return true;
+}
+
+/** Where the gold paid to a ship floats up from */
+function shipTop(ship: Ship) {
+  return { x: ship.x, y: ship.y, z: ship.height };
+}
+
+/**
  * Sells goods from the ship's hold at the port's market: every piece of one kind, or everything (no kind given). A
  * `gold` event; false if not in port or there is nothing to sell
  */
@@ -109,8 +165,7 @@ export function sellCargo(state: GameState, player: Player, good?: GoodId) {
   const amount = cargoValue(ship.cargo, kinds);
   if (amount === 0) return false;
   for (const id of kinds) delete ship.cargo[id];
-  const at = { x: ship.x, y: ship.y, z: ship.height };
-  earn(state, player, { amount, reason: 'market', kind: null, quest: null, at });
+  earn(state, player, { amount, reason: 'market', kind: null, quest: null, at: shipTop(ship) });
   markStep(state, player, 'sell');
   return true;
 }

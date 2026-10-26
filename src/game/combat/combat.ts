@@ -7,6 +7,7 @@ import { AMMO, rollVolley, type AmmoId, type Bite, type DamageDie, type GunId } 
 import type { Cargo } from '../economy/cargo';
 import type { QuestId } from '../economy/quests';
 import type { PathStepId } from '../economy/shipyard';
+import type { GoldReason } from '../records/stats';
 import { findUnit, isAfloat, unitKind, type Unit, type UnitKind } from './units';
 import { WEAPONS, WEAPON_IDS, damageShare, type HoldReason, type WeaponId } from './weapons';
 
@@ -164,12 +165,13 @@ export type GameEvent =
       readonly reason: 'gold';
     }
   | {
-      /** A player was paid (economy/): a bounty for a kill, a chest hauled aboard, a quest turned in, goods sold */
+      /** A player was paid (economy/): a bounty for a kill, a chest hauled aboard, a quest turned in, goods sold, guns
+       * or ammo sold back */
       readonly type: 'gold';
       /** The player's ship */
       readonly shipId: number;
       readonly amount: number;
-      readonly reason: 'bounty' | 'chest' | 'quest' | 'market';
+      readonly reason: GoldReason;
       /** What was sunk, for a bounty */
       readonly kind: UnitKind | null;
       /** Which quest, for a quest */
@@ -257,7 +259,11 @@ export function projectilePosition(p: Projectile, age = p.age): Point3 {
 export function holdReason(ship: Ship, target: Unit): HoldReason | null {
   const range = ship.range();
   if (range === 0) return 'noGuns';
-  if (!ship.infiniteAmmo && ship.ammo[ship.loaded[ship.weapon]] <= 0) return 'noAmmo';
+  if (!ship.infiniteAmmo) {
+    const loaded = ship.loaded[ship.weapon];
+    if (ship.ammo[loaded] <= 0) return 'noAmmo';
+    if (!ship.ammoBar[ship.weapon].includes(loaded)) return 'notAtHand';
+  }
   if (!ship.canSee(target.x, target.y)) return 'sight';
   if (Math.hypot(target.x - ship.x, target.y - ship.y) > range) return 'range';
   return null;
@@ -340,7 +346,7 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
   const count = ship.infiniteAmmo ? ready.length : Math.min(ready.length, ship.ammo[ammo.id]);
   if (count === 0) return;
   const firing = ready.slice(0, count);
-  if (!ship.infiniteAmmo) ship.ammo[ammo.id] -= count;
+  if (!ship.infiniteAmmo) ship.addAmmo(ammo.id, -count);
   const reload = reloadShare(ship, weapon.id);
   for (const { gun, slot } of firing) reloads[slot] = gun.reload * reload;
 

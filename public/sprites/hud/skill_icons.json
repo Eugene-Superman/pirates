@@ -1,0 +1,18 @@
+{
+ "file": "skill_icons.webp",
+ "tile": 96,
+ "icons": {
+  "repair": [
+   0,
+   0
+  ],
+  "fullSail": [
+   1,
+   0
+  ],
+  "locked": [
+   2,
+   0
+  ]
+ }
+}

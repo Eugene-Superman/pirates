@@ -26,7 +26,8 @@ interface Row {
 
 /**
  * A development tool: every HUD item, grouped, with a checkbox for whether it is also shown on the screen, and every
- * control working right here. Opened by the HUD's Settings button, closed by Close, Escape or a click beside it.
+ * control working right here. Opened by the gear medallion on the minimap's frame, closed by Close, Escape or a click
+ * beside it.
  * The mouse wheel scrolls it when it is taller than the screen
  */
 export class SettingsPanel {

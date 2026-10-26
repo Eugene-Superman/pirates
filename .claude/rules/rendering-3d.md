@@ -24,19 +24,24 @@ paths:
   a level reached, a boss's barrage marks). They may use `Math.random`.
 - `scene/cameraControl.ts` — how the camera keeps up with the ship (follow / dead zone / recenter), switched in the HUD.
 - `hud/` — screen-space Pixi `Text`/`Container`, not projected; `ui.ts` holds the shared colors, `Tile` (a clickable
-  rectangle), `labelButton` (a tile with a label), `show`/`tint` (change a `Text` only when the value changes) and
-  `HudWindow` (a window over the game: the dim behind it, its panel, Close, Escape, scaled to fit the screen; in the
-  HUD's own look, or another `WindowLook`). `theme.ts` is the windows' theme, dark wood under a brass frame: its
-  panel, `BRASS` tiles (a `TileStyle`), cards, icon slots and `THEMED_WINDOW`; the port's windows wear it, the others
-  are to follow. `iconAtlas.ts` loads the items' painted icons (`public/sprites/icons/`) the first time a window asks.
+  rectangle), `show`/`tint` (change a `Text` only when the value changes), `clip` (a line cut short with an ellipsis)
+  and `HudWindow` (a window over the game: the dim behind it, its panel, Close, Escape, scaled to fit the screen; in
+  the `WindowLook` it is given). `theme.ts` is the windows' theme, dark wood under a brass frame: its
+  panel, `BRASS` tiles (a `TileStyle`), cards, icon slots, meters (`drawMeter`), wells (`drawWell`) and
+  `THEMED_WINDOW`; the port's windows, every `HudWindow`, the chat (`ChatPanel`) and the plates and tracker at the top
+  (`UnitFrames`, `QuestTracker`, a HUD plate being `themedPanel` with smaller brackets) wear it. A text in a panel of a
+  fixed width wraps (`wordWrap`, or `CanvasTextMetrics` for the chat's lines): nothing runs out over its edge. `iconAtlas.ts` loads the items' painted icons (`public/sprites/icons/`) the first time a window asks,
+  and the minimap's buttons and the skill bar's skills (`public/sprites/hud/`).
   `input/` — turns pointer and key events into game method calls; the unit picked out with a click (`selection.ts`)
   is client state, which the game only hears of when the player attacks it. The HUD windows that Escape closes (the
-  sea chart, the statistics, the hold, the talents, the loadout, the port with an item's window over it, the settings)
+  sea chart, the statistics, the captain's mastery, the hold, the talents, the loadout, the port with an item's window
+  over it, the settings; and over them all the question before what can't be undone, one `ConfirmDialog` for the
+  whole HUD, the port's included)
   listen on `window` in the order the HUD makes them, top-most first and all before `keyboardInput` is bound; each
   skips an Escape already `defaultPrevented` and calls `preventDefault` when it acted, so one press closes only the
   top window, and Escape reaches the ship only when no window was open.
 - `storage/Store.ts` — the browser's memory until there is a server: the progress (`game.save()`), the settings, the
-  combat log and the language, by key. IndexedDB, else localStorage, else memory alone; read once at the start, written
+  quest tracker's folds, the combat log and the language, by key. IndexedDB, else localStorage, else memory alone; read once at the start, written
   a moment after a change and at once when the page is hidden; `written()` waits for a write before the page reloads
   (a new language). A new game (`clear()`) keeps the language. A part that keeps one thing gets a `Slot`.
 - Game logic is imported only from `game/index.ts` (`'../../game'`); Oxlint rejects deep imports into `game/`.
@@ -60,7 +65,8 @@ paths:
 - Immediate mode: `scene.clear()` and a full redraw every frame via `Painter3D`.
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
   The exceptions are things projected elsewhere: the sprites of ships, monsters and chests with their water masks,
-  the port's pictures (`PortSprites`) and the fog puffs (`FogClouds`), all made for this camera; the four shader
+  the port's pictures (`PortSprites`), the fog puffs (`FogClouds`) and the sky's clouds and their shadows
+  (`SkyClouds`), all made for this camera; the four shader
   meshes (`seaSurface.ts`, `fogOfWar.ts`, `Wake.ts`, the water round a wreck in `Sinking.ts`), whose vertices are
   projected with `Camera3D` every frame; and what stays the same size at every zoom, drawn in screen pixels at a
   projected point: the units' hit point bars (`SceneView.drawHpBars`) and the damage numbers (`DamageNumbers`).
@@ -90,11 +96,11 @@ There is no z-buffer, so order is everything. In `SceneView.update`:
    covers it once all its maps have loaded.
 2. Everything flat on the water (`z = 0`): wakes and the water round a wreck (shader meshes in layers of their own,
    under the islands' see-through shallows) → the port's ground picture, once loaded (a sprite under `scene`, in
-   place of its island's ground) → island "ground" (shallows, sand, cliff shadows) → world border → range rings (each
-   weapon's full volley, the water tinted, and its longest reach) → units' water (a serpent's body under the surface,
+   place of its island's ground) → island "ground" (shallows, sand, cliff shadows) → world border → range rings (the
+   picked weapon's shortest and longest reach, dashed, running round) → units' water (a serpent's body under the surface,
    a turtle's) → bubbles over bots' wrecks → chests' foam rings → repair rings → the level-up's glow and rings → the
    target lock ring, then the selection ring → shot ripples → a boss's barrage marks (`BarrageMarks`) → projectile
-   shadows → target marker.
+   shadows → target marker (where the ship can see; beyond, it goes over the fog, see below).
    There is no drawn ship shadow: it is baked into the sprite.
 3. Volumetric objects (islands' hills and palms, bots' ships and monsters, bots' wrecks going down, chests, the port's
    pictures' slices (`PortSprites`), or until they load its walls (in lengths of `WALL_STEP`), quay, houses,
@@ -107,16 +113,19 @@ Add a new volumetric object to the `objects` array with `depth` and `draw(painte
 draw it separately after sorting.
 
 A sprite can't go inside a `Graphics`, so the scene is layers in `container`, bottom to top:
-sea surface mesh → fog of war mesh (haze and mist) → fog puffs → wake mesh → wreck water mesh → `layers` → `overlay`
-(the navigation debug drawings) → `hpBars` (the units' hit point bars, with a red border on a bot hostile to the
-player) → the damage numbers, over everything.
+sea surface mesh → wake mesh → wreck water mesh → `layers` → the sky clouds' shadows → fog of war mesh (haze and
+mist) → fog puffs → `markerLayer` (the target marker where the ship can't see) → the sky's clouds → `overlay` (the
+navigation debug drawings) → `hpBars` (the units' hit point bars, with a red border on a bot hostile to the player) →
+the damage numbers, over everything.
 `layers` holds the port's ground picture (once loaded), then the sorted objects: `scene` (flat things and the objects
 farther than the first sprite), then for each sprite far to near its own layers (a ship: its sprite, its `waterMask`,
 its fire over it; a serpent: its pieces; a slice of the port's pictures) and a `Graphics` segment of the vector-drawn
 objects between it and the next sprite, opened only when there are some (`drawLayers`, segments reused frame to
 frame). The player's ship's layers end with `fireLayer`: flames, then smoke, then shot effects nearer than the ship,
 the repair's crosses, the level-up's light and the barrage's falling shells.
-The fog lies under the islands, so islands stay clear of it; units inside the fog are not drawn at all.
+The fog lies over everything on the water, so beyond the view the islands, the port and the wakes are hazed like the
+sea; units inside the fog are not drawn at all. The sky's clouds (`SkyClouds`) drift over it all, high above the
+sea, their shadows over everything under the fog.
 `draw` receives the painter of its layer — draw with it, not with `this.painter`. Nothing is drawn for a sprite until
 its `intact` atlas has loaded (the vector model stands in for a bot, a monster or a chest).
 
@@ -165,7 +174,7 @@ its `intact` atlas has loaded (the vector model stands in for a bot, a monster o
 - `top` — horizontal upward-facing surface (deck, plateau), lit.
 - `sides(bottom, top)` — side walls between two outlines; only camera-facing faces are drawn, already sorted.
 - `surface` — thin two-sided surface (sail, flag); the normal is flipped towards the camera.
-- `line`, `curve`, `disc`, `ring` — width and radius are in world units.
+- `line`, `curve`, `disc`, `ring`, `dashedRing` — width, radius and dashes are in world units.
 - `ball` — a circle around a projected point that looks the same from any side (smoke puff, flame); radius in world units.
 - Shadows: `shadowPoint(p, groundZ)` projects a point along `LIGHT` onto a plane; draw the shadow as a black `polygon` with `SHADOW_ALPHA`.
 - Boxes: `footprint(x, y, z, along, across, angle)` gives a turned rectangle's corners at height `z`, for `sides` and `top`.
@@ -191,8 +200,9 @@ its `intact` atlas has loaded (the vector model stands in for a bot, a monster o
   position and their spot on the water, so the textures stay fixed to the water whatever the camera does.
 - Texture origins are moved by whole tiles to near the camera (sea) or the ship (fog): far from 0 a float can't tell
   the texture's pixels apart.
-- The sea's look is one set of numbers, `SEA_LOOK` in `seaLook.ts`: three wave layers over its two wave maps
-  (`swell`, `ripples`), and the broad `patches` of deeper and shallower water and cloud shadows. The fog starts at
+- The sea's look is one set of numbers, `SEA_LOOK` in `seaLook.ts`: three wave layers over the `swell` and `ripples`
+  maps, a `chop` where gusts blow with whitecaps frayed by the wakes' foam, two layers of `caustics` (light on the
+  floor of the shallows), and the broad `patches` of deeper and shallower water, cloud shadows and gusts. The fog starts at
   `ship.viewRange`; hiding its layers in the HUD changes only the picture, never what the ship can see or shoot
   (`ship.canSee` in the game).
 

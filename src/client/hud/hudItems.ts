@@ -1,5 +1,5 @@
 import { Container, Text, type TextStyleOptions } from 'pixi.js';
-import { WEAPONS, WEAPON_IDS, type GameState, type WeaponId } from '../../game';
+import { WEAPONS, WEAPON_IDS, type GameState, type QuestId, type WeaponId } from '../../game';
 import type { SoundSettings } from '../audio/Sounds';
 import type { GpuInfo } from '../render/gpu';
 import { CAMERA_MODES, type CameraMode } from '../scene/cameraControl';
@@ -40,7 +40,7 @@ const WARNING_COLOR = 0xffb347;
 const SOFTWARE_WARNING =
   "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings";
 const HELP =
-  'Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold';
+  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold, P captain's mastery";
 
 export interface HudActions extends DamageActions, HoldActions, LoadoutActions, TalentActions {
   /** Uses the ship's ability (its level 5 talent) */
@@ -51,16 +51,20 @@ export interface HudActions extends DamageActions, HoldActions, LoadoutActions, 
   toggleFire: () => void;
   /** Orders the crew to repair, for gold */
   repair: () => void;
+  /** Gives a quest up, from the quest tracker (the player has said yes) */
+  dropQuest: (id: QuestId) => void;
   /** Camera zoom as a multiple of the default one */
   setZoom: (level: number) => void;
   setCameraMode: (mode: CameraMode) => void;
   setWeapon: (weapon: WeaponId) => void;
-  /** Shows or hides a weapon's range ring */
-  toggleRange: (weapon: WeaponId) => void;
+  /** Shows or hides the range rings of the weapon picked */
+  toggleRanges: () => void;
   /** Shows or hides the outline of the camera's zone */
   toggleZone: () => void;
   /** Shows or hides a part of the fog of war; the ship sees as far either way */
   toggleFog: (layer: FogLayer) => void;
+  /** Shows or hides the clouds drifting over the sea */
+  toggleSky: () => void;
   /** Shows or hides a debug drawing of the navigation */
   toggleDebug: (kind: NavDebug) => void;
   /** Turns all sound on or off */
@@ -84,11 +88,14 @@ export interface HudActions extends DamageActions, HoldActions, LoadoutActions, 
 export interface ViewStatus {
   zoom: number;
   cameraMode: CameraMode;
-  ranges: Readonly<Record<WeaponId, boolean>>;
+  /** Whether the range rings are shown */
+  ranges: boolean;
   zoneShown: boolean;
   /** The camera's zone on the screen, pixels; null when the camera mode has none */
   zoneBox: { x: number; y: number; width: number; height: number } | null;
   fog: Readonly<Record<FogLayer, boolean>>;
+  /** Whether clouds drift over the sea */
+  sky: boolean;
   debug: Readonly<Record<NavDebug, boolean>>;
   sound: SoundSettings;
   /** What draws the picture: the graphics card, or the processor in software */
@@ -319,6 +326,17 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       },
     },
     {
+      id: 'sky',
+      group: 'World',
+      label: 'Sky',
+      kind: 'control',
+      onScreen: false,
+      create: () => {
+        const row = new ButtonRow([{ label: t('Clouds'), key: 'clouds', onTap: actions.toggleSky }]);
+        return control(row, null, ({ view }) => row.setPressed(() => view.sky));
+      },
+    },
+    {
       id: 'weapon',
       group: 'Combat',
       label: 'Weapon',
@@ -342,11 +360,10 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       label: 'Range',
       kind: 'control',
       onScreen: false,
+      // The rings follow the weapon picked, in its colour
       create: () => {
-        const row = new ButtonRow(
-          WEAPON_IDS.map((id) => ({ label: t(WEAPONS[id].name), key: id, onTap: () => actions.toggleRange(id) })),
-        );
-        return control(row, null, ({ view }) => row.setPressed((id) => view.ranges[id]));
+        const box = new Checkbox(t('Show'), actions.toggleRanges);
+        return control(box, null, ({ view }) => box.setChecked(view.ranges));
       },
     },
     {
