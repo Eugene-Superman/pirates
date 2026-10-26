@@ -60,20 +60,24 @@ paths:
 - A `Ship` is anything that sails under a pilot: the player's ship, the bots' ships and sea monsters. Every ship has a
   `ShipClass` from `SHIP_CLASSES` (`ships/shipClasses.ts`): size, handling, `nature` (`object` for ships, `creature`
   for monsters), `height`, gun `slots` or a monster's `bite` are copied from it or read from it. Class ids are unique
-  across lines; how to add a class (and a bot's hull) is in `docs/ships.md`.
+  across lines; how to add a class (and a bot's hull) is in `docs/ships.md`. `ships/shipLines.ts` lists the lines
+  players sail and every ship in them (`SHIP_LINES`, `lineShip`): a built one is a class, a planned one only a name,
+  a role, provisional figures and how it will be got (`SHIP_SOURCES`, priced in `economy/currencies.ts`), for the
+  shipyard to show.
   The figures (`maxSpeed`, `minSpeed`, `acceleration`, `turnSpeed`, `viewRange`, `maxHp`) are getters: the
   class's, grown by the outfit fitted and the talents taken (`grownStats`, worked out again by `refit` when one of
-  them changes, the hull keeping its share of hit points). `tuneSpeeds` / `tuneViewRange` change the class's base for
-  the HUD's debug buttons. Damage lowers the top speed from `maxSpeed` towards `minSpeed` (`topSpeed`).
+  them changes, the hull keeping its share of hit points; `figuresWith` works them out with another piece in a slot,
+  for the shop). `tuneSpeeds` / `tuneViewRange` change the class's base for the HUD's debug buttons. Damage lowers the
+  top speed from `maxSpeed` towards `minSpeed` (`topSpeed`).
 - `setTarget` clamps the target to world bounds; `ship.steer(dt, helm)` turns no faster than `turnSpeed` and speeds up
   or slows down towards the helm's speed. The helm comes from the pilot.
 - `ship.bot` is the bot's mind (`bots/brain.ts`), `null` for a player's ship. A bot's ammo never runs out (`infiniteAmmo`).
 
 ## Levels, talents and outfit (`ships/talents.ts`, `ships/outfit.ts`)
 
-- Every ship levels on its own, from 1 to its class's `maxLevel` (10 at tier 1, 20 from tier 2; `MAX_LEVEL`): `xp`
-  from kills (`xpForKill`: less for a bot far below the ship) and quests (`gainXp`, `xp` and `level` events). XP
-  beyond the class's last level is lost.
+- Every ship levels on its own, from 1 to its class's `maxLevel` (10 for the starter sloop, 20 for a line's ships;
+  `MAX_LEVEL`): `xp` from kills (`xpForKill`: less for a bot far below the ship) and quests (`gainXp`, `xp` and
+  `level` events). XP beyond the class's last level is lost.
 - Talents: a point at every level from 2 that isn't a milestone, spent a rank at a time in three branches (`BRANCHES`),
   a branch's next row opening with `ROW_POINTS` spent in it; the milestone levels (`MILESTONES`: 5, 10, 15, 20) offer
   one of two signature talents instead, the level 5 one an ability (`useAbility`, F). `talentBlock` says why one
@@ -168,12 +172,12 @@ paths:
   shop, repairs at sea, the shipyard); `giveGold` is the HUD's debug button.
 - `loot.ts`: `stepLoot` reads this update's `destroyed` events: the player who sank a bot is paid its kind's `bounty`,
   their ship earns its XP, they count it for their quests (`countKill`), and the bot may leave a `Chest` (chance and
-  gold from `BOT_KINDS`, goods from its `cargo`, the loot generator). A player's ship that goes down leaves its cargo
-  floating there for `LOST_CARGO_TIME` (half stays aboard with a Hidden hold). `stepChests`: a chest sinks after
-  `CHEST_TIME`; a player's ship sailing over it takes its gold and what fits of its goods (`haulAboard`, dearest
-  first; a `holdFull` event when nothing fits), the rest stays floating.
+  gold from `BOT_KINDS`, a ship's only: a monster's `chest` is null; goods from its `cargo`, the loot generator). A
+  player's ship that goes down leaves its cargo floating there for `LOST_CARGO_TIME` (half stays aboard with a Hidden
+  hold). `stepChests`: a chest sinks after `CHEST_TIME`; a player's ship sailing over it takes its gold and what fits
+  of its goods (`haulAboard`, dearest first; a `holdFull` event when nothing fits), the rest stays floating.
 - `cargo.ts`: the goods (`GOODS`), a hold's or a chest's `Cargo`; a ship's `holdSize` is its class's `hold`, more with
-  Quartermaster.
+  Quartermaster. `throwOverboard` empties some of a good out of the hold, anywhere, to make room: it sinks.
 - `quests.ts`: the tavern's `QUESTS` (sink `count` of a hull class for a `reward` and `xp`, offered once `after` quests
   have been turned in); at most `MAX_QUESTS` taken at once, taken and turned in only in port. `shop.ts`, only in port:
   guns and outfit into the hold, packs of `AMMO_PACK` shots, the outfit fitted (`fitOutfit`), the shipwright's full
@@ -181,21 +185,23 @@ paths:
   is fitted from the hold anywhere (`fitFromHold`).
 - `shipyard.ts`: the ships for sale (`SHIP_OFFERS`) and their terms, the Captain's path (`captainsPath`): a first kill,
   a talent, a repair at sea, a sale (marked once, `markStep`), then quests turned in, a level, the Baron sunk, the
-  price. `fleet.ts`: `buyShip` once every term is met (`termsMet`), `takeHelm` of a ship laid up in port; the ship
+  price. `tierMastered`: whether the player has a ship of a tier at its last level, which a masterwork of that tier
+  asks for. `fleet.ts`: `buyShip` once every term is met (`termsMet`), `takeHelm` of a ship laid up in port; the ship
   sailed keeps the player's ship id, the one left is laid up as a `SavedShip` in `player.fleet`.
-- The port (`PORT`, made once, the same on every run): two stone `walls` run out from a straightened stretch of its
-  island's coast, their heads turned in towards each other; the island's `coast` runs round them, so ships bump into
-  them and the pilot sails round them like any coast. A player's ship that sails into the `basin` between them docks
-  (`stepDocking`, `ship.dock`): out of the fight, `setTarget` and `attack` ignored, it sails on to the `mooring` and
-  lies there. `leavePort` sails it out through the entrance to the `roadstead`; `mayDock` keeps it from docking again
-  until it has sailed `UNDOCK_MARGIN` beyond the basin. No bot spawns or wanders within `HARBOUR_CLEAR` of the basin
-  (`nearHarbour`), so the way in stays clear.
+- The port (`PORT`, made once, the same on every run): a bay cut into its island's own coast (`shore`), a stone `quay`
+  round its back, and two breakwaters (`walls`, smoothed middle lines) curving out from the headlands towards each
+  other; the island's `coast` runs round them, so ships bump into them and the pilot sails round them like any coast.
+  A player's ship that sails into the `basin` inside them docks (`stepDocking`, `ship.dock`): out of the fight,
+  `setTarget` and `attack` ignored, it sails on to the `mooring` and lies there. `leavePort` sails it out through the
+  entrance to the `roadstead`; `mayDock` keeps it from docking again until it has sailed `UNDOCK_MARGIN` beyond the
+  basin. No bot spawns or wanders within `HARBOUR_CLEAR` of the basin (`nearHarbour`), so the way in stays clear.
 - `save.ts`: `saveGame` makes plain `SaveData` of a player's progress (the purse, the hold of guns and outfit, quests,
   the Captain's path, the fleet laid up in port, the stats, and the ship: its class, place, hull, guns, ammo, weapon,
   outfit, XP and talents, cargo, stats, whether it is in port); `loadGame` checks every field and keeps only the valid
   ones (a ship on land or off the map comes back at `START`; talents are put back through `learnTalent`, so only what
   the rules allow). No bots, chests or time: the sea is made afresh. Bump `SAVE_VERSION` when the shape changes (an
-  older save is read field by field). The client keeps the save until there is a server.
+  older save is read field by field); a class renamed goes in `RENAMED_CLASSES`, so an older save's ship sails on
+  under its new id. The client keeps the save until there is a server.
 
 ## Records (`records/`)
 

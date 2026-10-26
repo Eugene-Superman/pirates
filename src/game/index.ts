@@ -37,7 +37,16 @@ export {
   type Weapon,
   type WeaponId,
 } from './combat/weapons';
-export { GOODS, GOOD_IDS, cargoCount, cargoValue, type Cargo, type Good, type GoodId } from './economy/cargo';
+export {
+  GOODS,
+  GOOD_IDS,
+  cargoCount,
+  cargoValue,
+  throwOverboard,
+  type Cargo,
+  type Good,
+  type GoodId,
+} from './economy/cargo';
 export { CHEST_TIME, LOST_CARGO_TIME, type Chest } from './economy/loot';
 export { STARTING_GOLD, fitFromHold, giveGold, type Player } from './economy/player';
 export {
@@ -73,7 +82,9 @@ export {
   captainsPath,
   goalOffer,
   offerName,
+  SHIP_OFFERS,
   termsMet,
+  tierMastered,
   type PathStep,
   type PathStepId,
   type ShipOffer,
@@ -97,6 +108,7 @@ export {
   type OutfitId,
   type OutfitSlot,
   type OutfitStat,
+  type ShipStats,
 } from './ships/outfit';
 export {
   BRANCHES,
@@ -130,8 +142,25 @@ export {
   type ShipClass,
   type ShipClassId,
   type Mount,
+  type PlayerLineId,
   type ShipLineId,
 } from './ships/shipClasses';
+export { CURRENCIES, type Currency, type CurrencyId } from './economy/currencies';
+export {
+  SHIPYARD_LINES,
+  SHIP_LINES,
+  SHIP_SOURCES,
+  classFigures,
+  isLineShip,
+  lineShip,
+  type LineShip,
+  type LineShipId,
+  type ShipFigures,
+  type ShipLine,
+  type ShipSource,
+  type ShipSourceId,
+  type ShipTerms,
+} from './ships/shipLines';
 export {
   MAP_SQUARE,
   MAP_SQUARES,
@@ -143,4 +172,4 @@ export {
   type Palm,
 } from './world/World';
 export { coastAt } from './world/islandShape';
-export { WALL_THICKNESS, leavePort, onPort, type HarbourWall, type Port, type WallPiece } from './world/port';
+export { WALL_THICKNESS, leavePort, onPort, type HarbourWall, type Port } from './world/port';

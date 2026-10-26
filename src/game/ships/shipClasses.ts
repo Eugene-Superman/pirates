@@ -4,15 +4,25 @@ import type { TargetNature, WeaponId } from '../combat/weapons';
 import type { Hull } from '../physics/hull';
 
 /**
- * Ship lines: families of ships with their own style and role (docs/ships.md lists the planned ones).
- * Every player starts in `starter`, then goes on in a line of their choice from tier 2 (`european` first). `bots` and
- * `monsters` are the hulls of the bots (bots/botKinds.ts), not for players
+ * The lines players sail: the starter, then families of ships with their own style and role, six tiers each
+ * (ships/shipLines.ts has them all, built and planned), and the masterworks (`premium`), bought. Every player starts in
+ * `starter`, then goes on in a line of their choice from its tier 1 (`european` first)
  */
-export type ShipLineId = 'starter' | 'european' | 'bots' | 'monsters';
+export type PlayerLineId = 'starter' | 'european' | 'eastern' | 'pirate' | 'northern' | 'legendary' | 'premium';
+
+/** Ship lines: the players', and `bots` and `monsters`, the hulls of the bots (bots/botKinds.ts), not for players */
+export type ShipLineId = PlayerLineId | 'bots' | 'monsters';
 
 /** Kinds of ships, unique across all lines. The client finds a class's art by `line` and `id` */
 export type ShipClassId =
-  'sloop' | 'corsair' | 'fishingBoat' | 'merchantSloop' | 'smugglerSloop' | 'baronBrig' | 'seaTurtle' | 'seaSerpent';
+  | 'sloop'
+  | 'coastalBark'
+  | 'fishingBoat'
+  | 'merchantSloop'
+  | 'smugglerSloop'
+  | 'baronBrig'
+  | 'seaTurtle'
+  | 'seaSerpent';
 
 /** A place for a gun on the ship, in ship coordinates: x to the bow, y to starboard, z up from the waterline */
 export interface Mount {
@@ -109,20 +119,20 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     },
     bite: null,
     barrage: null,
-    hold: 12,
+    hold: 36,
     maxLevel: 10,
   },
 
-  // The first ship of the European line, tier 2: what a player works towards in the starting waters (economy/
-  // shipyard.ts). All round, like the line: twice the sloop's hull and twice its broadside (8 cannons to 4), a harpoon
-  // gun more, a bigger hold, a little slower to turn. Its model is blender-assets/ships/european/corsair/build.py: the
-  // hull and the slots' places are measured on it. How many guns a ship carries is the game's number, not the
-  // model's: the model shows six ports a side, a tier 5 ship may carry fifty guns
-  corsair: {
-    id: 'corsair',
+  // The first ship of the European line, tier 1: what a player works towards in the starting waters (economy/
+  // shipyard.ts). All round, like the line: twice the sloop's hull and twice its guns (8 cannons and 8 harpoon guns to
+  // its 4 and 4), a bigger hold, a little slower to turn. Its model is blender-assets/ships/european/coastalBark/build.py: the hull and the
+  // slots' places are measured on it. How many guns a ship carries is the game's number, not the model's: the model
+  // shows six ports a side, a tier 5 ship may carry fifty guns
+  coastalBark: {
+    id: 'coastalBark',
     line: 'european',
-    tier: 2,
-    name: 'Corsair',
+    tier: 1,
+    name: 'Coastal Bark',
     hp: 800,
     nature: 'object',
     height: 10,
@@ -148,20 +158,26 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
         { x: 12.5, y: 6, z: 8.7 },
         { x: -12.5, y: 6.6, z: 9.5 },
       ],
+      // The bow, the forecastle's corners and the stern; then the quarterdeck's corners (its deck, QUARTER_Z) and the
+      // waist's bulwarks between the masts (the model has no harpoon guns of its own: these are where shots leave)
       harpoon: [
         { x: 17, y: 0, z: 8.9 },
         { x: 13.5, y: 3, z: 8.4 },
         { x: 13.5, y: -3, z: 8.4 },
         { x: -16.5, y: 0, z: 9.9 },
+        { x: -13, y: 4.2, z: 9.2 },
+        { x: -13, y: -4.2, z: 9.2 },
+        { x: 4.5, y: 6.4, z: 7 },
+        { x: 4.5, y: -6.4, z: 7 },
       ],
     },
     startingGuns: {
       cannon: ['cannon1', 'cannon1', 'cannon1', 'cannon1', 'cannon1', 'cannon1', null, null],
-      harpoon: ['harpoonGun1', 'harpoonGun1', null, null],
+      harpoon: ['harpoonGun1', 'harpoonGun1', 'harpoonGun1', 'harpoonGun1', null, null, null, null],
     },
     bite: null,
     barrage: null,
-    hold: 20,
+    hold: 60,
     maxLevel: 20,
   },
 

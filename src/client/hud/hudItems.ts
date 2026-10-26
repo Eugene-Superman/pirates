@@ -9,6 +9,7 @@ import { ButtonRow } from './ButtonRow';
 import { Checkbox } from './Checkbox';
 import { DamagePanel, type DamageActions } from './DamagePanel';
 import { FpsMeter } from './FpsMeter';
+import type { HoldActions } from './HoldPanel';
 import type { LoadoutActions } from './LoadoutPanel';
 import type { TalentActions } from './TalentPanel';
 import { show } from './ui';
@@ -39,9 +40,9 @@ const WARNING_COLOR = 0xffb347;
 const SOFTWARE_WARNING =
   "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings";
 const HELP =
-  'Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics';
+  'Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold';
 
-export interface HudActions extends DamageActions, LoadoutActions, TalentActions {
+export interface HudActions extends DamageActions, HoldActions, LoadoutActions, TalentActions {
   /** Uses the ship's ability (its level 5 talent) */
   useAbility: () => void;
   /** Stops firing at the target */

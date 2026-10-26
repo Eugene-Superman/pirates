@@ -18,11 +18,16 @@ import { GOLD_REASONS, STAT_COUNTS, copyStats, type Stats } from './records/stat
  * 2: the outfit, fitted and in the hold. 3: the ship's experience and talents. 4: talents with ranks (the tree to level
  * 20: older picks are forgotten, the XP kept), the cargo in the hold, the Captain's path. 5: the fleet: the ships laid
  * up in port, and the one sailed of any class a player can own. 6: the stats, the player's and every ship's (an older
-save starts them at 0, but for the quests turned in, which the Captain's path counted)
+save starts them at 0, but for the quests turned in, which the Captain's path counted). 7: the Corsair renamed the
+Coastal Bark (`coastalBark`), the first of the European line
  */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 /** The first version whose talents fit the tree of now */
 const RANKED_TALENTS = 4;
+/** Classes renamed since a version: an older save's ship of the old name sails as the new one */
+const RENAMED_CLASSES: readonly { readonly before: number; readonly from: string; readonly to: ShipClassId }[] = [
+  { before: 7, from: 'corsair', to: 'coastalBark' },
+];
 /** Steps of the Captain's path marked once and kept (the rest are counted from the player and ship) */
 const MARKED_STEPS: readonly PathStepId[] = ['sink', 'talent', 'repair', 'sell', 'baron'];
 
@@ -159,6 +164,13 @@ function learnOrder(id: TalentId) {
   return talent.kind === 'branch' ? talent.row : talent.level;
 }
 
+/** A saved ship's class, under its name of now, if a player can sail it; null if not (a later version's) */
+function sailable(value: unknown, version: number): ShipClassId | null {
+  const renamed = RENAMED_CLASSES.find(({ before, from }) => version < before && value === from);
+  const id = renamed ? renamed.to : value;
+  return isSailable(id) ? id : null;
+}
+
 function isMarkedStep(value: unknown): value is PathStepId {
   return MARKED_STEPS.some((id) => id === value);
 }
@@ -220,10 +232,11 @@ export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean
 
   // The ship sailed: a class no player can sail (a later version's) and only the purse is kept
   const saved = record(save.ship);
-  if (!saved || !isSailable(saved.shipClass)) return true;
+  const sailedClass = saved && sailable(saved.shipClass, save.version);
+  if (!saved || !sailedClass) return true;
   let ship = state.ship;
-  if (saved.shipClass !== ship.shipClass.id) {
-    const sailed = new Ship(SHIP_CLASSES[saved.shipClass], ship.id);
+  if (sailedClass !== ship.shipClass.id) {
+    const sailed = new Ship(SHIP_CLASSES[sailedClass], ship.id);
     state.ships[state.ships.indexOf(ship)] = sailed;
     state.ship = sailed;
     ship = sailed;
@@ -256,8 +269,8 @@ export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean
   if (Array.isArray(fleet)) {
     for (const item of fleet) {
       const laidUp = record(item);
-      if (!laidUp || !isSailable(laidUp.shipClass) || laidUp.shipClass === ship.shipClass.id) continue;
-      const id = laidUp.shipClass;
+      const id = laidUp && sailable(laidUp.shipClass, save.version);
+      if (!laidUp || !id || id === ship.shipClass.id) continue;
       if (player.fleet.some((kept) => kept.shipClass === id)) continue;
       const kept = new Ship(SHIP_CLASSES[id], ship.id);
       loadShip(kept, laidUp, save.version);

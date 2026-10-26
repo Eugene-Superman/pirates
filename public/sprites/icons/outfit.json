@@ -1,0 +1,154 @@
+{
+ "file": "outfit.webp",
+ "tile": 192,
+ "icons": {
+  "canvasSails": [
+   0,
+   0
+  ],
+  "patchedJib": [
+   1,
+   0
+  ],
+  "cottonSails": [
+   2,
+   0
+  ],
+  "stormSails": [
+   3,
+   0
+  ],
+  "silkSails": [
+   4,
+   0
+  ],
+  "lateenRig": [
+   5,
+   0
+  ],
+  "admiraltySails": [
+   6,
+   0
+  ],
+  "dragonSails": [
+   7,
+   0
+  ],
+  "krakenSails": [
+   8,
+   0
+  ],
+  "oakPlanking": [
+   9,
+   0
+  ],
+  "pinePlanking": [
+   0,
+   1
+  ],
+  "doublePlanking": [
+   1,
+   1
+  ],
+  "copperSheathing": [
+   2,
+   1
+  ],
+  "tarredPlanking": [
+   3,
+   1
+  ],
+  "teakHull": [
+   4,
+   1
+  ],
+  "ironPlates": [
+   5,
+   1
+  ],
+  "steelPlates": [
+   6,
+   1
+  ],
+  "brassPlating": [
+   7,
+   1
+  ],
+  "krakenPlating": [
+   8,
+   1
+  ],
+  "tiller": [
+   9,
+   1
+  ],
+  "seaAnchor": [
+   0,
+   2
+  ],
+  "shipsWheel": [
+   1,
+   2
+  ],
+  "dragAnchor": [
+   2,
+   2
+  ],
+  "ironRudder": [
+   3,
+   2
+  ],
+  "balancedRudder": [
+   4,
+   2
+  ],
+  "captainsWheel": [
+   5,
+   2
+  ],
+  "krakenWheel": [
+   6,
+   2
+  ],
+  "leviathanRudder": [
+   7,
+   2
+  ],
+  "spyglass": [
+   8,
+   2
+  ],
+  "brassSpyglass": [
+   9,
+   2
+  ],
+  "crowsNest": [
+   0,
+   3
+  ],
+  "coveredNest": [
+   1,
+   3
+  ],
+  "officersGlass": [
+   2,
+   3
+  ],
+  "telescope": [
+   3,
+   3
+  ],
+  "admiralsGlass": [
+   4,
+   3
+  ],
+  "starTelescope": [
+   5,
+   3
+  ],
+  "krakenEye": [
+   6,
+   3
+  ]
+ }
+}

@@ -1,0 +1,86 @@
+{
+ "file": "guns.webp",
+ "tile": 192,
+ "icons": {
+  "cannon1": [
+   0,
+   0
+  ],
+  "swivelGun": [
+   1,
+   0
+  ],
+  "cannon2": [
+   2,
+   0
+  ],
+  "carronade": [
+   3,
+   0
+  ],
+  "longNine": [
+   4,
+   0
+  ],
+  "cannon3": [
+   0,
+   1
+  ],
+  "pounder24": [
+   1,
+   1
+  ],
+  "culverin": [
+   2,
+   1
+  ],
+  "pounder32": [
+   3,
+   1
+  ],
+  "pounder42": [
+   4,
+   1
+  ],
+  "harpoonGun1": [
+   0,
+   2
+  ],
+  "deckCrossbow": [
+   1,
+   2
+  ],
+  "harpoonGun2": [
+   2,
+   2
+  ],
+  "whalingGun": [
+   3,
+   2
+  ],
+  "harpoonGun3": [
+   4,
+   2
+  ],
+  "ballista": [
+   0,
+   3
+  ],
+  "barbedLauncher": [
+   1,
+   3
+  ],
+  "twinLauncher": [
+   2,
+   3
+  ],
+  "leviathanLance": [
+   3,
+   3
+  ],
+  "krakenBane": [
+   4,
+   3
+  ]
+ }
+}

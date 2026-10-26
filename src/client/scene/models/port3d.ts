@@ -1,4 +1,4 @@
-import { WALL_THICKNESS, type Port, type WallPiece } from '../../../game';
+import { WALL_THICKNESS, type HarbourWall, type Port } from '../../../game';
 import type { Vec3 } from '../../render/Camera3D';
 import { footprint, shade, shadowPoint, type Painter3D } from '../../render/Painter3D';
 
@@ -19,11 +19,11 @@ const ROOFS = [0xb5452f, 0x3f6f9a, 0x8a5a2b, 0x9a4a3a, 0x5f7f4f]; // the tavern'
 const SHADOW_ALPHA = 0.18;
 
 const WALL_HEIGHT = 6; // world units above the water
-const WALL_STEP = 40; // world units: a wall is drawn in lengths about this long, each sorted with the other objects
+const WALL_STEP = 24; // world units: a wall is drawn in lengths about this long, each sorted with the other objects
 const BLOCK_SHADE = 0.05; // how much one length's stones differ from the next's
 const QUAY = { depth: 14, height: 3 }; // world units: the quay's stones on the beach, behind its edge
-// The town's houses, in the harbour's frame: how far back from the quay's edge (world units: a row along the beach,
-// two more up on the land), where along it (world units from the middle), their size (along the quay, across, wall
+// The town's houses, in the harbour's frame: how far back from the back of the quay (world units: a row along the
+// beach, two more up on the land), where along it (world units from the middle), their size (along the quay, across, wall
 // height) and roof
 const HOUSES = [
   { back: 24, at: -58, size: [20, 13, 9], roof: 0, onLand: false },
@@ -41,8 +41,14 @@ export interface PortPiece {
   draw(p: Painter3D): void;
 }
 
+/** A straight length of a wall or the quay */
+interface Piece {
+  readonly from: { readonly x: number; readonly y: number };
+  readonly to: { readonly x: number; readonly y: number };
+}
+
 /** A box of stones along a piece of wall, from under the water up to `height`; its shadow on the water first */
-function drawStones(p: Painter3D, piece: WallPiece, across: number, height: number, top: number, side: number) {
+function drawStones(p: Painter3D, piece: Piece, across: number, height: number, top: number, side: number) {
   const dx = piece.to.x - piece.from.x;
   const dy = piece.to.y - piece.from.y;
   const x = (piece.from.x + piece.to.x) / 2;
@@ -60,13 +66,20 @@ function drawStones(p: Painter3D, piece: WallPiece, across: number, height: numb
   p.top(upper, top);
 }
 
-/** A piece cut into lengths of about WALL_STEP: a long wall can't be sorted against a ship as one object */
-function lengths(piece: WallPiece): WallPiece[] {
-  const dx = piece.to.x - piece.from.x;
-  const dy = piece.to.y - piece.from.y;
-  const n = Math.max(1, Math.round(Math.hypot(dx, dy) / WALL_STEP));
-  const point = (k: number) => ({ x: piece.from.x + (dx * k) / n, y: piece.from.y + (dy * k) / n });
-  return Array.from({ length: n }, (_, k) => ({ from: point(k), to: point(k + 1) }));
+/** A line cut into straight lengths of about WALL_STEP: a long wall can't be sorted against a ship as one object */
+function lengths(line: HarbourWall): Piece[] {
+  const pieces: Piece[] = [];
+  let from = line[0];
+  let run = 0;
+  for (let i = 1; i < line.length; i++) {
+    run += Math.hypot(line[i].x - line[i - 1].x, line[i].y - line[i - 1].y);
+    if (run >= WALL_STEP || i === line.length - 1) {
+      pieces.push({ from, to: line[i] });
+      from = line[i];
+      run = 0;
+    }
+  }
+  return pieces;
 }
 
 function drawHouse(p: Painter3D, x: number, y: number, z: number, angle: number, house: (typeof HOUSES)[number]) {
@@ -106,16 +119,25 @@ function drawLighthouse(p: Painter3D, x: number, y: number, z: number, time: num
   p.sides(footprint(x, y, z, size, size, turn), below, COLORS.tower);
   p.sides(below, top, COLORS.band);
   p.top(top, COLORS.band);
+  drawLampGlow(p, [x, y, z + height + lamp], time);
+}
+
+/** The lighthouse's lamp, glowing brighter and dimmer: on the vector lighthouse, and on the port's pictures */
+export function drawLampGlow(p: Painter3D, light: Vec3, time: number) {
+  const { lamp } = LIGHTHOUSE;
   const glow = 0.55 + 0.45 * Math.sin(time * 2.4);
-  const light: Vec3 = [x, y, z + height + lamp];
   p.ball(light, lamp * 1.9, COLORS.lamp, 0.25 * glow);
   p.ball(light, lamp, COLORS.lamp, 0.6 + 0.4 * glow);
 }
 
 function drawFlag(p: Painter3D, x: number, y: number, z: number, fly: number, time: number) {
-  const base: Vec3 = [x, y, z];
   const top: Vec3 = [x, y, z + FLAG.pole];
-  p.line(base, top, 1.2, COLORS.pole);
+  p.line([x, y, z], top, 1.2, COLORS.pole);
+  drawPennant(p, top, fly, time);
+}
+
+/** A flag flying from the top of its staff, `fly` radians on the map, waving: on the vector port and its pictures */
+export function drawPennant(p: Painter3D, top: Vec3, fly: number, time: number) {
   const wave = Math.sin(time * 3) * 1.5;
   const fx = Math.cos(fly) * FLAG.width;
   const fy = Math.sin(fly) * FLAG.width;
@@ -132,22 +154,22 @@ function drawFlag(p: Painter3D, x: number, y: number, z: number, fly: number, ti
 
 /**
  * The port's harbour and town, as pieces for the scene to sort with everything else: the two walls in lengths (ships
- * sail in between them), their heads with a lighthouse and a flag, the quay at the back of the basin, the houses
- * along it and up on the land. The island under them is an island, its coast running round the walls
+ * sail in between them), their heads with a lighthouse and a flag, the quay round the back of the bay, the houses
+ * behind it and up on the land. The island under them is an island, its coast running round the walls
  */
 export function portPieces(p: Painter3D, port: Port, time: number): PortPiece[] {
   const pieces: PortPiece[] = [];
   const { island, harbour, walls, quay } = port;
   const out = { x: Math.cos(harbour), y: Math.sin(harbour) };
   const side = { x: -out.y, y: out.x };
-  // How far out from the island's centre the quay's edge is; a point of the town, `back` from it and `at` along it
-  const edge = (quay.from.x - island.x) * out.x + (quay.from.y - island.y) * out.y;
+  // How far out from the island's centre the back of the quay is; a point of the town, `back` from it and `at` along it
+  const edge = Math.min(...quay.map((q) => (q.x - island.x) * out.x + (q.y - island.y) * out.y));
   const town = (back: number, at: number) => ({
     x: island.x + out.x * (edge - back) + side.x * at,
     y: island.y + out.y * (edge - back) + side.y * at,
   });
 
-  const stones = (piece: WallPiece, k: number, across: number, height: number, top: number, sides: number) => {
+  const stones = (piece: Piece, k: number, across: number, height: number, top: number, sides: number) => {
     const x = (piece.from.x + piece.to.x) / 2;
     const y = (piece.from.y + piece.to.y) / 2;
     const block = shade(top, k % 2 === 0 ? 1 - BLOCK_SHADE : 1 + BLOCK_SHADE);
@@ -157,18 +179,26 @@ export function portPieces(p: Painter3D, port: Port, time: number): PortPiece[] 
     });
   };
   for (const wall of walls) {
-    lengths(wall.body).forEach((piece, k) =>
-      stones(piece, k, WALL_THICKNESS, WALL_HEIGHT, COLORS.stone, COLORS.stoneSide),
-    );
-    stones(wall.head, 1, WALL_THICKNESS, WALL_HEIGHT, COLORS.stone, COLORS.stoneSide);
+    lengths(wall).forEach((piece, k) => stones(piece, k, WALL_THICKNESS, WALL_HEIGHT, COLORS.stone, COLORS.stoneSide));
   }
-  // The quay: stones laid on the beach behind its edge, from one wall to the other
-  const back = { x: (-out.x * QUAY.depth) / 2, y: (-out.y * QUAY.depth) / 2 };
-  const laid = {
-    from: { x: quay.from.x + back.x, y: quay.from.y + back.y },
-    to: { x: quay.to.x + back.x, y: quay.to.y + back.y },
+  // The quay: stones laid on the shore behind its edge, from one wall to the other
+  const inland = (q: { x: number; y: number }) => {
+    const length = Math.hypot(island.x - q.x, island.y - q.y);
+    return {
+      x: q.x + ((island.x - q.x) / length) * (QUAY.depth / 2),
+      y: q.y + ((island.y - q.y) / length) * (QUAY.depth / 2),
+    };
   };
-  stones(laid, 0, QUAY.depth, QUAY.height, COLORS.quay, COLORS.quaySide);
+  lengths(quay).forEach((piece, k) =>
+    stones(
+      { from: inland(piece.from), to: inland(piece.to) },
+      k,
+      QUAY.depth,
+      QUAY.height,
+      COLORS.quay,
+      COLORS.quaySide,
+    ),
+  );
 
   for (const house of HOUSES) {
     const { x, y } = town(house.back, house.at);
@@ -179,12 +209,12 @@ export function portPieces(p: Painter3D, port: Port, time: number): PortPiece[] 
     });
   }
 
-  const light = walls[0].head.to;
+  const light = walls[0][walls[0].length - 1];
   pieces.push({
     depth: p.depth([light.x, light.y, WALL_HEIGHT + LIGHTHOUSE.height / 2]),
     draw: (painter) => drawLighthouse(painter, light.x, light.y, WALL_HEIGHT, time),
   });
-  const flag = walls[1].head.to;
+  const flag = walls[1][walls[1].length - 1];
   pieces.push({
     depth: p.depth([flag.x, flag.y, WALL_HEIGHT + FLAG.pole / 2]),
     draw: (painter) => drawFlag(painter, flag.x, flag.y, WALL_HEIGHT, harbour + Math.PI / 2, time),

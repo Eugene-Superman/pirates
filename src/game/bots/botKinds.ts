@@ -33,8 +33,11 @@ export interface BotKind {
   readonly level: number;
   /** Experience the ship that sinks it earns */
   readonly xp: number;
-  /** The chance it leaves a chest floating where it sank, and the gold in one (at least, at most) */
-  readonly chest: { readonly chance: number; readonly gold: readonly [number, number] };
+  /**
+   * The chance it leaves a chest of gold floating where it sank, and the gold in one (at least, at most); null for a
+   * sea monster, which carries no gold: only what its body is worth (`cargo`)
+   */
+  readonly chest: { readonly chance: number; readonly gold: readonly [number, number] } | null;
   /** The goods its wreck may leave floating (with the chest's gold, if any) */
   readonly cargo: readonly CargoDrop[];
   /** A boss: one of it, at its lair, with its escort; null for the rest */
@@ -52,9 +55,9 @@ export interface Boss {
 
 // Balanced against the starter sloop with its starting guns (two cannons I, two harpoon guns I): each fight costs it
 // a share of its hull that the repair skill brings back in half a minute or so. pirate-balance.xlsx, Plan bots, has
-// the numbers. The loot: about 8 gold a fishing boat, 20 a turtle, 30–37 the rest (bounty + chests on average), so a
-// minute's fighting pays for the ammo it took several times over (economy/shop.ts); their goods sell for about half
-// as much again at the market (economy/cargo.ts), once carried home
+// the first numbers. The loot is kept lean: about 7 gold a fishing boat, 15 a turtle, 22–29 the rest (bounty + chests
+// on average); chests of gold only from ships, a monster leaves only what its body is worth. Their goods sell for
+// about a third as much again at the market (economy/cargo.ts), once carried home
 export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
   // Nets and fish, no guns: it runs from whoever attacks it
   fisher: {
@@ -69,8 +72,8 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     bounty: 6,
     level: 1,
     xp: 10,
-    chest: { chance: 0.3, gold: [4, 10] },
-    cargo: [{ good: 'fish', count: [2, 4], chance: 0.9 }],
+    chest: { chance: 0.15, gold: [3, 6] },
+    cargo: [{ good: 'fish', count: [1, 3], chance: 0.6 }],
     boss: null,
   },
   // A swivel gun that reaches less far than the player's cannons: keep your distance and it can't answer
@@ -86,10 +89,10 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     bounty: 18,
     level: 3,
     xp: 30,
-    chest: { chance: 0.7, gold: [15, 40] },
+    chest: { chance: 0.4, gold: [10, 25] },
     cargo: [
-      { good: 'cloth', count: [2, 4], chance: 0.9 },
-      { good: 'spices', count: [1, 2], chance: 0.4 },
+      { good: 'cloth', count: [1, 3], chance: 0.7 },
+      { good: 'spices', count: [1, 1], chance: 0.3 },
     ],
     boss: null,
   },
@@ -105,10 +108,10 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     bounty: 25,
     level: 5,
     xp: 40,
-    chest: { chance: 0.5, gold: [12, 35] },
+    chest: { chance: 0.3, gold: [8, 20] },
     cargo: [
-      { good: 'rum', count: [1, 3], chance: 0.8 },
-      { good: 'contraband', count: [1, 2], chance: 0.4 },
+      { good: 'rum', count: [1, 2], chance: 0.6 },
+      { good: 'contraband', count: [1, 1], chance: 0.3 },
     ],
     boss: null,
   },
@@ -125,8 +128,8 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     bounty: 15,
     level: 2,
     xp: 20,
-    chest: { chance: 0.35, gold: [8, 20] },
-    cargo: [{ good: 'turtleShell', count: [1, 2], chance: 0.8 }],
+    chest: null,
+    cargo: [{ good: 'turtleShell', count: [1, 1], chance: 0.5 }],
     boss: null,
   },
   serpent: {
@@ -141,8 +144,8 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     bounty: 22,
     level: 4,
     xp: 35,
-    chest: { chance: 0.45, gold: [10, 30] },
-    cargo: [{ good: 'serpentScale', count: [1, 2], chance: 0.8 }],
+    chest: null,
+    cargo: [{ good: 'serpentScale', count: [1, 1], chance: 0.5 }],
     boss: null,
   },
   // The boss of the starting waters (ships/shipClasses.ts, baronBrig): its lair is far from the port, and it sails
@@ -159,7 +162,7 @@ export const BOT_KINDS: Readonly<Record<BotKindId, BotKind>> = {
     bounty: 300,
     level: 8,
     xp: 450,
-    chest: { chance: 1, gold: [80, 150] },
+    chest: { chance: 1, gold: [60, 120] },
     cargo: [
       { good: 'contraband', count: [4, 6], chance: 1 },
       { good: 'baronsStrongbox', count: [1, 1], chance: 1 },

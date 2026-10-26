@@ -7,7 +7,7 @@ import type { OutfitBonus } from './outfit';
 import type { Ship } from './Ship';
 
 /**
- * The highest level any ship reaches: a class's own is its `maxLevel` (the starter sloop's 10, a tier 2 ship's 20).
+ * The highest level any ship reaches: a class's own is its `maxLevel` (the starter sloop's 10, a line's ships' 20).
  * Every ship levels on its own: a new one starts at 1
  */
 export const MAX_LEVEL = 20;
@@ -107,7 +107,7 @@ export const PERKS = {
   /** A cannon hit leaves the target this share of its speed for `time` seconds: Chain shot */
   chainShot: { speed: 0.7, time: 4 },
   /** Places in the hold, a rank: Quartermaster */
-  hold: 3,
+  hold: 10,
   /** A kill's bounty, a rank: Bounty hunter */
   bounty: 0.07,
   /** A kill's chance to leave a chest, a rank: Treasure hunter */

@@ -10,7 +10,8 @@ const LINE = 17; // pixels per quest line
 
 /**
  * The player's purse and quests in the top right corner, beside the fullscreen button: their gold and how full the
- * hold is, and every quest taken with how far it has got (a done one in green, to turn in at the tavern)
+ * hold is (a click on it opens the hold), and every quest taken with how far it has got (a done one in green, to turn
+ * in at the tavern)
  */
 export class GoldPanel {
   readonly container = new Container();
@@ -21,13 +22,17 @@ export class GoldPanel {
   /** What the background was drawn for */
   private drawnFor = '';
 
-  constructor() {
+  /** onHold: what a click on the hold does */
+  constructor(onHold: () => void) {
     const coin = new Graphics();
     drawCoin(coin, 8);
     coin.position.set(PAD + 8, PAD + 10);
     this.gold.position.set(PAD + 22, PAD);
     this.hold.anchor.set(1, 0);
     this.hold.position.set(WIDTH - PAD, PAD + 2);
+    this.hold.eventMode = 'static';
+    this.hold.cursor = 'pointer';
+    this.hold.on('pointertap', onHold);
     this.quests.forEach((line, i) => line.position.set(PAD, PAD + 26 + i * LINE));
     this.container.addChild(this.background, coin, this.gold, this.hold, ...this.quests);
     this.container.eventMode = 'static';

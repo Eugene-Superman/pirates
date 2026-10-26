@@ -50,9 +50,9 @@ const EMITTERS: Readonly<Partial<Record<ShipClassId, { burning: Emitter[]; sinki
       { x: -11.5, y: -1.2, z: 6.9, spread: [1.2, 1.5, 0.3] },
     ],
   },
-  // Matches blender-assets/ships/european/corsair/build.py (y negated): the waist, the forecastle, the quarterdeck
+  // Matches blender-assets/ships/european/coastalBark/build.py (y negated): the waist, the forecastle, the quarterdeck
   // and the burning feet of both courses; going down, the foremast fallen over the bow and the main course
-  corsair: {
+  coastalBark: {
     burning: [
       { x: 2, y: -2, z: 6.2, spread: [2.5, 1.5, 0.4] },
       { x: -6, y: 3, z: 6.2, spread: [1.5, 1.5, 0.4] },

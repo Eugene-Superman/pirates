@@ -1,31 +1,24 @@
-import { Container, Graphics, type Rectangle, type Text } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, type Rectangle } from 'pixi.js';
 import {
-  AMMO,
   AMMO_IDS,
-  AMMO_PACK,
   GOODS,
   GOOD_IDS,
-  GUNS,
   GUN_IDS,
   MAX_QUESTS,
-  OUTFITS,
   OUTFIT_IDS,
-  OUTFIT_SLOTS,
-  OUTFIT_STATS,
   QUESTS,
   QUEST_IDS,
   REPAIR_HP_PER_GOLD,
+  SHIPYARD_LINES,
   SHIP_CLASSES,
-  WEAPON_IDS,
-  ammoPackPrice,
+  SHIP_LINES,
   captainsPath,
   cargoCount,
   cargoValue,
   goalOffer,
-  gunPrice,
-  laidUpLevel,
+  isLineShip,
+  lineShip,
   offerName,
-  outfitPrice,
   questDone,
   questOffered,
   repairPrice,
@@ -34,15 +27,30 @@ import {
   type GameState,
   type GoodId,
   type GunId,
-  type OutfitBonus,
   type OutfitId,
   type OutfitSlot,
-  type OutfitStat,
+  type PlayerLineId,
   type QuestId,
   type Ship,
   type WeaponId,
 } from '../../game';
-import { Tile, UI, drawBall, drawCoin, drawHarpoon, labelButton, show, text, tierColor, tint } from './ui';
+import { BUILDINGS, HarbourView, type BuildingId } from './HarbourView';
+import { ItemInfo } from './ItemInfo';
+import { AMMO_ICONS, GUN_ICONS, OUTFIT_ICONS, SHIP_ICONS } from './iconAtlas';
+import { KNOT, itemFace, type ItemFace, type ShopItem, type Tone } from './itemFaces';
+import { LINE_STYLE } from './shipLore';
+import {
+  BRASS,
+  THEME,
+  TITLE_STYLE,
+  brassButton,
+  drawCard,
+  drawDivider,
+  iconSlot,
+  subheading,
+  themedPanel,
+} from './theme';
+import { Tile, UI, drawCoin, playTap, show, text, tierColor, tint } from './ui';
 import { t } from '../i18n/i18n';
 
 /** What the port's menus do: game methods, each saying whether it worked */
@@ -65,74 +73,132 @@ export interface PortActions {
   takeHelm: (index: number) => boolean;
 }
 
-const WIDTH = 1200; // pixels, before scaling down to fit the screen
-const HEIGHT = 640;
+// A building's window, over the harbour's picture
+const WIDTH = 860; // pixels, before scaling down to fit the screen
+const HEIGHT = 720;
 const MARGIN = 20; // between the window and the screen's edge, at least
 const PAD = 18;
-const HEADER = 58; // pixels: the title row
-const TAVERN_WIDTH = 500;
-const SHOP_X = PAD * 2 + TAVERN_WIDTH;
-const SHOP_WIDTH = WIDTH - SHOP_X - PAD;
+const ICON = 64; // pixels: the building's medallion in the window's corner
+const DIVIDER = PAD + ICON + 7; // the gold line under the header
+const TABS_TOP = PAD + ICON + 18; // the row of tabs under the building's name, when it has more than one
+const BODY_TOP = { tabs: TABS_TOP + 38, plain: PAD + ICON + 20 }; // where its rows start, under the tabs or not
+const BODY_WIDTH = WIDTH - PAD * 2;
+const TAVERN_WIDTH = BODY_WIDTH;
+const SHOP_WIDTH = BODY_WIDTH;
 const QUEST_HEIGHT = 74;
 const QUEST_GAP = 6;
-const GUN_ROW = 40;
-const AMMO_ROW = 29;
+// The guns, the ammo and the outfit, two cards a row (pixels): a card's height, the gaps between them, the icon's
+// slot, the info button
+const CARD = { height: 100, gap: 12, rowGap: 8, slot: 84, inset: 10 } as const;
+const CARD_WIDTH = (BODY_WIDTH - CARD.gap) / 2;
+const INFO = { width: 30, size: 16 } as const;
 const ROW_GAP = 4;
 const BUY = { width: 64, height: 24 };
-const LEAVE = { width: 150, height: 30 };
+const SHIP_BUY = 120; // pixels: a ship's card's button (Take the helm)
+const BACK = { width: 220, height: 30 };
 const MESSAGE_TIME = 3.5; // seconds a message stays
-const DIM_ALPHA = 0.55;
+const DIM_ALPHA = 0.6; // how dark the harbour's picture is behind a building's window
 const GOLD = 0xffcf3f;
+const CLOSED_ICON = 170; // pixels: the medallion of a building that isn't open yet
 
-type ShopTab = WeaponId | 'ammo' | 'outfit' | 'shipwright' | 'market' | 'shipyard';
-const TABS: readonly { readonly id: ShopTab; readonly label: string }[] = [
-  { id: 'cannon', label: 'Cannons' },
-  { id: 'harpoon', label: 'Harpoon guns' },
-  { id: 'ammo', label: 'Ammo' },
-  { id: 'outfit', label: 'Outfit' },
-  { id: 'shipwright', label: 'Shipwright' },
-  { id: 'market', label: 'Market' },
-  { id: 'shipyard', label: 'Shipyard' },
-];
-const TAB = { pad: 8, gap: 5 } as const; // pixels: inside a shop tab beside its name, and between two
-const MARKET_ROW = 34;
-const PATH_LINE = 21; // pixels: a term of the shipyard's offer
-const SHIPYARD = { buy: 300, button: 30, row: 40, helm: 130 } as const; // pixels: Buy, a ship's row, Take the helm
-const SLOT_NAMES: Readonly<Record<OutfitSlot, string>> = {
+type ShopTab =
+  | WeaponId
+  | 'cannonballs'
+  | 'harpoons'
+  | OutfitSlot
+  | 'shipwright'
+  | 'market'
+  | 'myShips'
+  | Exclude<PlayerLineId, 'starter'>;
+const TABS: Readonly<Record<ShopTab, string>> = {
+  cannon: 'Cannons',
+  harpoon: 'Harpoon guns',
+  cannonballs: 'Cannonballs',
+  harpoons: 'Harpoons',
   sails: 'Sails',
   hull: 'Hull',
   rudder: 'Rudder',
   lookout: 'Lookout',
+  shipwright: 'Repairs',
+  market: 'Market',
+  myShips: 'My ships',
+  premium: 'Buy',
+  european: 'European',
+  eastern: 'Eastern',
+  pirate: 'Free pirates',
+  northern: 'Northern',
+  legendary: 'Legendary',
 };
-const STAT_NAMES: Readonly<Record<OutfitStat, string>> = {
-  speed: 'speed',
-  holedSpeed: 'speed when holed',
-  acceleration: 'acceleration',
-  braking: 'braking',
-  turn: 'turning',
+const TAB_IDS: readonly ShopTab[] = [
+  'cannon',
+  'harpoon',
+  'cannonballs',
+  'harpoons',
+  'sails',
+  'hull',
+  'rudder',
+  'lookout',
+  'shipwright',
+  'market',
+  'myShips',
+  'european',
+  'eastern',
+  'pirate',
+  'northern',
+  'legendary',
+  'premium',
+];
+/** The tabs of ammo, and the weapon whose ammo each sells */
+const AMMO_TABS: Partial<Record<ShopTab, WeaponId>> = { cannonballs: 'cannon', harpoons: 'harpoon' };
+/** The workshop's tabs of outfit, a slot's each */
+const OUTFIT_TABS: Partial<Record<ShopTab, OutfitSlot>> = {
+  sails: 'sails',
   hull: 'hull',
-  sight: 'sight',
+  rudder: 'rudder',
+  lookout: 'lookout',
 };
-const KNOT = 10; // world units per second
-const OUTFIT_TOP = 62; // pixels: the outfit's rows, under its summary and slot buttons
-
-/** What a piece of outfit gives, in a few words: "+17% speed · +15% acceleration" */
-function bonusText(bonus: OutfitBonus) {
-  return OUTFIT_STATS.flatMap((stat) => {
-    const share = bonus[stat];
-    if (!share) return [];
-    return [`${share > 0 ? '+' : '−'}${Math.round(Math.abs(share) * 100)}% ${t(STAT_NAMES[stat])}`];
-  }).join(' · ');
-}
-
-/** A figure of the ship for sale beside the player's: "Hull 800 (yours 400)" */
-function compare(label: string, theirs: number | string, ours: number | string) {
-  return t('{label} {theirs} (yours {ours})', { label: t(label), theirs, ours });
-}
-
-/** A speed in knots, for the shipyard's figures */
-function knots(speed: number) {
-  return t('{speed} kn', { speed: (speed / KNOT).toFixed(1) });
+/** The shipyard's tabs of a line's ships */
+const LINE_TABS: Partial<Record<ShopTab, PlayerLineId>> = Object.fromEntries(
+  SHIPYARD_LINES.map((line) => [line, line]),
+);
+const TONES: Readonly<Record<Tone, number>> = { good: UI.good, bad: UI.bad, plain: THEME.dim };
+/** What each building's window shows: its tabs (none for the tavern, which has the quests, or one that isn't open) */
+const BUILDING_TABS: Readonly<Record<BuildingId, readonly ShopTab[]>> = {
+  tavern: [],
+  market: ['market'],
+  workshop: ['sails', 'hull', 'rudder', 'lookout', 'shipwright'],
+  shipyard: ['myShips', 'european', 'eastern', 'pirate', 'northern', 'legendary', 'premium'],
+  arsenal: ['cannon', 'harpoon', 'cannonballs', 'harpoons'],
+  guild: [],
+  auction: [],
+};
+/** The buildings that aren't open yet: what will be there */
+const CLOSED: Partial<Record<BuildingId, string>> = {
+  guild:
+    'Captains will band together here: found a guild, share its treasury, sail out and fight side by side. It opens with the online game.',
+  auction:
+    'Captains will sell one another guns, outfit and goods here, each at their own price. It opens with the online game.',
+};
+/** What a line's tab says after its look: how its ships are got, for the lines whose ships aren't the shipyard's */
+const LINE_NOTES: Partial<Record<PlayerLineId, string>> = {
+  legendary:
+    'Each is won its own way and paid in its own currency: sea monster hunts, boss fights, treasure maps, the arena, events and guild battles.',
+  premium:
+    'Bought with doubloons, once you have a ship of the same tier of another line at its last level. As strong as the ships of their tier, no stronger: what you pay for is their looks.',
+};
+const TAB = { pad: 10, gap: 6 } as const; // pixels: inside a tab beside its name, and between two
+const MARKET_ROW = 34;
+const PATH_LINE = 21; // pixels: a term of the shipyard's offer
+const LIST_BOTTOM = HEIGHT - PAD - 20; // pixels: where a tab's rows are cut off, over the message under them
+const SCROLL = { speed: 0.6, bar: 4, margin: 2 } as const; // pixels per unit of the wheel; the scroll bar's width
+const TIER_HEADING = 28; // pixels: a tier's heading over its ships, in a line of several ships a tier
+/** Shortens a text of one line to a width, with an ellipsis (a card's: the info window has all of it) */
+function clip(line: Text, width: number) {
+  let shown = line.text;
+  while (line.width > width && shown.length > 1) {
+    shown = shown.slice(0, -1).trimEnd();
+    line.text = `${shown}…`;
+  }
 }
 
 /** The ship's figures that its outfit changes, in a line */
@@ -146,39 +212,44 @@ function shipFigures(ship: Ship) {
   });
 }
 
+/** A mark over a building's medallion when something waits there: quests to turn in, goods to sell, a ship to buy */
+function badges(state: GameState): Partial<Record<BuildingId, string>> {
+  const { player, ship } = state;
+  const done = player.quests.filter(questDone).length;
+  const cargo = cargoCount(ship.cargo);
+  return {
+    tavern: done > 0 ? String(done) : '',
+    market: cargo > 0 ? String(cargo) : '',
+    workshop: ship.hp < ship.maxHp ? '!' : '',
+    shipyard: goalOffer(state, player) && termsMet(state, player) ? '!' : '',
+  };
+}
+
+/** What the shipyard's cards depend on: the ship sailed, those laid up, the ship worked towards */
+function fleetKey(state: GameState) {
+  const { ship, player } = state;
+  const goal = goalOffer(state, player);
+  return `${ship.shipClass.id}:${player.fleet.map((kept) => kept.shipClass).join()}:${goal?.shipClass ?? ''}`;
+}
+
 interface QuestView {
   readonly id: QuestId;
   readonly background: Graphics;
   readonly about: Text;
-  /** The border the background was last drawn with */
-  painted: number;
+  /** The outline the background was last drawn with (-1: none), null before it was drawn */
+  painted: number | null;
   readonly progress: Text;
   readonly button: Tile;
   readonly buttonText: Text;
   readonly drop: Tile;
 }
 
-/** A row of the shop: a gun or an ammo, its price, how many the player has, and Buy */
+/** A card of the arsenal, the workshop or the shipyard: what it says of its item, how many the player has (or how
+ * far its ship has got), and its button */
 interface ShopRow {
-  readonly gun: GunId | null;
-  readonly ammo: AmmoId | null;
-  readonly owned: Text;
-  readonly buy: Tile;
-}
-
-/** The shipyard tab's texts that change: the terms, Buy and what it says, the ship sailed's level and hull */
-interface ShipyardView {
-  terms: Text[];
-  buy: { readonly tile: Tile; readonly label: Text; readonly name: string; readonly price: number } | null;
-  status: Text | null;
-  sailed: Text | null;
-}
-
-/** A row of the outfit: a piece, whether it is fitted or in the hold, and Buy (and fit), Fit or Take off */
-interface OutfitRow {
-  readonly id: OutfitId;
+  readonly face: ItemFace;
   readonly background: Graphics;
-  /** Whether the background was last drawn for a fitted piece */
+  /** Whether the background was last drawn outlined (the item in use), null before it was drawn */
   painted: boolean | null;
   readonly owned: Text;
   readonly button: Tile;
@@ -186,29 +257,64 @@ interface OutfitRow {
 }
 
 /**
- * The port's menus, over everything while the player's ship is in port: the tavern on the left (bounties to take,
- * how far each has got, the reward to collect), the shop on the right (guns into the hold, packs of ammo, the
- * shipwright's repair), the player's gold at the top and Leave port (or Escape), which sails the ship out
+ * The port, over everything while the player's ship is in port: the harbour's picture with a medallion over each
+ * building (HarbourView), and the window of the building clicked over it. The tavern has bounties to take, how far
+ * each has got and the reward to collect; the market buys the hold's goods; the workshop sells and fits the ship's
+ * outfit and mends its hull; the shipyard keeps the player's ships and shows every line's, built and planned, selling
+ * the next one; the arsenal sells guns and ammo. The guild hall and the auction house aren't open yet. Escape closes a building's window, then sets sail
  */
 export class PortScreen {
   readonly container = new Container();
+  private readonly harbour: HarbourView;
+  /** A gun, an ammo or a piece of outfit up close, over the arsenal or the workshop */
+  private readonly info: ItemInfo;
+  /** A building's window and the dim behind it */
+  private readonly building = new Container();
   private readonly dim = new Graphics();
   private readonly panel = new Container();
+  private readonly icon = new Sprite();
+  private readonly title = new Text({ text: '', style: { ...TITLE_STYLE, fontSize: 26 } });
+  private readonly about = text('', 13, THEME.dim, {
+    wordWrap: true,
+    wordWrapWidth: WIDTH - PAD * 3 - ICON - BACK.width,
+  });
   private readonly gold = text('', 18, GOLD, { fontWeight: 'bold' });
-  private readonly message = text('', 13, UI.text, { fontWeight: 'bold' });
+  private readonly coin = new Graphics();
+  private readonly message = text('', 13, THEME.text, { fontWeight: 'bold' });
+  /** The ship's figures, at the bottom of the workshop's outfit while no message is there */
+  private readonly figures = text('', 12, THEME.dim);
+  /** The tavern's quests, shown in its window */
+  private readonly tavern = new Container();
   private readonly quests: QuestView[] = [];
+  /** A building that isn't open yet: its medallion and what will be there */
+  private readonly closed = new Container();
+  private readonly closedIcon = new Sprite();
+  private readonly closedText = text('', 15, THEME.text, {
+    wordWrap: true,
+    wordWrapWidth: BODY_WIDTH - CLOSED_ICON - 40,
+  });
   private readonly tabs: { id: ShopTab; tile: Tile; label: Text }[];
+  /** A tab's rows, scrolled with the mouse wheel or the bar beside them when they are taller than the window */
   private readonly list = new Container();
+  /** The rows' mask: what of them shows */
+  private readonly clip = new Graphics();
+  private readonly scrollBar = new Graphics();
+  private scroll = 0;
+  /** Where the rows start in the window, scrolled to the top */
+  private listTop: number = BODY_TOP.tabs;
+  /** How tall the rows are, measured as they are made (a masked container is only as tall as its mask) */
+  private listHeight = 0;
+  /** Where the scroll bar was grabbed: the pointer's y and the scroll then; null while it isn't dragged */
+  private dragging: { readonly y: number; readonly scroll: number } | null = null;
   private rows: ShopRow[] = [];
   private repair: { tile: Tile; label: Text; hull: Text } | null = null;
-  private outfit: { figures: Text; slots: { slot: OutfitSlot; tile: Tile; label: Text }[]; rows: OutfitRow[] } | null =
-    null;
   private market: { hold: Text; sellAll: Tile; sellText: Text } | null = null;
-  private shipyard: ShipyardView | null = null;
+  /** The Captain's path's terms under the line of the ship the player works towards, each one's text */
+  private terms: Text[] = [];
+  /** The building whose window is open over the harbour */
+  private open: BuildingId | null = null;
   private tab: ShopTab = 'cannon';
-  /** The outfit's slot shown */
-  private slot: OutfitSlot = 'sails';
-  /** The tab (and slot) the shop's rows were made for */
+  /** The building and tab the shop's rows were made for */
   private builtFor = '';
   private messageUntil = 0;
   private time = 0;
@@ -223,64 +329,106 @@ export class PortScreen {
     this.actions = actions;
     this.screen = screen;
     this.container.visible = false;
-    const background = new Graphics()
-      .roundRect(0, 0, WIDTH, HEIGHT, 12)
-      .fill({ color: UI.panel, alpha: 0.97 })
-      .stroke({ width: 1.5, color: UI.border, alpha: 0.4 });
+    this.harbour = new HarbourView(
+      screen,
+      portName,
+      (id) => this.enter(id),
+      () => this.actions.leavePort(),
+    );
+    // Made before the port listens for Escape: it closes first
+    this.info = new ItemInfo(screen);
+    this.loadIcons();
+
+    const background = themedPanel(WIDTH, HEIGHT);
     for (const blocker of [this.dim, background]) {
       blocker.eventMode = 'static';
       // Clicks in port must not reach the stage, which would steer the ship
       blocker.on('pointerdown', (e) => e.stopPropagation());
     }
-    const title = text(t(portName), 22, UI.active, { fontWeight: 'bold' });
-    title.position.set(PAD, PAD - 2);
-    const coin = new Graphics();
-    drawCoin(coin, 10);
-    coin.position.set(PAD + title.width + 34, PAD + 12);
-    this.gold.position.set(coin.x + 16, PAD);
-    const leave = labelButton(LEAVE.width, LEAVE.height, t('Leave port  (Esc)'), () => this.actions.leavePort(), 13);
-    leave.tile.setLook({ border: UI.active });
-    leave.tile.container.position.set(WIDTH - PAD - LEAVE.width, PAD - 4);
+    // A click beside the window goes back to the harbour
+    this.dim.on('pointertap', () => this.leaveBuilding());
+    this.icon.width = this.icon.height = ICON;
+    this.icon.position.set(PAD, PAD);
+    this.title.position.set(PAD + ICON + 14, PAD - 2);
+    this.about.position.set(PAD + ICON + 14, PAD + 32);
+    const back = brassButton(BACK.width, BACK.height, t('Back to the harbour  (Esc)'), () => this.leaveBuilding(), 13);
+    back.tile.container.position.set(WIDTH - PAD - BACK.width, PAD);
+    drawCoin(this.coin, 10);
+    this.gold.anchor.set(1, 0);
+    this.gold.position.set(WIDTH - PAD, PAD + BACK.height + 12);
     this.message.position.set(PAD, HEIGHT - PAD - 14);
-    this.panel.addChild(background, title, coin, this.gold, leave.tile.container, this.message);
+    this.figures.position.set(PAD, HEIGHT - PAD - 13);
 
-    // The tavern
-    const tavern = text(t('Tavern'), 17, UI.text, { fontWeight: 'bold' });
-    tavern.position.set(PAD, HEADER);
-    const tavernNote = text(
-      t('Bounties: up to {n} at a time. Sink what they ask, then come back', { n: MAX_QUESTS }),
-      12,
-      UI.dim,
-    );
-    tavernNote.position.set(PAD, HEADER + 22);
-    this.panel.addChild(tavern, tavernNote);
-    QUEST_IDS.forEach((id, i) => this.panel.addChild(this.questView(id, HEADER + 46 + i * (QUEST_HEIGHT + QUEST_GAP))));
+    // The tavern: a row per quest
+    QUEST_IDS.forEach((id, i) => this.tavern.addChild(this.questView(id, i * (QUEST_HEIGHT + QUEST_GAP))));
+    this.tavern.position.set(PAD, BODY_TOP.plain);
 
-    // The shop
-    const shop = text(t('Shop'), 17, UI.text, { fontWeight: 'bold' });
-    shop.position.set(SHOP_X, HEADER);
-    this.panel.addChild(shop);
-    let x = SHOP_X + Math.ceil(shop.width) + TAB.gap * 2;
-    this.tabs = TABS.map(({ id, label }) => {
-      const caption = text(t(label), 12, UI.text, { fontWeight: 'bold' });
-      const tile = new Tile(Math.ceil(caption.width) + TAB.pad * 2, 24, () => (this.tab = id), 5);
+    // A building that isn't open yet
+    this.closedIcon.width = this.closedIcon.height = CLOSED_ICON;
+    const closedTitle = text(t('Closed for now'), 18, UI.warn, { fontWeight: 'bold' });
+    closedTitle.position.set(CLOSED_ICON + 32, 20);
+    this.closedText.position.set(CLOSED_ICON + 32, 52);
+    this.closed.addChild(this.closedIcon, closedTitle, this.closedText);
+    this.closed.position.set(PAD + 8, BODY_TOP.plain + 20);
+
+    // The shop's tabs: each building shows its own
+    this.tabs = TAB_IDS.map((id) => {
+      const caption = text(t(TABS[id]), 13, THEME.text, { fontWeight: 'bold' });
+      const tile = new Tile(Math.ceil(caption.width) + TAB.pad * 2, 26, () => (this.tab = id), 5, BRASS);
       caption.anchor.set(0.5);
-      caption.position.set(tile.width / 2, 12);
+      caption.position.set(tile.width / 2, 13);
       tile.content.addChild(caption);
-      tile.container.position.set(x, HEADER - 2);
-      x += tile.width + TAB.gap;
-      this.panel.addChild(tile.container);
+      tile.container.visible = false;
       return { id, tile, label: caption };
     });
-    this.list.position.set(SHOP_X, HEADER + 34);
-    this.panel.addChild(this.list);
 
-    this.container.addChild(this.dim, this.panel);
+    this.list.mask = this.clip;
+    this.panel.eventMode = 'static';
+    this.panel.on('wheel', (e) => this.scrollBy(e.deltaY * SCROLL.speed));
+    this.scrollBar.eventMode = 'static';
+    this.scrollBar.cursor = 'pointer';
+    this.scrollBar.on('pointerdown', (e) => {
+      e.stopPropagation();
+      this.dragging = { y: e.global.y, scroll: this.scroll };
+    });
+    this.panel.on('globalpointermove', (e) => {
+      if (!this.dragging) return;
+      // The bar's thumb moves over the view as the rows move under it: scaled by how much taller they are
+      const view = LIST_BOTTOM - this.listTop;
+      const moved = (e.global.y - this.dragging.y) / this.panel.scale.y;
+      this.scrollTo(this.dragging.scroll + (moved * this.listHeight) / view);
+    });
+    this.panel.on('pointerup', () => (this.dragging = null));
+    this.panel.on('pointerupoutside', () => (this.dragging = null));
+
+    this.panel.addChild(
+      background,
+      drawDivider(new Graphics(), PAD, DIVIDER, WIDTH - PAD * 2),
+      this.icon,
+      this.title,
+      this.about,
+      back.tile.container,
+      this.coin,
+      this.gold,
+      this.tavern,
+      this.closed,
+      this.list,
+      this.clip,
+      this.scrollBar,
+      this.message,
+      this.figures,
+    );
+    for (const { tile } of this.tabs) this.panel.addChild(tile.container);
+    this.building.addChild(this.dim, this.panel);
+    this.building.visible = false;
+    this.container.addChild(this.harbour.container, this.building, this.info.container);
     window.addEventListener('keydown', (e) => {
       // A window over the port (the loadout) closes first
       if (e.code !== 'Escape' || !this.isOpen || e.defaultPrevented) return;
-      this.actions.leavePort();
-      // Escape left port; it shouldn't also do what it does at sea (keyboardInput)
+      // Out of a building's window to the harbour; from the harbour out to sea
+      if (this.open) this.leaveBuilding();
+      else this.actions.leavePort();
+      // It shouldn't also do what Escape does at sea (keyboardInput)
       e.preventDefault();
     });
   }
@@ -289,17 +437,91 @@ export class PortScreen {
     return this.container.visible;
   }
 
-  /** Opens while the player's ship is in port, closes when it leaves; then fills in the gold, quests and shop */
+  /** Opens a building's window over the harbour */
+  private enter(id: BuildingId) {
+    this.open = id;
+    // The icons again, if they failed to load before
+    if (id === 'arsenal' || id === 'workshop' || id === 'shipyard') this.loadIcons();
+    const building = BUILDINGS.find((b) => b.id === id);
+    show(this.title, building ? t(building.name) : '');
+    // The tavern says how many bounties a captain may take; the others what they are for
+    show(
+      this.about,
+      id === 'tavern'
+        ? t('Bounties: up to {n} at a time. Sink what they ask, then come back', { n: MAX_QUESTS })
+        : building
+          ? t(building.about)
+          : '',
+    );
+    // The medallion clicked would stay lit, its note shown, under the window
+    this.harbour.unhover();
+    const medallion = this.harbour.medallion(id);
+    this.icon.visible = medallion !== null;
+    this.closedIcon.visible = medallion !== null;
+    if (medallion) {
+      this.icon.texture = medallion;
+      this.icon.width = this.icon.height = ICON;
+      this.closedIcon.texture = medallion;
+      this.closedIcon.width = this.closedIcon.height = CLOSED_ICON;
+    }
+    const tabs = BUILDING_TABS[id];
+    if (tabs.length > 0 && !tabs.includes(this.tab)) this.tab = tabs[0];
+    // A ship waiting to be bought: the shipyard opens on its line
+    const goal = id === 'shipyard' && this.state ? goalOffer(this.state, this.state.player) : null;
+    if (goal && this.state && termsMet(this.state, this.state.player)) {
+      const line = SHIP_CLASSES[goal.shipClass].line;
+      this.tab = tabs.find((tab) => tab === line) ?? this.tab;
+    }
+    // The tabs in a row under the name, only when there is more than one to choose from
+    let x = PAD;
+    for (const { id: tab, tile } of this.tabs) {
+      tile.container.visible = tabs.length > 1 && tabs.includes(tab);
+      if (!tile.container.visible) continue;
+      tile.container.position.set(x, TABS_TOP);
+      x += tile.width + TAB.gap;
+    }
+    const top = tabs.length > 1 ? BODY_TOP.tabs : BODY_TOP.plain;
+    this.listTop = top;
+    this.list.position.set(PAD, top);
+    // A little room round the rows, for the cards' outlines
+    const { margin } = SCROLL;
+    this.clip
+      .clear()
+      .rect(PAD - margin, top - margin, BODY_WIDTH + margin * 2, LIST_BOTTOM - top + margin)
+      .fill({ color: 0xffffff });
+    this.tavern.visible = id === 'tavern';
+    const closed = CLOSED[id];
+    this.closed.visible = closed !== undefined;
+    if (closed) show(this.closedText, t(closed));
+    this.list.visible = tabs.length > 0;
+    this.builtFor = '';
+    this.messageUntil = 0;
+    this.building.visible = true;
+  }
+
+  /** Closes the building's window: back to the harbour */
+  private leaveBuilding() {
+    this.open = null;
+    this.building.visible = false;
+    this.info.hide();
+  }
+
+  /** Opens while the player's ship is in port, closes when it leaves; then fills in the open building's window */
   update(state: GameState) {
     const { ship, player } = state;
+    const dt = Math.max(0, state.time - this.time);
     this.time = state.time;
     this.state = state;
     if (ship.docked !== this.container.visible) {
       this.container.visible = ship.docked;
-      if (ship.docked)
-        this.say(t('Welcome ashore. The tavern has work, the shop has guns and shot, the market buys cargo'));
+      this.leaveBuilding();
+      if (ship.docked) this.harbour.open();
+      else this.harbour.close();
     }
     if (!this.isOpen) return;
+    this.harbour.update(dt, player.gold, badges(state));
+    this.info.update(state);
+    if (!this.open) return;
 
     const { width, height } = this.screen;
     const size = `${width}x${height}`;
@@ -311,76 +533,53 @@ export class PortScreen {
       this.panel.position.set(Math.round((width - WIDTH * scale) / 2), Math.round((height - HEIGHT * scale) / 2));
     }
     show(this.gold, t('{n} gold', { n: player.gold }));
+    this.coin.position.set(this.gold.x - this.gold.width - 14, this.gold.y + this.gold.height / 2);
     this.message.visible = this.time < this.messageUntil;
 
-    for (const view of this.quests) {
-      const taken = player.quests.find((q) => q.id === view.id);
-      const quest = QUESTS[view.id];
-      const done = taken !== undefined && questDone(taken);
-      const full = player.quests.length >= MAX_QUESTS;
-      const offered = questOffered(player, view.id);
-      show(view.progress, taken ? (done ? t('Done!') : `${taken.kills} / ${quest.count}`) : '');
-      tint(view.progress, done ? UI.good : UI.text);
-      show(
-        view.about,
-        offered
-          ? t(quest.text)
-          : t('Turn in {n} more tavern quest to hear of it|Turn in {n} more tavern quests to hear of it', {
-              n: quest.after - player.progress.questsDone,
-            }),
-      );
-      tint(view.about, offered ? UI.dim : UI.warn);
-      show(view.buttonText, done ? t('Turn in') : taken ? t('Taken') : offered ? t('Take') : t('Later'));
-      view.button.setLook({
-        pressed: done,
-        disabled: (taken !== undefined && !done) || (!taken && (full || !offered)),
-      });
-      tint(view.buttonText, done ? UI.darkText : UI.text);
-      view.drop.container.visible = taken !== undefined && !done;
-      const border = done ? UI.good : taken ? UI.active : UI.border;
-      if (view.painted !== border) {
-        view.painted = border;
-        view.background
-          .clear()
-          .roundRect(0, 0, TAVERN_WIDTH, QUEST_HEIGHT, 8)
-          .fill({ color: UI.idle, alpha: 0.5 })
-          .stroke({ width: taken ? 1.5 : 1, color: border, alpha: taken ? 0.9 : 0.3 });
-      }
-    }
-
+    if (this.open === 'tavern') this.updateQuests(state);
+    const tabs = BUILDING_TABS[this.open];
+    if (tabs.length === 0) return;
     for (const { id, tile, label } of this.tabs) {
       tile.setLook({ pressed: id === this.tab });
-      tint(label, id === this.tab ? UI.darkText : UI.text);
+      tint(label, id === this.tab ? THEME.darkText : THEME.text);
     }
     const built =
-      this.tab === 'outfit'
-        ? `outfit:${this.slot}`
-        : this.tab === 'market'
-          ? `market:${GOOD_IDS.map((id) => ship.cargo[id] ?? 0).join()}`
+      this.tab === 'market'
+        ? `market:${GOOD_IDS.map((id) => ship.cargo[id] ?? 0).join()}`
+        : this.tab === 'myShips' || LINE_TABS[this.tab]
+          ? `${this.tab}:${fleetKey(state)}`
           : this.tab;
     if (this.builtFor !== built) {
       this.builtFor = built;
       this.buildShop(this.tab);
     }
     for (const row of this.rows) {
-      if (row.gun) {
-        const fitted = WEAPON_IDS.reduce((n, w) => n + ship.guns[w].filter((g) => g === row.gun).length, 0);
-        const inHold = player.hold[row.gun] ?? 0;
-        show(row.owned, fitted + inHold > 0 ? t('fitted {fitted} · hold {hold}', { fitted, hold: inHold }) : '');
-        row.buy.setLook({ disabled: player.gold < gunPrice(row.gun) });
-      } else if (row.ammo) {
-        show(row.owned, t('{n} aboard', { n: ship.ammo[row.ammo] }));
-        row.buy.setLook({ disabled: player.gold < ammoPackPrice(row.ammo) });
+      show(row.owned, row.face.owned(state));
+      const { short, enabled } = row.face.button(state);
+      show(row.label, short);
+      row.button.setLook(enabled ? {} : { disabled: true });
+      const inUse = row.face.inUse(state);
+      if (row.painted !== inUse) {
+        row.painted = inUse;
+        drawCard(
+          row.background.clear(),
+          CARD_WIDTH,
+          CARD.height,
+          tierColor(row.face.tier),
+          inUse ? THEME.brassLight : undefined,
+        );
       }
     }
-    if (this.outfit) this.updateOutfit(state);
+    const outfit = OUTFIT_TABS[this.tab] !== undefined;
+    show(this.figures, outfit ? t('Your ship: {figures}', { figures: shipFigures(ship) }) : '');
+    this.figures.visible = outfit && !this.message.visible;
     if (this.market) {
       const value = cargoValue(ship.cargo);
       show(this.market.hold, t('Hold {cargo} / {size}', { cargo: cargoCount(ship.cargo), size: ship.holdSize }));
       show(this.market.sellText, value > 0 ? t('Sell everything: {n} gold', { n: value }) : t('Nothing to sell'));
-      this.market.sellAll.setLook({ disabled: value === 0, border: value > 0 ? GOLD : UI.border });
+      this.market.sellAll.setLook(value > 0 ? { border: GOLD } : { disabled: true });
     }
-    if (this.shipyard) this.updateShipyard(state);
+    this.updateTerms(state);
     if (this.repair) {
       const price = repairPrice(ship);
       show(this.repair.hull, t('Hull {hp} / {max}', { hp: ship.hp, max: ship.maxHp }));
@@ -389,7 +588,42 @@ export class PortScreen {
     }
   }
 
-  private say(message: string, color: number = UI.text) {
+  /** The tavern's quests: taken or not, how far each has got, Take, Turn in or Drop */
+  private updateQuests(state: GameState) {
+    const { player } = state;
+    for (const view of this.quests) {
+      const taken = player.quests.find((q) => q.id === view.id);
+      const quest = QUESTS[view.id];
+      const done = taken !== undefined && questDone(taken);
+      const full = player.quests.length >= MAX_QUESTS;
+      const offered = questOffered(player, view.id);
+      show(view.progress, taken ? (done ? t('Done!') : `${taken.kills} / ${quest.count}`) : '');
+      tint(view.progress, done ? UI.good : THEME.text);
+      show(
+        view.about,
+        offered
+          ? t(quest.text)
+          : t('Turn in {n} more tavern quest to hear of it|Turn in {n} more tavern quests to hear of it', {
+              n: quest.after - player.progress.questsDone,
+            }),
+      );
+      tint(view.about, offered ? THEME.dim : UI.warn);
+      show(view.buttonText, done ? t('Turn in') : taken ? t('Taken') : offered ? t('Take') : t('Later'));
+      view.button.setLook({
+        pressed: done,
+        disabled: (taken !== undefined && !done) || (!taken && (full || !offered)),
+      });
+      tint(view.buttonText, done ? THEME.darkText : THEME.text);
+      view.drop.container.visible = taken !== undefined && !done;
+      const outline = done ? UI.good : taken ? THEME.brassLight : undefined;
+      if (view.painted !== (outline ?? -1)) {
+        view.painted = outline ?? -1;
+        drawCard(view.background.clear(), TAVERN_WIDTH, QUEST_HEIGHT, undefined, outline);
+      }
+    }
+  }
+
+  private say(message: string, color: number = THEME.text) {
     show(this.message, message);
     tint(this.message, color);
     this.messageUntil = this.time + MESSAGE_TIME;
@@ -398,23 +632,23 @@ export class PortScreen {
   private questView(id: QuestId, y: number) {
     const quest = QUESTS[id];
     const row = new Container();
-    row.position.set(PAD, y);
+    row.position.set(0, y);
     const background = new Graphics();
-    const title = text(t(quest.title), 14, UI.text, { fontWeight: 'bold' });
+    const title = text(t(quest.title), 14, THEME.text, { fontWeight: 'bold' });
     title.position.set(12, 8);
-    const about = text(t(quest.text), 12, UI.dim, { wordWrap: true, wordWrapWidth: TAVERN_WIDTH - 150 });
+    const about = text(t(quest.text), 12, THEME.dim, { wordWrap: true, wordWrapWidth: TAVERN_WIDTH - 150 });
     about.position.set(12, 28);
     const reward = text(t('{n} gold', { n: quest.reward }), 13, GOLD, { fontWeight: 'bold' });
     reward.anchor.set(1, 0);
     reward.position.set(TAVERN_WIDTH - 12, 8);
-    const progress = text('', 13, UI.text, { fontWeight: 'bold' });
+    const progress = text('', 13, THEME.text, { fontWeight: 'bold' });
     progress.anchor.set(1, 0);
     progress.position.set(TAVERN_WIDTH - 12, 28);
-    const main = labelButton(84, 24, t('Take'), () => this.questAction(id), 12);
+    const main = brassButton(84, 24, t('Take'), () => this.questAction(id), 12);
     main.tile.container.position.set(TAVERN_WIDTH - 12 - 84, QUEST_HEIGHT - 32);
-    const drop = labelButton(50, 24, t('Drop'), () => {
+    const drop = brassButton(50, 24, t('Drop'), () => {
       this.actions.dropQuest(id);
-      this.say(t('"{title}" dropped', { title: t(quest.title) }), UI.dim);
+      this.say(t('"{title}" dropped', { title: t(quest.title) }), THEME.dim);
     });
     drop.tile.container.position.set(TAVERN_WIDTH - 12 - 84 - 56, QUEST_HEIGHT - 32);
     row.addChild(background, title, about, reward, progress, main.tile.container, drop.tile.container);
@@ -422,7 +656,7 @@ export class PortScreen {
       id,
       background,
       about,
-      painted: -1,
+      painted: null,
       progress,
       button: main.tile,
       buttonText: main.text,
@@ -443,36 +677,30 @@ export class PortScreen {
     }
   }
 
-  /** The rows of a shop tab: the guns of a weapon by tier, every ammo, or the shipwright */
+  /** The rows of a shop tab: the guns or the ammo of a weapon by tier, the outfit, the shipwright, the market... */
   private buildShop(tab: ShopTab) {
     for (const child of this.list.removeChildren()) child.destroy({ children: true });
+    this.dragging = null;
     this.rows = [];
     this.repair = null;
-    this.outfit = null;
     this.market = null;
-    this.shipyard = null;
-    if (tab === 'outfit') {
-      this.buildOutfit();
-    } else if (tab === 'market') {
+    this.terms = [];
+    const ammo = AMMO_TABS[tab];
+    const slot = OUTFIT_TABS[tab];
+    const line = LINE_TABS[tab];
+    if (tab === 'market') {
       this.buildMarket();
-    } else if (tab === 'shipyard') {
-      this.buildShipyard();
-    } else if (tab === 'ammo') {
-      let y = 0;
-      for (const weapon of WEAPON_IDS) {
-        const heading = text(t(weapon === 'cannon' ? 'Cannonballs' : 'Harpoons'), 13, UI.text, { fontWeight: 'bold' });
-        heading.position.set(0, y);
-        this.list.addChild(heading);
-        y += 20;
-        for (const ammo of AMMO_IDS[weapon]) {
-          this.list.addChild(this.ammoRow(ammo, y));
-          y += AMMO_ROW + ROW_GAP;
-        }
-        y += 6;
-      }
+    } else if (tab === 'myShips') {
+      this.buildFleet();
+    } else if (line) {
+      this.buildLine(line);
+    } else if (ammo) {
+      AMMO_IDS[ammo].forEach((id, i) => this.list.addChild(this.card({ ammo: id }, i)));
+    } else if (slot) {
+      OUTFIT_IDS[slot].forEach((id, i) => this.list.addChild(this.card({ outfit: id }, i)));
     } else if (tab === 'shipwright') {
-      const hull = text('', 15, UI.text, { fontWeight: 'bold' });
-      const fix = labelButton(200, 30, '', () => {
+      const hull = text('', 15, THEME.text, { fontWeight: 'bold' });
+      const fix = brassButton(200, 30, '', () => {
         if (this.actions.repairInPort()) this.say(t('The shipwright mended the hull'), UI.heal);
       });
       fix.tile.container.position.set(0, 30);
@@ -481,157 +709,133 @@ export class PortScreen {
           per: REPAIR_HP_PER_GOLD,
         }),
         12,
-        UI.dim,
+        THEME.dim,
       );
       note.position.set(0, 72);
       this.list.addChild(hull, fix.tile.container, note);
       this.repair = { tile: fix.tile, label: fix.text, hull };
-    } else {
-      GUN_IDS[tab].forEach((gun, i) => this.list.addChild(this.gunRow(gun, i * (GUN_ROW + ROW_GAP))));
+    } else if (tab === 'cannon' || tab === 'harpoon') {
+      GUN_IDS[tab].forEach((gun, i) => this.list.addChild(this.card({ gun }, i)));
     }
+    this.listHeight = Math.max(0, ...this.list.children.map((child) => child.y + child.height));
+    this.scrollTo(0);
   }
 
-  private gunRow(gun: GunId, y: number) {
-    const { name, tier, die, range, reload, role } = GUNS[gun];
-    const row = new Container();
-    row.position.set(0, y);
-    const background = new Graphics()
-      .roundRect(0, 0, SHOP_WIDTH, GUN_ROW, 6)
-      .fill({ color: UI.idle, alpha: 0.5 })
-      .stroke({ width: 1, color: tierColor(tier), alpha: 0.5 });
-    const badge = new Graphics().roundRect(8, 9, 24, 22, 4).fill({ color: tierColor(tier) });
-    const tierText = text(`T${tier}`, 11, UI.darkText, { fontWeight: 'bold' });
-    tierText.anchor.set(0.5);
-    tierText.position.set(20, 20);
-    const title = text(t(name), 13, UI.text, { fontWeight: 'bold' });
-    title.position.set(40, 4);
-    const stats = text(
-      t('d{die} · reach {range} · {reload} s · {role}', { die, range, reload, role: t(role) }),
-      11,
-      UI.dim,
-    );
-    stats.position.set(40, 22);
-    const owned = text('', 11, UI.dim);
-    owned.anchor.set(1, 0);
-    owned.position.set(SHOP_WIDTH - BUY.width - 16, 23);
-    const price = text(t('{n} gold', { n: gunPrice(gun) }), 12, GOLD, { fontWeight: 'bold' });
-    price.anchor.set(1, 0);
-    price.position.set(SHOP_WIDTH - BUY.width - 16, 5);
-    const buy = labelButton(BUY.width, BUY.height, t('Buy'), () => {
-      if (this.actions.buyGun(gun))
-        this.say(t('{name} is in the hold: fit it in the loadout (L)', { name: t(name) }), UI.good);
-      else this.say(t('Not enough gold'), UI.bad);
-    });
-    buy.tile.container.position.set(SHOP_WIDTH - BUY.width - 8, (GUN_ROW - BUY.height) / 2);
-    row.addChild(background, badge, tierText, title, stats, owned, price, buy.tile.container);
-    this.rows.push({ gun, ammo: null, owned, buy: buy.tile });
-    return row;
+  /** Scrolls a tab's rows by some pixels: down for more */
+  private scrollBy(delta: number) {
+    if (this.open && BUILDING_TABS[this.open].length > 0) this.scrollTo(this.scroll + delta);
+  }
+
+  /** Scrolls a tab's rows to a place (pixels from their top), as far as they go, and shows where on the bar */
+  private scrollTo(scroll: number) {
+    const top = this.listTop;
+    const view = LIST_BOTTOM - top;
+    const most = Math.max(0, this.listHeight - view);
+    this.scroll = Math.min(Math.max(scroll, 0), most);
+    this.list.y = top - this.scroll;
+    this.scrollBar.clear();
+    this.scrollBar.visible = most > 0;
+    if (most === 0) return;
+    const x = WIDTH - PAD + SCROLL.margin;
+    const thumb = Math.max(30, (view * view) / this.listHeight);
+    const y = top + ((view - thumb) * this.scroll) / most;
+    this.scrollBar
+      .roundRect(x, top, SCROLL.bar, view, 2)
+      .fill({ color: 0x000000, alpha: 0.35 })
+      .roundRect(x, y, SCROLL.bar, thumb, 2)
+      .fill({ color: THEME.brass });
+  }
+
+  /** Loads the arsenal's, the workshop's and the shipyard's icons; their cards are made again with them once they are
+   * there */
+  private loadIcons() {
+    for (const icons of [GUN_ICONS, AMMO_ICONS, OUTFIT_ICONS, SHIP_ICONS]) icons.load(() => (this.builtFor = ''));
   }
 
   /**
-   * The outfit tab: the ship's figures with what is fitted, a button per slot, and the pieces of the slot picked: each
-   * bought and fitted at once, fitted from the hold, or taken off
+   * A card of the arsenal, the workshop or the shipyard, the `index`th of its tab (`top` pixels down it): the item's
+   * icon in a slot lit in its tier's colour (or its tier, until the icons load; a ship's slot empty, its picture to
+   * come), its name, what it is, its figures, its price and how many the player has, and buttons to see it up close (as
+   * does a click on its icon) and to buy it (or fit it, take it off, take its helm). Outlined while the ship has it
+   * fitted or loaded, or sails it
    */
-  private buildOutfit() {
-    const figures = text('', 13, UI.text, { fontWeight: 'bold' });
-    this.list.addChild(figures);
-    let x = 0;
-    const slots = OUTFIT_SLOTS.map((slot) => {
-      const label = text(t(SLOT_NAMES[slot]), 12, UI.text, { fontWeight: 'bold' });
-      const tile = new Tile(Math.ceil(label.width) + 22, 24, () => (this.slot = slot), 5);
-      label.anchor.set(0.5);
-      label.position.set(tile.width / 2, 12);
-      tile.content.addChild(label);
-      tile.container.position.set(x, 24);
-      x += tile.width + 6;
-      this.list.addChild(tile.container);
-      return { slot, tile, label };
-    });
-    const rows = OUTFIT_IDS[this.slot].map((id, i) => this.outfitRow(id, OUTFIT_TOP + i * (GUN_ROW + ROW_GAP)));
-    const note = text(t('The shipwright fits it here, in port; the piece taken off goes to the hold'), 12, UI.dim);
-    note.position.set(0, OUTFIT_TOP + rows.length * (GUN_ROW + ROW_GAP) + 4);
-    this.list.addChild(note);
-    this.outfit = { figures, slots, rows };
-  }
-
-  private outfitRow(id: OutfitId, y: number): OutfitRow {
-    const { name, tier, role, bonus } = OUTFITS[id];
-    const row = new Container();
-    row.position.set(0, y);
+  private card(item: ShopItem, index: number, top = 0) {
+    const { inset, slot: size } = CARD;
+    const width = CARD_WIDTH;
+    const buy = 'ship' in item ? SHIP_BUY : BUY.width;
+    const card = new Container();
+    card.position.set((index % 2) * (CARD_WIDTH + CARD.gap), top + Math.floor(index / 2) * (CARD.height + CARD.rowGap));
+    const face = itemFace(item, this.actions);
     const background = new Graphics();
-    const badge = new Graphics().roundRect(8, 9, 24, 22, 4).fill({ color: tierColor(tier) });
-    const tierText = text(`T${tier}`, 11, UI.darkText, { fontWeight: 'bold' });
-    tierText.anchor.set(0.5);
-    tierText.position.set(20, 20);
-    const title = text(t(name), 13, UI.text, { fontWeight: 'bold' });
-    title.position.set(40, 4);
-    // What it is for beside its name; what it gives under it, where the hold's count goes too
-    const about = text(t(role), 11, UI.dim);
-    about.position.set(title.x + title.width + 8, 6);
-    const gives = text(bonusText(bonus), 11, UI.text);
-    gives.position.set(40, 22);
-    const owned = text('', 11, UI.dim);
-    owned.anchor.set(1, 0);
-    owned.position.set(SHOP_WIDTH - BUY.width - 16, 23);
-    const price = text(t('{n} gold', { n: outfitPrice(id) }), 12, GOLD, { fontWeight: 'bold' });
+    const slot = iconSlot(size, tierColor(face.tier), `T${face.tier}`, face.letters);
+    slot.show(face.icon);
+    slot.container.position.set(inset, (CARD.height - size) / 2);
+    slot.container.eventMode = 'static';
+    slot.container.cursor = 'pointer';
+    slot.container.on('pointerdown', (e) => e.stopPropagation());
+    slot.container.on('pointertap', () => {
+      playTap();
+      this.info.open(itemFace(item, this.actions));
+    });
+    const left = inset + size + 12;
+    const price = text(face.price, 13, GOLD, { fontWeight: 'bold' });
     price.anchor.set(1, 0);
-    price.position.set(SHOP_WIDTH - BUY.width - 16, 5);
-    const action = labelButton(BUY.width, BUY.height, t('Buy'), () => this.outfitAction(id));
-    action.tile.container.position.set(SHOP_WIDTH - BUY.width - 8, (GUN_ROW - BUY.height) / 2);
-    row.addChild(background, badge, tierText, title, about, gives, owned, price, action.tile.container);
-    this.list.addChild(row);
-    return { id, background, painted: null, owned, button: action.tile, label: action.text };
+    price.position.set(width - 12, 9);
+    const title = text(face.name, 14, THEME.text, { fontWeight: 'bold' });
+    title.position.set(left, 8);
+    clip(title, price.x - price.width - 8 - left);
+    // What it is for in a line (the info window has all of it), and its figures under it
+    const about = text(face.about, 11, THEME.dim);
+    about.position.set(left, 29);
+    clip(about, width - left - 12);
+    const stats = text(face.stats, 12, THEME.text);
+    stats.position.set(left, 47);
+    // A piece of outfit that changes three figures takes a smaller hand before it is cut short
+    if (stats.width > width - left - 12) stats.style.fontSize = 11;
+    clip(stats, width - left - 12);
+    const owned = text('', 11, THEME.dim);
+    owned.position.set(left, CARD.height - 12 - BUY.height + 5);
+    const button = brassButton(buy, BUY.height, this.state ? face.button(this.state).short : t('Buy'), () =>
+      this.press(face),
+    );
+    button.tile.container.position.set(width - 12 - buy, CARD.height - 12 - BUY.height);
+    const info = brassButton(
+      INFO.width,
+      BUY.height,
+      'i',
+      () => this.info.open(itemFace(item, this.actions)),
+      INFO.size,
+    );
+    info.text.style.fontFamily = TITLE_STYLE.fontFamily ?? 'serif';
+    info.text.style.fontStyle = 'italic';
+    info.tile.container.position.set(button.tile.container.x - 6 - INFO.width, button.tile.container.y);
+    card.addChild(
+      background,
+      slot.container,
+      title,
+      price,
+      about,
+      stats,
+      owned,
+      info.tile.container,
+      button.tile.container,
+    );
+    this.rows.push({ face, background, painted: null, owned, button: button.tile, label: button.text });
+    return card;
   }
 
-  /** Buys a piece and fits it, fits it from the hold, or takes it off if it is fitted */
-  private outfitAction(id: OutfitId) {
+  /** A card's button: buys the item, fits it or takes it off, and says what happened */
+  private press(face: ItemFace) {
     if (!this.state) return;
-    const { ship, player } = this.state;
-    const { slot } = OUTFITS[id];
-    const name = t(OUTFITS[id].name);
-    if (ship.outfit[slot] === id) {
-      if (this.actions.fitOutfit(slot, null)) this.say(t('{name} taken off: it is in the hold', { name }), UI.dim);
-    } else if ((player.outfits[id] ?? 0) > 0) {
-      if (this.actions.fitOutfit(slot, id)) this.say(t('{name} fitted', { name }), UI.good);
-    } else if (this.actions.buyOutfit(id) && this.actions.fitOutfit(slot, id)) {
-      this.say(t('{name} bought and fitted', { name }), UI.good);
-    } else {
-      this.say(t('Not enough gold'), UI.bad);
-    }
-  }
-
-  private updateOutfit(state: GameState) {
-    const { ship, player } = state;
-    const view = this.outfit;
-    if (!view) return;
-    show(view.figures, shipFigures(ship));
-    for (const { slot, tile, label } of view.slots) {
-      tile.setLook({ pressed: slot === this.slot });
-      tint(label, slot === this.slot ? UI.darkText : UI.text);
-    }
-    for (const row of view.rows) {
-      const { slot, tier } = OUTFITS[row.id];
-      const fitted = ship.outfit[slot] === row.id;
-      const spares = player.outfits[row.id] ?? 0;
-      show(row.owned, fitted ? t('fitted') : spares > 0 ? t('{n} in the hold', { n: spares }) : '');
-      tint(row.owned, fitted ? UI.active : UI.dim);
-      show(row.label, fitted ? t('Take off') : spares > 0 ? t('Fit') : t('Buy'));
-      row.button.setLook({ disabled: !fitted && spares === 0 && player.gold < outfitPrice(row.id) });
-      if (row.painted === fitted) continue;
-      row.painted = fitted;
-      row.background
-        .clear()
-        .roundRect(0, 0, SHOP_WIDTH, GUN_ROW, 6)
-        .fill({ color: UI.idle, alpha: 0.5 })
-        .stroke({ width: fitted ? 2 : 1, color: fitted ? UI.active : tierColor(tier), alpha: fitted ? 0.95 : 0.5 });
-    }
+    const done = face.press(this.state);
+    if (done) this.say(done.message, TONES[done.tone]);
   }
 
   /** The market: what the hold carries, by good, each sold apart or all together */
   private buildMarket() {
     const ship = this.state?.ship;
-    const hold = text('', 15, UI.text, { fontWeight: 'bold' });
-    const sellAll = labelButton(230, 28, '', () => {
+    const hold = text('', 15, THEME.text, { fontWeight: 'bold' });
+    const sellAll = brassButton(230, 28, '', () => {
       const value = ship ? cargoValue(ship.cargo) : 0;
       if (this.actions.sellCargo()) this.say(t('Sold everything for {n} gold', { n: value }), GOLD);
     });
@@ -645,7 +849,7 @@ export class PortScreen {
           'The hold is empty. Sunk ships and monsters leave goods floating: sail over them to haul them aboard, then sell them here. A ship that goes down loses its cargo where it sank.',
         ),
         12,
-        UI.dim,
+        THEME.dim,
         { wordWrap: true, wordWrapWidth: SHOP_WIDTH },
       );
       empty.position.set(0, 40);
@@ -658,18 +862,15 @@ export class PortScreen {
       const count = ship?.cargo[id] ?? 0;
       const row = new Container();
       row.position.set(0, 40 + i * (MARKET_ROW + ROW_GAP));
-      const background = new Graphics()
-        .roundRect(0, 0, SHOP_WIDTH, MARKET_ROW, 6)
-        .fill({ color: UI.idle, alpha: 0.5 })
-        .stroke({ width: 1, color: UI.border, alpha: 0.25 });
-      const title = text(`${name}  ×${count}`, 13, UI.text, { fontWeight: 'bold' });
+      const background = drawCard(new Graphics(), SHOP_WIDTH, MARKET_ROW);
+      const title = text(`${name}  ×${count}`, 13, THEME.text, { fontWeight: 'bold' });
       title.position.set(12, (MARKET_ROW - title.height) / 2);
       const worth = text(`${t('{n} gold each', { n: price })} · ${t('{n} gold', { n: price * count })}`, 12, GOLD, {
         fontWeight: 'bold',
       });
       worth.anchor.set(1, 0.5);
       worth.position.set(SHOP_WIDTH - BUY.width - 16, MARKET_ROW / 2);
-      const sell = labelButton(BUY.width, BUY.height, t('Sell'), () => {
+      const sell = brassButton(BUY.width, BUY.height, t('Sell'), () => {
         if (this.actions.sellCargo(id)) this.say(t('{name} sold: +{n} gold', { name, n: price * count }), GOLD);
       });
       sell.tile.container.position.set(SHOP_WIDTH - BUY.width - 6, (MARKET_ROW - BUY.height) / 2);
@@ -679,180 +880,97 @@ export class PortScreen {
   }
 
   /**
-   * The shipyard: the next ship the player works towards (its figures beside the ship sailed now, its terms, the
-   * Captain's path, and Buy once they are met), then the player's ships: the one sailed and those laid up in port,
-   * each with Take the helm
+   * The shipyard's "My ships": the ship sailed (outlined) and those laid up in port, as cards, each with Take the helm
+   * but the one sailed
    */
-  private buildShipyard() {
+  private buildFleet() {
     const state = this.state;
     if (!state) return;
-    const offer = goalOffer(state, state.player);
-    const now = state.ship;
-    let y = 0;
-    const view: ShipyardView = { terms: [], buy: null, status: null, sailed: null };
-    if (offer) {
-      const next = SHIP_CLASSES[offer.shipClass];
-      const title = text(t(offerName(offer)), 20, UI.active, { fontWeight: 'bold' });
-      const line = text(t('European line · tier {tier} · {n} gold', { tier: next.tier, n: offer.price }), 13, GOLD, {
-        fontWeight: 'bold',
-      });
-      line.position.set(title.width + 14, 6);
-      const figures = [
-        compare('Hull', next.hp, now.shipClass.hp),
-        compare('Speed', knots(next.maxSpeed), knots(now.shipClass.maxSpeed)),
-        compare('Cannons', next.slots.cannon.length, now.shipClass.slots.cannon.length),
-        compare('Harpoon guns', next.slots.harpoon.length, now.shipClass.slots.harpoon.length),
-        compare('Hold', next.hold, now.shipClass.hold),
-        compare('Sight', next.viewRange, now.shipClass.viewRange),
-      ].join('  ·  ');
-      const stats = text(figures, 12, UI.text, { wordWrap: true, wordWrapWidth: SHOP_WIDTH });
-      stats.position.set(0, 34);
-      const about = text(
-        t(
-          'The first ship of the European line: all round, like its line. A new ship starts at level 1 with talents of its own.',
-        ),
-        12,
-        UI.dim,
-        { wordWrap: true, wordWrapWidth: SHOP_WIDTH },
-      );
-      about.position.set(0, 34 + stats.height + 6);
-      const heading = text(t("The shipwright's terms: the Captain's path"), 14, UI.text, { fontWeight: 'bold' });
-      const top = about.y + about.height + 14;
-      heading.position.set(0, top);
-      this.list.addChild(title, line, stats, about, heading);
-      view.terms = captainsPath(state, state.player).map((_, i) => {
-        const term = text('', 13, UI.text);
-        term.position.set(8, top + 26 + i * PATH_LINE);
-        this.list.addChild(term);
-        return term;
-      });
-      y = top + 30 + view.terms.length * PATH_LINE;
-      const buy = labelButton(SHIPYARD.buy, SHIPYARD.button, '', () => {
-        if (!this.actions.buyShip()) this.say(t('Not enough gold'), UI.bad);
-      });
-      buy.tile.container.position.set(0, y);
-      const status = text('', 12, UI.dim, { wordWrap: true, wordWrapWidth: SHOP_WIDTH - SHIPYARD.buy - 14 });
-      status.anchor.set(0, 0.5);
-      status.position.set(SHIPYARD.buy + 14, y + SHIPYARD.button / 2);
-      this.list.addChild(buy.tile.container, status);
-      view.buy = { tile: buy.tile, label: buy.text, name: t(offerName(offer)), price: offer.price };
-      view.status = status;
-      y += SHIPYARD.button + 22;
-    } else {
-      const done = text(
-        t('You own every ship the shipyard sells for now: more of the line come with the next waters'),
-        13,
-        UI.good,
-        { fontWeight: 'bold', wordWrap: true, wordWrapWidth: SHOP_WIDTH },
-      );
-      this.list.addChild(done);
-      y = done.height + 18;
-    }
-
-    const heading = text(t('Your ships'), 14, UI.text, { fontWeight: 'bold' });
-    heading.position.set(0, y);
-    this.list.addChild(heading);
-    y += 26;
-    const rows: { name: string; figures: string; laidUp: number | null }[] = [
-      { name: now.shipClass.name, figures: '', laidUp: null },
-      ...state.player.fleet.map((ship, i) => ({
-        name: SHIP_CLASSES[ship.shipClass].name,
-        figures: t('Lv {level} · hull {hp}', { level: laidUpLevel(ship), hp: ship.hp }),
-        laidUp: i,
-      })),
-    ];
-    for (const { name, figures, laidUp } of rows) {
-      const row = new Container();
-      row.position.set(0, y);
-      const background = new Graphics()
-        .roundRect(0, 0, SHOP_WIDTH, SHIPYARD.row, 6)
-        .fill({ color: UI.idle, alpha: 0.5 })
-        .stroke({ width: laidUp === null ? 2 : 1, color: laidUp === null ? UI.active : UI.border, alpha: 0.7 });
-      const title = text(t(name), 14, UI.text, { fontWeight: 'bold' });
-      title.position.set(12, (SHIPYARD.row - title.height) / 2);
-      const info = text(figures, 12, UI.dim);
-      info.anchor.set(0, 0.5);
-      info.position.set(title.x + title.width + 14, SHIPYARD.row / 2);
-      row.addChild(background, title, info);
-      if (laidUp === null) {
-        const helm = text(t('At the helm'), 13, UI.active, { fontWeight: 'bold' });
-        helm.anchor.set(1, 0.5);
-        helm.position.set(SHOP_WIDTH - 14, SHIPYARD.row / 2);
-        row.addChild(helm);
-        view.sailed = info;
-      } else {
-        const take = labelButton(SHIPYARD.helm, BUY.height, t('Take the helm'), () => this.actions.takeHelm(laidUp));
-        take.tile.container.position.set(SHOP_WIDTH - SHIPYARD.helm - 8, (SHIPYARD.row - BUY.height) / 2);
-        row.addChild(take.tile.container);
-      }
-      this.list.addChild(row);
-      y += SHIPYARD.row + ROW_GAP;
-    }
-    const note = text(
+    const owned = [state.ship.shipClass.id, ...state.player.fleet.map((kept) => kept.shipClass)].filter(isLineShip);
+    owned.forEach((ship, i) => this.list.addChild(this.card({ ship }, i)));
+    const laidUp = text(
       t("A ship you don't sail lies in port with its guns, ammo, outfit, talents and cargo, and levels on its own"),
       12,
-      UI.dim,
+      THEME.dim,
       { wordWrap: true, wordWrapWidth: SHOP_WIDTH },
     );
-    note.position.set(0, y + 4);
-    this.list.addChild(note);
-    this.shipyard = view;
+    laidUp.position.set(0, Math.ceil(owned.length / 2) * (CARD.height + CARD.rowGap) + 6);
+    const goal = goalOffer(state, state.player);
+    const lines = text(
+      goal
+        ? t('Every line has a tab of its ships: the shipyard sells the {name} now, the others come later', {
+            name: t(offerName(goal)),
+          })
+        : t('Every line has a tab of its ships: the others come later'),
+      12,
+      THEME.dim,
+      { wordWrap: true, wordWrapWidth: SHOP_WIDTH },
+    );
+    lines.position.set(0, laidUp.y + laidUp.height + 6);
+    this.list.addChild(laidUp, lines);
   }
 
-  private updateShipyard(state: GameState) {
-    const view = this.shipyard;
-    if (!view) return;
+  /**
+   * A line's tab of the shipyard: its name, what it is for and what its ships look like, then its ships from tier 1 up
+   * as cards (a built one to buy or to take the helm of, a planned one with its provisional figures, coming later); in
+   * a line of several ships a tier (the Forbidden Fleets, the masterworks), under a heading for each tier, and a word
+   * on how they are got. Under the line of the ship the player works towards, the shipwright's terms for it, the
+   * Captain's path
+   */
+  private buildLine(id: PlayerLineId) {
+    const line = SHIP_LINES[id];
+    const title = new Text({ text: t(line.name), style: { ...TITLE_STYLE, fontSize: 22 } });
+    const role = text(t(line.role), 13, GOLD, { fontWeight: 'bold' });
+    role.position.set(title.width + 14, 7);
+    clip(role, SHOP_WIDTH - role.x);
+    const about = [t(LINE_STYLE[id]), LINE_NOTES[id] ? t(LINE_NOTES[id]) : ''].filter(Boolean).join(' ');
+    const style = text(about, 12, THEME.dim, { wordWrap: true, wordWrapWidth: SHOP_WIDTH });
+    style.position.set(0, 34);
+    this.list.addChild(title, role, style);
+    let y = style.y + style.height + 12;
+    const tiers = [...new Set(line.ships.map((ship) => lineShip(ship).tier))];
+    if (tiers.length === line.ships.length) {
+      line.ships.forEach((ship, i) => this.list.addChild(this.card({ ship }, i, y)));
+      y += Math.ceil(line.ships.length / 2) * (CARD.height + CARD.rowGap);
+    } else {
+      for (const tier of tiers) {
+        const heading = subheading(t('Tier {tier}', { tier }));
+        heading.position.set(0, y);
+        this.list.addChild(heading);
+        y += TIER_HEADING;
+        const ships = line.ships.filter((ship) => lineShip(ship).tier === tier);
+        ships.forEach((ship, i) => this.list.addChild(this.card({ ship }, i, y)));
+        y += Math.ceil(ships.length / 2) * (CARD.height + CARD.rowGap) + 6;
+      }
+    }
+
+    const state = this.state;
+    const goal = state && goalOffer(state, state.player);
+    if (!state || !goal || !line.ships.some((ship) => ship === goal.shipClass)) return;
+    y += 6;
+    const heading = subheading(t("The shipwright's terms: the Captain's path"));
+    heading.position.set(0, y);
+    this.list.addChild(heading);
+    // Two columns, the first half of the path down the left
     const path = captainsPath(state, state.player);
-    path.forEach((step, i) => {
-      const term = view.terms[i];
+    const half = Math.ceil(path.length / 2);
+    this.terms = path.map((_, i) => {
+      const term = text('', 13, THEME.text);
+      term.position.set(8 + Math.floor(i / half) * (SHOP_WIDTH / 2), y + 26 + (i % half) * PATH_LINE);
+      this.list.addChild(term);
+      return term;
+    });
+  }
+
+  /** The Captain's path's terms under its ship's line: each done or not, and how far */
+  private updateTerms(state: GameState) {
+    if (this.terms.length === 0) return;
+    captainsPath(state, state.player).forEach((step, i) => {
+      const term = this.terms[i];
       if (!term) return;
       const count = step.need === null ? '' : `: ${step.have} / ${step.need}`;
       show(term, `${step.done ? '✓' : '○'}  ${t(step.text)}${count}`);
-      tint(term, step.done ? UI.good : UI.text);
+      tint(term, step.done ? UI.good : THEME.text);
     });
-    const ready = termsMet(state, state.player);
-    if (view.buy && view.status) {
-      const { tile, label, name, price } = view.buy;
-      show(label, t('Buy the {name}: {n} gold', { name, n: price }));
-      tile.setLook({ disabled: !ready, border: ready ? GOLD : UI.border });
-      show(
-        view.status,
-        ready ? t('Every term met: the {name} is yours to buy', { name }) : t('Meet every term to buy it'),
-      );
-      tint(view.status, ready ? UI.good : UI.dim);
-    }
-    if (view.sailed) {
-      const { ship } = state;
-      show(view.sailed, t('Lv {level} · hull {hp}', { level: ship.level, hp: ship.hp }));
-    }
-  }
-
-  private ammoRow(ammo: AmmoId, y: number) {
-    const { bonus, tier, weapon } = AMMO[ammo];
-    const name = t(AMMO[ammo].name);
-    const row = new Container();
-    row.position.set(0, y);
-    const icon = new Graphics();
-    if (weapon === 'cannon') drawBall(icon, 5, tier);
-    else drawHarpoon(icon, 14, tier);
-    icon.position.set(10, AMMO_ROW / 2);
-    const title = text(`${name}  +${bonus}`, 12, tierColor(tier), { fontWeight: 'bold' });
-    title.position.set(24, (AMMO_ROW - title.height) / 2);
-    const owned = text('', 11, UI.dim);
-    owned.anchor.set(1, 0.5);
-    owned.position.set(SHOP_WIDTH - BUY.width - 130, AMMO_ROW / 2);
-    const price = text(t('{pack} for {n} gold', { pack: AMMO_PACK, n: ammoPackPrice(ammo) }), 12, GOLD, {
-      fontWeight: 'bold',
-    });
-    price.anchor.set(1, 0.5);
-    price.position.set(SHOP_WIDTH - BUY.width - 14, AMMO_ROW / 2);
-    const buy = labelButton(BUY.width, BUY.height, t('Buy'), () => {
-      if (this.actions.buyAmmo(ammo)) this.say(`+${AMMO_PACK} ${name}`, UI.good);
-      else this.say(t('Not enough gold'), UI.bad);
-    });
-    buy.tile.container.position.set(SHOP_WIDTH - BUY.width - 4, (AMMO_ROW - BUY.height) / 2);
-    row.addChild(icon, title, owned, price, buy.tile.container);
-    this.rows.push({ gun: null, ammo, owned, buy: buy.tile });
-    return row;
   }
 }

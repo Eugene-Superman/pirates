@@ -37,7 +37,7 @@ export interface Chest {
 /**
  * The spoils of this update's kills: the player who sank a bot is paid its bounty (more for a Bounty hunter), counts
  * it for their quests and their ship earns its experience; the bot may leave a chest floating where it went down, with
- * gold (more often for a Treasure hunter) and its goods. A player's ship that went down leaves its cargo floating
+ * gold (a ship's only; more often for a Treasure hunter) and its goods. A player's ship that went down leaves its cargo floating
  * (half of it stays aboard with a Hidden hold). `random` is the game's loot generator, seeded like the dice.
  * Stepped from Game.update right after combat, which made the `destroyed` events
  */
@@ -66,9 +66,12 @@ export function stepLoot(state: GameState, random: () => number) {
       markStep(state, player, 'sink');
       if (kind.boss) markStep(state, player, 'baron');
     }
-    const chance = kind.chest.chance * (1 + PERKS.chest * (killer?.rank('treasureHunter') ?? 0));
-    const [least, most] = kind.chest.gold;
-    const gold = random() < chance ? least + Math.floor(random() * (most - least + 1)) : 0;
+    let gold = 0;
+    if (kind.chest) {
+      const chance = kind.chest.chance * (1 + PERKS.chest * (killer?.rank('treasureHunter') ?? 0));
+      const [least, most] = kind.chest.gold;
+      if (random() < chance) gold = least + Math.floor(random() * (most - least + 1));
+    }
     const goods = rollCargo(kind.cargo, random);
     if (gold === 0 && isEmpty(goods)) continue;
     state.chests.push({

@@ -1,0 +1,62 @@
+{
+ "file": "ammo.webp",
+ "tile": 192,
+ "icons": {
+  "ball1": [
+   0,
+   0
+  ],
+  "chainShot": [
+   1,
+   0
+  ],
+  "ball2": [
+   2,
+   0
+  ],
+  "ball3": [
+   3,
+   0
+  ],
+  "heatedShot": [
+   4,
+   0
+  ],
+  "explosiveShell": [
+   5,
+   0
+  ],
+  "royalShot": [
+   6,
+   0
+  ],
+  "harpoon1": [
+   0,
+   1
+  ],
+  "barbedHarpoon": [
+   1,
+   1
+  ],
+  "harpoon2": [
+   2,
+   1
+  ],
+  "harpoon3": [
+   3,
+   1
+  ],
+  "poisonHarpoon": [
+   4,
+   1
+  ],
+  "explosiveHarpoon": [
+   5,
+   1
+  ],
+  "leviathanHarpoon": [
+   6,
+   1
+  ]
+ }
+}

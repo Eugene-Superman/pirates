@@ -11,8 +11,9 @@ export interface Good {
   readonly price: number;
 }
 
-// Every piece takes one place in the hold. A merchant's cargo is worth about its bounty again, a smuggler's a little
-// more: carrying it home is half the loot, and what a player risks when they push their luck at sea
+// Every piece takes one place in the hold. A merchant's cargo is worth about two thirds of its bounty again, a
+// smuggler's about half: carrying it home is a good part of the loot, and what a player risks when they push their
+// luck at sea. Holds are roomy (botKinds.ts drops little at a time), so a full one is a long voyage's haul
 // prettier-ignore
 export const GOODS: Readonly<Record<GoodId, Good>> = {
   fish: { id: 'fish', name: 'Fish', price: 3 },
@@ -87,6 +88,18 @@ export function haulAboard(ship: Ship, goods: Cargo): Cargo {
     room -= n;
   }
   return taken;
+}
+
+/**
+ * Throws up to `count` pieces of a good out of the ship's hold, to make room for better: they sink. Anywhere, at sea
+ * or in port. Returns whether anything went
+ */
+export function throwOverboard(ship: Ship, good: GoodId, count: number) {
+  const n = Math.min(Math.floor(count), ship.cargo[good] ?? 0);
+  if (n <= 0) return false;
+  ship.cargo[good] = (ship.cargo[good] ?? 0) - n;
+  if (ship.cargo[good] === 0) delete ship.cargo[good];
+  return true;
 }
 
 /** The goods a wreck leaves, rolled with the loot generator */

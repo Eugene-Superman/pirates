@@ -7,6 +7,7 @@ import type { MapAxes } from './chart';
 import { CombatLogPanel } from './CombatLogPanel';
 import { FullscreenButton } from './FullscreenButton';
 import { GoldPanel } from './GoldPanel';
+import { HoldPanel } from './HoldPanel';
 import { LABEL_STYLE, hudItems, type HudActions, type HudItem, type HudWidget, type ViewStatus } from './hudItems';
 import { LoadoutPanel } from './LoadoutPanel';
 import { TalentButton } from './TalentButton';
@@ -91,13 +92,14 @@ export class Hud {
   private readonly loadout: LoadoutPanel;
   private readonly talents: TalentPanel;
   private readonly stats: StatsPanel;
+  private readonly hold: HoldPanel;
   private readonly talentButton: TalentButton;
   private readonly log: CombatLogPanel;
   /** Where the items on the screen are kept between visits */
   private readonly keptItems: Slot;
   private readonly minimap: Minimap;
   private readonly chart: SeaChart;
-  private readonly gold = new GoldPanel();
+  private readonly gold = new GoldPanel(() => this.toggleHold());
   private readonly path = new PathPanel();
   private readonly fullscreen = new FullscreenButton();
   private readonly port: PortScreen;
@@ -127,6 +129,7 @@ export class Hud {
     // top (the last added below) is made first, and one press closes only it
     this.chart = new SeaChart(axes, screen);
     this.stats = new StatsPanel(screen);
+    this.hold = new HoldPanel(actions, screen);
     this.talents = new TalentPanel(actions, screen, shipClass.maxLevel);
     this.loadout = new LoadoutPanel(actions, screen, shipClass);
     // Made before the keyboard is bound: its Escape (leave port) goes before the one at sea
@@ -165,6 +168,7 @@ export class Hud {
       this.port.container,
       this.loadout.container,
       this.talents.container,
+      this.hold.container,
       this.stats.container,
       this.chart.container,
     );
@@ -179,6 +183,11 @@ export class Hud {
   /** Opens or closes the statistics */
   toggleStats() {
     this.stats.toggle();
+  }
+
+  /** Opens or closes the hold */
+  toggleHold() {
+    this.hold.toggle();
   }
 
   /** Opens or closes the loadout window */
@@ -229,6 +238,7 @@ export class Hud {
     this.loadout.update(state.ship, state.player);
     this.talents.update(state.ship, state.player);
     this.stats.update(state, frameMs / 1000);
+    this.hold.update(state.ship);
     this.chart.update(state);
     const frame = { state, view, frameMs };
     let column = 0;
