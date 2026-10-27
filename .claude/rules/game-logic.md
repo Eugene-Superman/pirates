@@ -47,6 +47,10 @@ paths:
 - Every island has its own shape, made up by `randomIslandShape` (`world/islandShape.ts`) from the map's generator: a
   size, a long axis, bays and capes, a jagged coast (`coastShape`), its land's height and maybe a hill. Its `coast`
   polygon and `reach` (farthest coast point from the centre) are computed once in `createIslands`.
+- A painted island (one the client draws from a painting) then takes the painting's beach as its shape
+  (`withPaintedCoast`: `world/paintedCoasts.json`, matched by the island's centre, written with the paintings by
+  `blender-assets/islands/build_island_art.py`): a painting is never stretched, so the island fits it. After the map's
+  generator has drawn every number, so the map's other islands, places and heights stay the same.
 - The port's island comes first in `world.islands`: a fixed shape of its own (`world/port.ts`, a stream of the map's
   seed) in the middle of the world. The other islands keep `ISLAND_GAP` clear of it and of each other.
 - A player's ship starts at `START` (`world/World.ts`: the port's roadstead) and comes back there after it was sunk;
@@ -77,7 +81,8 @@ paths:
 
 - Every ship levels on its own, from 1 to its class's `maxLevel` (10 for the starter sloop, 20 for a line's ships;
   `MAX_LEVEL`): `xp` from kills (`xpForKill`: less for a bot far below the ship) and quests (`gainXp`, `xp` and
-  `level` events). XP beyond the class's last level is lost.
+  `level` events). XP beyond the class's last level is lost. `giveLevels` is the HUD's debug buttons: a level up or
+  down, within the class's; a level lost takes the talents again through `learnTalents`, as a save does.
 - Talents: a point at every level from 2 that isn't a milestone, spent a rank at a time in three branches (`BRANCHES`),
   a branch's next row opening with `ROW_POINTS` spent in it; the milestone levels (`MILESTONES`: 5, 10, 15, 20) offer
   one of two signature talents instead, the level 5 one an ability (`useAbility`, F). `talentBlock` says why one

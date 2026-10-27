@@ -5,7 +5,7 @@ import type { GameState } from './GameState';
 import type { NavGrid } from './navigation/NavGrid';
 import { routeClearance } from './navigation/pilot';
 import { OUTFITS, OUTFIT_SLOTS, isOutfit, type OutfitId, type OutfitSlot } from './ships/outfit';
-import { TALENTS, isTalent, xpForLevel, type TalentId } from './ships/talents';
+import { isTalent, learnTalents, xpForLevel, type TalentId } from './ships/talents';
 import { GOOD_IDS, cargoCount, type Cargo } from './economy/cargo';
 import { isSailable, type PathStepId } from './economy/shipyard';
 import { Ship } from './ships/Ship';
@@ -161,12 +161,6 @@ function isGun(value: unknown): value is GunId {
 
 function isAmmo(value: unknown): value is AmmoId {
   return typeof value === 'string' && value in AMMO;
-}
-
-/** Talents are put back rows first (signatures by their level), so each row finds its points spent before it */
-function learnOrder(id: TalentId) {
-  const talent = TALENTS[id];
-  return talent.kind === 'branch' ? talent.row : talent.level;
 }
 
 /** A saved ship's class, under its name of now, if a player can sail it; null if not (a later version's) */
@@ -335,14 +329,12 @@ export function loadShip(ship: Ship, data: unknown, version: number) {
   ship.xp = Math.min(count(saved.xp) ?? 0, xpForLevel(ship.shipClass.maxLevel));
   const talents = record(saved.talents);
   if (talents && version >= RANKED_TALENTS) {
-    // learnTalent keeps to the rules (points earned, a branch's rows in turn, a signature a milestone): rows first
-    const ids = Object.keys(talents).filter(isTalent);
-    ids.sort((a, b) => learnOrder(a) - learnOrder(b));
-    for (const id of ids) {
-      // Stops at the first refusal: a rank past the talent's last would loop on for as long as the save says
-      const rank = count(talents[id]) ?? 0;
-      for (let i = 0; i < rank && ship.learnTalent(id); i++);
-    }
+    learnTalents(
+      ship,
+      Object.keys(talents)
+        .filter(isTalent)
+        .map((id) => [id, count(talents[id]) ?? 0] as const),
+    );
   }
   // After the talents: Quartermaster makes the hold bigger
   const cargo = record(saved.cargo);

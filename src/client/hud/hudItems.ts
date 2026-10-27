@@ -32,7 +32,7 @@ const CAMERA_LABELS: Readonly<Record<CameraMode, string>> = {
 const FOG_LABELS: Readonly<Record<FogLayer, string>> = { mist: 'Mist', clouds: 'Clouds' };
 const DEBUG_LABELS: Readonly<Record<NavDebug, string>> = { route: 'Route', hulls: 'Hulls and coasts' };
 const HELP_WIDTH = 360; // pixels: the help wraps, so the column leaves room for the frames at the top
-const DEBUG_GOLD = 500; // gold the debug button gives
+const DEBUG_GOLD: readonly number[] = [1000, 5000, 10000]; // gold each debug button gives
 const KNOT = 10; // world units per second: the HUD shows speed in knots, a tenth of the game's units
 const VIEW_STEP = 50; // world units, for the view range buttons
 const VALUE_GAP = 10; // pixels between a row's buttons and what comes after them
@@ -78,6 +78,8 @@ export interface HudActions extends DamageActions, HoldActions, LoadoutActions, 
   changeViewRange: (delta: number) => void;
   /** Gold for testing the shop */
   addGold: (amount: number) => void;
+  /** Levels up or down for testing the talents and the shipyard, within the ship's first and last */
+  changeLevel: (delta: number) => void;
   /** Forgets everything kept in this browser and starts again */
   newGame: () => void;
   /** Picks the language of the game's texts: the page reloads in it */
@@ -415,9 +417,28 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       onScreen: false,
       create: () => {
         const text = new Text({ text: ' ', style: LABEL_STYLE });
-        const row = new ButtonRow([{ label: `+${DEBUG_GOLD}`, key: null, onTap: () => actions.addGold(DEBUG_GOLD) }]);
+        const row = new ButtonRow(
+          DEBUG_GOLD.map((amount) => ({ label: `+${amount}`, key: null, onTap: () => actions.addGold(amount) })),
+        );
         return control(row, text, ({ state }) =>
           show(text, t('{gold}, for testing the shop', { gold: state.player.gold })),
+        );
+      },
+    },
+    {
+      id: 'level',
+      group: 'Debug',
+      label: 'Level',
+      kind: 'control',
+      onScreen: false,
+      create: () => {
+        const text = new Text({ text: ' ', style: LABEL_STYLE });
+        const row = new ButtonRow([
+          { label: '−1', key: null, onTap: () => actions.changeLevel(-1) },
+          { label: '+1', key: null, onTap: () => actions.changeLevel(1) },
+        ]);
+        return control(row, text, ({ state: { ship } }) =>
+          show(text, t('{level} of {max}', { level: ship.level, max: ship.shipClass.maxLevel })),
         );
       },
     },

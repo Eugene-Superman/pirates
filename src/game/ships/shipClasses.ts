@@ -17,6 +17,7 @@ export type ShipLineId = PlayerLineId | 'bots' | 'monsters';
 export type ShipClassId =
   | 'sloop'
   | 'coastalBark'
+  | 'corsair'
   | 'fishingBoat'
   | 'merchantSloop'
   | 'smugglerSloop'
@@ -178,6 +179,73 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     bite: null,
     barrage: null,
     hold: 60,
+    maxLevel: 20,
+  },
+
+  // The European line's tier 2: a three-master with three tiers of guns, about 1.5 times the Coastal Bark's hull and
+  // guns (12 cannons and 12 harpoon guns), a bigger hold, a little quicker for all that and slower to turn. Its model is
+  // blender-assets/ships/european/corsair/build.py: the hull and the slots' places are measured on it. It shows some
+  // fifty ports; the game's twelve cannons are the main battery's eight a side and the lower battery's four amidships
+  corsair: {
+    id: 'corsair',
+    line: 'european',
+    tier: 2,
+    name: 'Corsair',
+    hp: 1300,
+    nature: 'object',
+    height: 13,
+    radius: 16,
+    // Measured on the model: stem to transom at the upper deck, widest beam (the knee of the head and its ram reach
+    // further, but narrow)
+    hull: { bow: 28, stern: -25.5, halfBeam: 8.8 },
+    viewRange: 450,
+    maxSpeed: 130,
+    minSpeed: 68,
+    acceleration: 46,
+    deceleration: 72,
+    turnSpeed: 1.45,
+    slots: {
+      // The main battery in the waist from amidships out (the model's GUN_ROWS "main"), at the muzzles; then the
+      // lower battery's middle ports
+      cannon: [
+        { x: -0.8, y: 9, z: 8.3 },
+        { x: 2.4, y: 9, z: 8.3 },
+        { x: -4, y: 9, z: 8.3 },
+        { x: 5.6, y: 9, z: 8.3 },
+        { x: -7.2, y: 9, z: 8.3 },
+        { x: 8.8, y: 8.9, z: 8.3 },
+        { x: -10.4, y: 9, z: 8.3 },
+        { x: 12, y: 8.5, z: 8.3 },
+        { x: 0.4, y: 9.4, z: 4.5 },
+        { x: -3, y: 9.4, z: 4.5 },
+        { x: 3.8, y: 9.4, z: 4.5 },
+        { x: -6.4, y: 9.4, z: 4.5 },
+      ],
+      // The model's three launchers (the forecastle's, the quarterdeck's pair), then the forecastle's corners, the
+      // stern, the quarterdeck's corners and the waist's bulwarks
+      harpoon: [
+        { x: 22.6, y: 0, z: 11 },
+        { x: -14, y: -2.6, z: 11.7 },
+        { x: -14, y: 2.6, z: 11.7 },
+        { x: 19, y: 3.6, z: 10.4 },
+        { x: 19, y: -3.6, z: 10.4 },
+        { x: -25, y: 0, z: 12.6 },
+        { x: -22, y: 4.8, z: 11.4 },
+        { x: -22, y: -4.8, z: 11.4 },
+        { x: 4, y: 8, z: 9.2 },
+        { x: 4, y: -8, z: 9.2 },
+        { x: -6, y: 8, z: 9.2 },
+        { x: -6, y: -8, z: 9.2 },
+      ],
+    },
+    // The main battery fitted, the lower battery's ports empty; half the harpoon slots
+    startingGuns: {
+      cannon: [...Array<GunId>(8).fill('cannon1'), ...Array<null>(4).fill(null)],
+      harpoon: [...Array<GunId>(6).fill('harpoonGun1'), ...Array<null>(6).fill(null)],
+    },
+    bite: null,
+    barrage: null,
+    hold: 80,
     maxLevel: 20,
   },
 

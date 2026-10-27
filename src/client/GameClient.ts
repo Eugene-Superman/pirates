@@ -9,6 +9,7 @@ import {
   fitFromHold,
   fitOutfit,
   giveGold,
+  giveLevels,
   isAfloat,
   leavePort,
   orderRepair,
@@ -128,6 +129,7 @@ export class GameClient {
         changeMinSpeed: (delta) => ship.tuneSpeeds(0, delta),
         changeViewRange: (delta) => ship.tuneViewRange(delta),
         addGold: (amount) => giveGold(game.state.player, amount),
+        changeLevel: (delta) => this.cue(giveLevels(game.state, ship, delta)),
         // Talents: picked anywhere, forgotten at the shipwright's
         learnTalent: (id) => this.cue(takeTalent(game.state, ship, id), 'talent'),
         resetTalents: () => this.cue(resetTalents(game.state, game.state.player), 'quest'),

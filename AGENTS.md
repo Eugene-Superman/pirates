@@ -8,7 +8,8 @@ five levels) and leave chests and goods to haul aboard; the port in the middle o
 with its buildings to click, has a tavern (bounty quests), a market for the goods, a workshop (the ship's outfit,
 repair), a shipyard and an arsenal (guns, ammo); a guild hall and an auction house wait for the online part.
 A boss, the Smuggler Baron, holds a corner of the sea. The Captain's path leads a new player to the next ship, the
-Coastal Bark, the first of the European line; the shipyard shows every line's ships, the rest planned for later.
+Coastal Bark, the first of the European line, then to the Corsair, its tier 2; the shipyard shows every line's ships,
+the rest planned for later.
 Camera: classic 2:1 isometric pseudo-3D (no perspective) — the target look of the game.
 
 Stack: TypeScript 7 (strict) + Pixi.js v8 + Vite 8, Prettier + Oxlint. No backend yet, no tests.
@@ -51,7 +52,9 @@ src/
     GameState.ts       everything the client reads and draws
     save.ts            a player's progress as plain data (saveGame), and putting it back checked field by field
                        (loadGame): Game.save() / Game.load()
-    world/World.ts     the world: the port's island and islands placed round it from a fixed seed, START (off the
+    world/World.ts     the world: the port's island and islands placed round it from a fixed seed, the painted ones
+                       with their paintings' coasts (paintedCoasts.json, written by
+                       blender-assets/islands/build_island_art.py), START (off the
                        port: where a player's ship comes in), islandOutline; map.ts (8 × 8 map squares of 1000
                        units: MAP_SQUARE, MAP_SQUARES, WORLD_WIDTH); islandShape.ts (every island's own shape, made
                        up from the seeded generator); port.ts (the port: its island, a bay with curved harbour walls
@@ -186,7 +189,8 @@ src/
     scene/
       SceneView.ts     isometric scene: draw order, redraws every frame; sceneObjects.ts (what it sorts by depth)
       cameraControl.ts how the camera keeps up with the ship: follow / dead zone / recenter
-      models/          island3d.ts (low-poly islands), port3d.ts (the port's walls, quay, houses, lighthouse and flag, until
+      models/          island3d.ts (low-poly islands, until their paintings load), port3d.ts
+                       (the port's walls, quay, houses, lighthouse and flag, until
                        its pictures load; then its lamp and flags over them), botShip3d.ts
                        (the bots' ships as vector models, until their atlases load), serpent3d.ts and turtle3d.ts (sea monsters:
                        their water, the serpent's body bending as it swims, and their bodies until their atlases load),
@@ -196,7 +200,8 @@ src/
                        the turtle swimming and biting); SerpentSprite.ts — a sea serpent from its atlases: pieces laid
                        along its body, the head swimming and biting; ChestSprites.ts — the floating loot from its
                        atlases (dropped, bobbing, blinking before it sinks); PortSprites.ts — the port from its
-                       pictures: the ground under the ships, the rest in slices sorted with them
+                       pictures: the ground under the ships, the rest in slices sorted with them; IslandSprites.ts —
+                       the islands from their paintings, each in slices sorted with the ships, its shallows under them
       effects/         client-only decorations with their own state: Wake.ts (wakes of everything that sails, one
                        shader), foam.ts (what the wakes, the wreck's water and the sea's whitecaps share),
                        targetMarker.ts (where the ship is heading, once the mouse lets go: a green light coming
@@ -221,6 +226,11 @@ public/sprites/port/   the port's pictures (ground.webp, raised_<n>.webp, port.j
                        it by build_port_art.py; and the harbour
                        view in port (harbour.webp, medallions.webp, harbour.json: where each building is on it),
                        made from painted art by blender-assets/port/build_harbour_art.py — don't edit by hand
+public/sprites/islands/ the islands' paintings (island_NN.webp: one's slices, island_NN_shallows.webp: the light
+                       water round it, islands.json: where each goes and is sorted by): painted over each island's
+                       outline, laid on it unstretched and cut by
+                       blender-assets/islands/build_island_art.py, which writes their coasts into
+                       src/game/world/paintedCoasts.json with them — don't edit by hand
 public/sprites/icons/  the guns', the ammo's, the outfit's and the ships' icons (guns.webp, ammo.webp, outfit.webp,
                        ships.webp; their .json: each one's tile), cut out of painted pictures by
                        blender-assets/icons/build_gun_icons.py, build_ammo_icons.py, build_outfit_icons.py and

@@ -18,10 +18,14 @@ export interface ShipOffer {
   readonly baron: boolean;
 }
 
-// The goal of the starting waters: a couple of hours of play. The level is about where the starting bots stop
-// paying full XP (ships/talents.ts, xpForKill); the gold is some 80 kills with their cargo, less the repairs
+// The ladder, in order: the next one the player doesn't own is the goal. The Coastal Bark is the goal of the starting
+// waters: a couple of hours of play. The level is about where the starting bots stop paying full XP
+// (ships/talents.ts, xpForKill); the gold is some 80 kills with their cargo, less the repairs. The Corsair asks for a
+// Coastal Bark well sailed (the level is the ship's sailed now, the quests are counted from the start), and three
+// times the gold
 export const SHIP_OFFERS: readonly ShipOffer[] = [
   { shipClass: 'coastalBark', price: 3000, level: 7, quests: 5, baron: true },
+  { shipClass: 'corsair', price: 9000, level: 12, quests: 12, baron: false },
 ];
 
 /** A step of the path, as the HUD shows it: done or not, and how far for a counted one */

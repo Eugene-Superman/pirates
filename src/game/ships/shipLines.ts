@@ -216,8 +216,7 @@ export const SHIPYARD_LINES: readonly PlayerLineId[] = [
 // little: what is paid for is its looks. To be balanced when each is built
 // prettier-ignore
 const PLANNED: Readonly<Record<PlannedShipId, { readonly name: string; readonly tier: number } & ShipFigures>> = {
-  // The Royal Navies (the Coastal Bark, tier 1, is built)
-  corsair:          { name: 'Corsair',                   tier: 2, hp: 1300, maxSpeed: 130, turnSpeed: 1.45, cannons: 12, harpoons: 12, hold:  80, viewRange: 450 },
+  // The Royal Navies (the Coastal Bark, tier 1, and the Corsair, tier 2, are built)
   frigate:          { name: 'Frigate',                   tier: 3, hp: 1900, maxSpeed: 140, turnSpeed: 1.35, cannons: 20, harpoons: 16, hold: 100, viewRange: 490 },
   royalGalleon:     { name: 'Royal Galleon',             tier: 4, hp: 3150, maxSpeed: 125, turnSpeed: 1.20, cannons: 30, harpoons: 25, hold: 150, viewRange: 490 },
   admiral:          { name: 'Admiral',                   tier: 5, hp: 4300, maxSpeed: 135, turnSpeed: 1.10, cannons: 36, harpoons: 36, hold: 160, viewRange: 520 },

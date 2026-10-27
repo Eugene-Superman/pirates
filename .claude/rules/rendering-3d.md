@@ -15,10 +15,15 @@ paths:
   ship, the player's or a bot's), `BotSprites.ts` (a sprite and its fire per bot in sight; the turtle's swims and
   bites), `SerpentSprite.ts` (a serpent's pieces laid along its body), `ChestSprites.ts` (the floating loot) and
   `PortSprites.ts` (the port from its pictures, `public/sprites/port/`: the ground under the ships, the rest in slices
-  sorted with them by `port.json`'s points; a lamp and flags drawn over them when it has them).
+  sorted with them by `port.json`'s points; a lamp and flags drawn over them when it has them) and `IslandSprites.ts`
+  (the islands from their paintings, `public/sprites/islands/`: each in slices sorted with the ships by
+  `islands.json`'s points, and its shallows, a small picture of a smooth fade stretched under them; a painting is an
+  island's whose centre it gives).
   Until their atlases load, the bots' ships (`botShip3d.ts`, a look per class), the sea monsters (`serpent3d.ts`,
-  `turtle3d.ts`), the chests (`chest3d.ts`) and the port (`port3d.ts`, its island drawn as an island) are drawn as
-  vector models; those files also draw the monsters' and chests' water. The islands are vector models only.
+  `turtle3d.ts`), the chests (`chest3d.ts`), the port (`port3d.ts`, its island drawn as an island) and the islands
+  (`island3d.ts`, also those with no painting) are drawn as vector models; those files also draw the monsters' and
+  chests' water. A painting is never stretched onto its island: the island takes the painting's beach as its coast
+  (`paintedCoasts.json` in `game/world/`), so what ships run into is drawn.
 - `scene/effects/` — client-only decorations with their own state (foam, target marker, ship fire and smoke,
   the sinking animation, shot effects, the sea surface, the fog of war, bots' wrecks, serpents' trails, the repair,
   a level reached, a boss's barrage marks). They may use `Math.random`.
@@ -65,7 +70,7 @@ paths:
 - Immediate mode: `scene.clear()` and a full redraw every frame via `Painter3D`.
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
   The exceptions are things projected elsewhere: the sprites of ships, monsters and chests with their water masks,
-  the port's pictures (`PortSprites`), the fog puffs (`FogClouds`) and the sky's clouds and their shadows
+  the port's pictures (`PortSprites`), the islands' paintings (`IslandSprites`), the fog puffs (`FogClouds`) and the sky's clouds and their shadows
   (`SkyClouds`), all made for this camera; the four shader
   meshes (`seaSurface.ts`, `fogOfWar.ts`, `Wake.ts`, the water round a wreck in `Sinking.ts`), whose vertices are
   projected with `Camera3D` every frame; and what stays the same size at every zoom, drawn in screen pixels at a
@@ -95,14 +100,16 @@ There is no z-buffer, so order is everything. In `SceneView.update`:
 1. Background: the renderer clears the screen to the sea's flat `SEA_COLOR` (`seaLook.ts`); the sea surface mesh
    covers it once all its maps have loaded.
 2. Everything flat on the water (`z = 0`): wakes and the water round a wreck (shader meshes in layers of their own,
-   under the islands' see-through shallows) → the port's ground picture, once loaded (a sprite under `scene`, in
-   place of its island's ground) → island "ground" (shallows, sand, cliff shadows) → world border → range rings (the
+   under the islands' see-through shallows) → the painted islands' shallows (`IslandSprites.shallows`, sprites under
+   `scene`) → the port's ground picture, once loaded (a sprite under `scene`, in place of its island's ground) → a
+   vector-drawn island's "ground" (shallows, sand, cliff shadows) → world border → range rings (the
    picked weapon's shortest and longest reach, dashed, running round) → units' water (a serpent's body under the surface,
    a turtle's) → bubbles over bots' wrecks → chests' foam rings → repair rings → the level-up's glow and rings → the
    target lock ring, then the selection ring → shot ripples → a boss's barrage marks (`BarrageMarks`) → projectile
    shadows → target marker (where the ship can see; beyond, it goes over the fog, see below).
    There is no drawn ship shadow: it is baked into the sprite.
-3. Volumetric objects (islands' hills and palms, bots' ships and monsters, bots' wrecks going down, chests, the port's
+3. Volumetric objects (islands' hills and palms, or the slices of their paintings (`IslandSprites`), bots' ships and
+   monsters, bots' wrecks going down, chests, the port's
    pictures' slices (`PortSprites`), or until they load its walls (in lengths of `WALL_STEP`), quay, houses,
    lighthouse and flag (`portPieces`), projectiles, and the player's ship) — `SceneObject`s (`sceneObjects.ts`) sorted
    by `painter.depth(...)` **from far to near**.
@@ -117,9 +124,9 @@ sea surface mesh → wake mesh → wreck water mesh → `layers` → the sky clo
 mist) → fog puffs → `markerLayer` (the target marker where the ship can't see) → the sky's clouds → `overlay` (the
 navigation debug drawings) → `hpBars` (the units' hit point bars, with a red border on a bot hostile to the player) →
 the damage numbers, over everything.
-`layers` holds the port's ground picture (once loaded), then the sorted objects: `scene` (flat things and the objects
+`layers` holds the painted islands' shallows and the port's ground picture (once loaded), then the sorted objects: `scene` (flat things and the objects
 farther than the first sprite), then for each sprite far to near its own layers (a ship: its sprite, its `waterMask`,
-its fire over it; a serpent: its pieces; a slice of the port's pictures) and a `Graphics` segment of the vector-drawn
+its fire over it; a serpent: its pieces; a slice of the port's pictures or of an island's) and a `Graphics` segment of the vector-drawn
 objects between it and the next sprite, opened only when there are some (`drawLayers`, segments reused frame to
 frame). The player's ship's layers end with `fireLayer`: flames, then smoke, then shot effects nearer than the ship,
 the repair's crosses, the level-up's light and the barrage's falling shells.
