@@ -68,6 +68,26 @@ const EMITTERS: Readonly<Partial<Record<ShipClassId, { burning: Emitter[]; sinki
       { x: -15, y: -1.5, z: 8.5, spread: [1.5, 2, 0.3] },
     ],
   },
+  // Matches blender-assets/ships/european/corsair/build.py (y negated, times 9 / its radius 16): the waist, the
+  // forecastle, the quarterdeck and the burning feet of the courses and the spanker; going down, the foremast fallen
+  // over the bow, the main course, the waist and the quarterdeck
+  corsair: {
+    burning: [
+      { x: 1.7, y: -1.4, z: 4.5, spread: [1.7, 1.1, 0.3] },
+      { x: -3.9, y: 1.7, z: 4.5, spread: [1.1, 1.1, 0.3] },
+      { x: 9.6, y: 1, z: 5.9, spread: [1.1, 0.9, 0.2] },
+      { x: -10.7, y: -1.1, z: 6.3, spread: [1.1, 1.3, 0.2] },
+      { x: -0.3, y: 0, z: 8.8, spread: [1.1, 4.5, 0.5] },
+      { x: 7.9, y: 0, z: 8.4, spread: [1.1, 4.2, 0.5] },
+      { x: -11.5, y: 0, z: 8.2, spread: [3.4, 0.8, 0.3] },
+    ],
+    sinking: [
+      { x: 14.6, y: -2.2, z: 6.2, spread: [3.4, 2.8, 0.5] },
+      { x: -0.3, y: 0, z: 9.1, spread: [1.1, 3.9, 0.5] },
+      { x: -3.4, y: -1.4, z: 4.4, spread: [2, 1.4, 0.3] },
+      { x: -10.7, y: -1.1, z: 6.1, spread: [1.1, 1.3, 0.2] },
+    ],
+  },
   // The bots' ships, from blender-assets/ships/bots/ (y negated, then scaled to the sloop's size): the catch, the
   // little decks and the sail's burning foot of a fishing boat; going down, its side still out of the water
   fishingBoat: {

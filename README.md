@@ -74,9 +74,12 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    level, the Smuggler Baron sunk, the price). The Baron's brig sails in the north-east with two smugglers; his mortar
    marks red circles on the water where its shells will land — sail out of them. With every term met, the shipyard
    sells the Coastal Bark: it starts at level 1 (up to 20) with talents of its own, and your sloop stays in port with
-   everything on it. The shipyard's My ships lists your ships: take the helm of any of them there. A tab for each line
+   everything on it. Then the path leads on to the Corsair, the line's tier 2: a three-master with three tiers of guns,
+   for the Coastal Bark at level 12, twelve quests and 9,000 gold. The shipyard's My ships lists your ships: take the
+   helm of any of them there. A tab for each line
    shows its ships (the Forbidden Fleets four a tier, each with how it will be won and in what currency), and Buy the
-   masterworks, for doubloons; all but the Coastal Bark are planned, with provisional figures and their legends.
+   masterworks, for doubloons; all but the Coastal Bark and the Corsair are planned, with provisional figures and their
+   legends.
 
    Your ship's hull, level, gold, doubloons and hold are in the top-left corner, speed and FPS under it; the quests
    you have taken (✕ gives one up, once you say yes) and the Captain's path are in the top-right corner, each folded

@@ -288,6 +288,25 @@ export function talentBlock(ship: Ship, id: TalentId): string | null {
   return null;
 }
 
+/** Talents are taken again rows first (signatures by their level), so each row finds its points spent before it */
+function learnOrder(id: TalentId) {
+  const talent = TALENTS[id];
+  return talent.kind === 'branch' ? talent.row : talent.level;
+}
+
+/**
+ * Takes talents with their ranks again (a save loaded, a level lost), keeping to the rules of learnTalent (points
+ * earned, a branch's rows in turn, a signature a milestone): what the ship has no points or milestone for is left out
+ */
+export function learnTalents(ship: Ship, ranks: Iterable<readonly [TalentId, number]>) {
+  const ordered = [...ranks];
+  ordered.sort(([a], [b]) => learnOrder(a) - learnOrder(b));
+  for (const [id, rank] of ordered) {
+    // Stops at the first refusal: a rank past the talent's last would loop on for as long as asked
+    for (let i = 0; i < rank && ship.learnTalent(id); i++);
+  }
+}
+
 /** A player takes a talent for their ship (K): `ship.learnTalent`, and a step of the Captain's path. False if it can't */
 export function takeTalent(state: GameState, ship: Ship, id: TalentId) {
   if (!ship.learnTalent(id)) return false;
@@ -312,6 +331,26 @@ export function gainXp(state: GameState, ship: Ship, amount: number, reason: 'ki
   ship.xp = Math.min(ship.xp + amount, xpForLevel(ship.shipClass.maxLevel));
   state.events.push({ type: 'xp', shipId: ship.id, amount, reason, at });
   if (ship.level > before) state.events.push({ type: 'level', shipId: ship.id, level: ship.level, at });
+}
+
+/**
+ * Levels out of thin air, for the debug buttons: the ship's XP set to the start of the level `delta` away, within 1
+ * and its class's last. Going up is a `level` event, as if earned; going down, the talents the lower level has no
+ * points or milestone for are forgotten, the deepest rows first. False if the level stays
+ */
+export function giveLevels(state: GameState, ship: Ship, delta: number) {
+  const before = ship.level;
+  const level = clamp(before + delta, 1, ship.shipClass.maxLevel);
+  if (level === before) return false;
+  ship.xp = xpForLevel(level);
+  if (level > before) {
+    state.events.push({ type: 'level', shipId: ship.id, level, at: { x: ship.x, y: ship.y, z: ship.height } });
+  } else {
+    const taken = [...ship.talentRanks()];
+    ship.forgetTalents();
+    learnTalents(ship, taken);
+  }
+  return true;
 }
 
 /**

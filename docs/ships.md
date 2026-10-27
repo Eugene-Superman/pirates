@@ -1,9 +1,10 @@
 # Ships
 
 Every player starts on the **Starter Sloop** (line `starter`). Later ships come in lines: families with their own style
-and role, six tiers each, and the masterworks, bought. The sloop and the European line's tier 1, the **Coastal Bark**
-(the goal of the starting waters, sold at the shipyard once the Captain's path is done), are built; the other 59 are
-planned. `SHIP_LINES` in `src/game/ships/shipLines.ts` lists every line and its ships: a planned one has a name, a tier,
+and role, six tiers each, and the masterworks, bought. The sloop and the European line's tier 1 and 2, the **Coastal
+Bark** (the goal of the starting waters, sold at the shipyard once the Captain's path is done) and the **Corsair** (the
+next goal, sold the same way), are built; the other 58 are planned. `SHIP_LINES` in `src/game/ships/shipLines.ts`
+lists every line and its ships: a planned one has a name, a tier,
 a role, provisional figures and how it is got, which the shipyard shows (its legend and each line's look are in
 `src/client/hud/shipLore.ts`). A player keeps every ship they buy: one sailed, the others laid up in port
 (`src/game/economy/fleet.ts`). Every ship levels on its own from 1 (the sloop to 10, a line's ships to 20) and has
@@ -23,7 +24,7 @@ talents of its own.
 
 Tiers 1 → 6, with their ids (built ones in bold):
 
-- **Royal Navies:** **Coastal Bark** (`coastalBark`), Corsair (`corsair`), Frigate (`frigate`), Royal Galleon
+- **Royal Navies:** **Coastal Bark** (`coastalBark`), **Corsair** (`corsair`), Frigate (`frigate`), Royal Galleon
   (`royalGalleon`), Admiral (`admiral`), Imperial Ship of the Line (`shipOfTheLine`)
 - **Empires of the East:** River Junk (`riverJunk`), Sea Merchant (`seaMerchant`), Dragon Sentinel (`dragonSentinel`),
   Celestial Frigate (`celestialFrigate`), Imperial Junk (`imperialJunk`), Dragon Armada (`dragonArmada`)

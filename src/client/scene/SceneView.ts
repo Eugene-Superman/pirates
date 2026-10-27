@@ -35,6 +35,7 @@ import { SEA_COLOR } from './effects/seaLook';
 import { createSeaSurface, type SeaSurface, updateSeaSurface } from './effects/seaSurface';
 import { drawChest, drawChestWater } from './models/chest3d';
 import { drawIslandGround, drawIslandRaised } from './models/island3d';
+import { IslandSprites } from './models/IslandSprites';
 import { portPieces } from './models/port3d';
 import { PortSprites } from './models/PortSprites';
 import { BotSprites } from './models/BotSprites';
@@ -158,6 +159,8 @@ export class SceneView {
   private readonly chestSprites: ChestSprites;
   /** The port from its pictures, once they have loaded */
   private readonly portSprites = new PortSprites();
+  /** The islands from their paintings, each once it has loaded */
+  private readonly islandSprites: IslandSprites;
   /** Zoom as a multiple of CAMERA.zoom; the camera eases towards it */
   private zoomLevel = 1;
   /** Whether the HUD outlines the camera's zone */
@@ -193,6 +196,7 @@ export class SceneView {
     this.shipSprite = new ShipSprite(state.ship.shipClass);
     this.bots = new BotSprites(this.camera);
     this.chestSprites = new ChestSprites(this.camera);
+    this.islandSprites = new IslandSprites(state.world.islands);
 
     this.camera.focusX = state.ship.x;
     this.camera.focusY = state.ship.y;
@@ -271,7 +275,8 @@ export class SceneView {
     const { port } = world;
     const portArt = this.portSprites.loaded;
     const drawn = portArt ? islands.filter((island) => island !== port.island) : islands;
-    for (const island of drawn) drawIslandGround(painter, island);
+    // A painted island is all in its pictures: its shallows under everything on the water, the rest sorted with the ships
+    for (const island of drawn) if (!this.islandSprites.has(island)) drawIslandGround(painter, island);
 
     this.drawWorldBorder();
 
@@ -336,10 +341,14 @@ export class SceneView {
     }
 
     // Volumetric objects: from far to near
-    const objects: SceneObject[] = drawn.map((island) => ({
-      depth: painter.depth([island.x, island.y, island.height / 2]),
-      draw: (p: Painter3D) => drawIslandRaised(p, island, time),
-    }));
+    const objects = this.islandSprites.objects(painter, camera, drawn, width, height);
+    for (const island of drawn) {
+      if (this.islandSprites.has(island)) continue;
+      objects.push({
+        depth: painter.depth([island.x, island.y, island.height / 2]),
+        draw: (p: Painter3D) => drawIslandRaised(p, island, time),
+      });
+    }
     for (const other of others) {
       const shake = this.shots.shake(other.id, time);
       const lunge = this.shots.lunge(other.id, time);
@@ -417,12 +426,15 @@ export class SceneView {
 
   /**
    * Draws the sorted objects, far to near: a sprite can't go inside a Graphics, so each ship's sprite (and its fire),
-   * each slice of the port's pictures, goes between two layers, the vector-drawn objects farther than it in the one
-   * under it, the nearer ones in the next (opened only when there are some: sprites in a row share none). The port's
-   * ground lies under all of it. Returns the painter of the layer right under the player's ship
+   * each slice of the port's or an island's pictures, goes between two layers, the vector-drawn objects farther than
+   * it in the one under it, the nearer ones in the next (opened only when there are some: sprites in a row share none).
+   * The islands' shallows and the port's ground lie under all of it. Returns the painter of the layer right under the
+   * player's ship
    */
   private drawLayers(objects: readonly SceneObject[], width: number, height: number) {
-    const order: Container[] = this.portSprites.loaded ? [this.portSprites.ground, this.scene] : [this.scene];
+    const order: Container[] = [this.islandSprites.shallows];
+    if (this.portSprites.loaded) order.push(this.portSprites.ground);
+    order.push(this.scene);
     let painter = this.painter;
     let behindShip = this.painter;
     let used = 0;

@@ -2,6 +2,7 @@ import type { Point } from '../lib/geometry';
 import { createRandom } from '../lib/random';
 import { coastAt, coastline, randomIslandShape } from './islandShape';
 import { MAP_SQUARES, WORLD_HEIGHT, WORLD_WIDTH } from './map';
+import paintedCoasts from './paintedCoasts.json';
 import { PORT, type Port } from './port';
 
 export { MAP_SQUARE, MAP_SQUARES, WORLD_HEIGHT, WORLD_WIDTH } from './map';
@@ -20,6 +21,9 @@ const ISLAND_COUNT = Math.round(ISLANDS_PER_SQUARE * MAP_SQUARES * MAP_SQUARES);
 const PLACING_TRIES = 60; // per island: a spot that is too near another island or the start is thrown away
 const START_CLEARANCE = 400; // world units of open water round the start (off the port) beyond an island's reach
 const ISLAND_GAP = 150; // world units between two islands' reach at least
+// World units: a painted coast is the island's whose centre is this near the painting's. One of an island the map no
+// longer has (its islands made up afresh) is left out, and the island keeps the coast it was made up with
+const SAME_CENTRE = 1;
 
 export interface Island {
   x: number;
@@ -45,10 +49,22 @@ export interface WorldData {
 
 // A fixed seed keeps the map the same on every run
 export function createWorld(): WorldData {
-  return {
-    islands: [PORT.island, ...createIslands(ISLAND_COUNT, createRandom(42), [PORT.island])],
-    port: PORT,
-  };
+  const islands = createIslands(ISLAND_COUNT, createRandom(42), [PORT.island]);
+  return { islands: [PORT.island, ...islands.map(withPaintedCoast)], port: PORT };
+}
+
+/**
+ * The island with the coast of its painting, if it has one (paintedCoasts.json, written with the paintings by
+ * blender-assets/islands/build_island_art.py): the painting is never stretched to the island, the island takes the
+ * painting's beach instead, so a ship runs aground where it sees the beach. Its place, heights and palms stay as made
+ * up; changed afterwards, so the map's generator draws the same numbers whatever is painted
+ */
+function withPaintedCoast(island: Island): Island {
+  const painted = paintedCoasts.islands.find(({ at }) => Math.hypot(at[0] - island.x, at[1] - island.y) < SAME_CENTRE);
+  if (!painted) return island;
+  const { radius, shape } = painted;
+  const coast = coastline(island.x, island.y, radius, shape, 1);
+  return { ...island, radius, shape, coast, reach: radius * Math.max(...shape) };
 }
 
 /** Island coastline points, scaled relative to the island's radius */

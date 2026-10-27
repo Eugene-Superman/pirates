@@ -126,6 +126,7 @@ export {
   TALENTS,
   abilityCooldown,
   branchTalents,
+  giveLevels,
   pointsSpent,
   reloadShare,
   signatureChoices,
