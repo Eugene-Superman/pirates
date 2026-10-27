@@ -1,19 +1,31 @@
 import { Assets, Container, FillGradient, Graphics, Rectangle, Sprite, Text, type Texture } from 'pixi.js';
 import {
-  BOT_KINDS,
   SHIP_CLASSES,
   MAP_SQUARE,
   MAP_SQUARES,
   WORLD_HEIGHT,
   WORLD_WIDTH,
+  ZONES,
   islandOutline,
   signedDistanceToPolygon,
+  zoneBoss,
   type GameState,
+  type GatePlace,
   type Island,
   type Ship,
+  type ZoneId,
 } from '../../game';
-import { BOSS_LAIR, CHART, MapProjection, columnName, drawLostCargo, drawShipArrow, type MapAxes } from './chart';
-import { THEME, TITLE_STYLE, subheading } from './theme';
+import {
+  CHART,
+  MapProjection,
+  bossLair,
+  columnName,
+  drawGates,
+  drawLostCargo,
+  drawShipArrow,
+  type MapAxes,
+} from './chart';
+import { THEME, TITLE_STYLE, brassButton, subheading } from './theme';
 import { Tooltip, type TooltipText } from './Tooltip';
 import { playTap, show } from './ui';
 import { t } from '../i18n/i18n';
@@ -83,8 +95,10 @@ const COURSE = { dash: 7, gap: 5, width: 1.5, end: 3.5 } as const; // pixels: th
 // The boss's medallion: its radius (pixels), the seconds a ring takes to spread from it, and how far round it the
 // pointer tells of it (in its radius)
 const BOSS = { radius: 13, period: 2.4, rings: 2, hover: 1.4 } as const;
-const BOSS_LEVEL = BOT_KINDS.baron.level;
 const PORT_HOVER = 4; // pixels off the port's coast the pointer still tells of it
+const GATE = { size: 6, hover: 16 } as const; // pixels: a gate's mark, and how far round it the pointer tells of it
+// The world chart's button in the frame's bottom left corner: its size and its inset from the frame's edges, pixels
+const WORLD_BUTTON = { width: 170, height: 30, inset: 22 } as const;
 
 /** The boss's medallion round (0, 0): a skull over crossed bones on dark red, in a brass ring */
 function drawBossMedallion(g: Graphics, r: number) {
@@ -197,24 +211,36 @@ export class SeaChart {
   private drawnFor = '';
   /** The square under the pointer, as its column and row; null off the chart */
   private hovered: { col: number; row: number } | null = null;
-  /** What the pointer is on that the tooltip tells of */
-  private pointing: 'boss' | 'port' | null = null;
+  /** What the pointer is on that the tooltip tells of: the boss's lair, the port, a gate */
+  private pointing: 'boss' | 'port' | GatePlace | null = null;
+  /** The sea's boss's lair, if it has one */
+  private readonly lairAt: { readonly x: number; readonly y: number } | null;
+  /** The sea's gates, as last laid out */
+  private gates: readonly GatePlace[] = [];
+  /** Opens the world chart: every sea */
+  private readonly world: ReturnType<typeof brassButton>;
   private closeHovered = false;
   /** Screen pixels per pixel of the frame's picture, as last laid out */
   private frameScale = 0;
   /** The port's island, as last laid out: the pointer on it names the port */
   private port: Island | null = null;
 
-  /** portName: the port's, as the game names it */
-  constructor(axes: MapAxes, screen: Rectangle, portName: string) {
+  /** portName: the port's, as the game names it; zone: the sea it charts; openWorld: opens the world chart */
+  constructor(axes: MapAxes, screen: Rectangle, portName: string, zone: ZoneId, openWorld: () => void) {
     this.map = new MapProjection(axes);
     this.screen = screen;
     this.container.visible = false;
+    this.lairAt = bossLair(zone);
+    const boss = zoneBoss(zone);
     this.bossText = {
-      title: t(SHIP_CLASSES[BOT_KINDS.baron.shipClass].name),
+      title: boss ? t(SHIP_CLASSES[boss.shipClass].name) : '',
       color: CHART.boss,
-      lines: [t('Lv {level}', { level: BOSS_LEVEL }), t("A boss's lair")],
+      lines: [t('Lv {level}', { level: boss?.level ?? 1 }), t("A boss's lair")],
     };
+    this.world = brassButton(WORLD_BUTTON.width, WORLD_BUTTON.height, t('World chart (N)'), () => {
+      this.hide();
+      openWorld();
+    });
     this.portText = { title: t(portName), lines: [] };
     for (const blocker of [this.dim, this.board, this.close]) {
       blocker.eventMode = 'static';
@@ -246,7 +272,7 @@ export class SeaChart {
     this.square.anchor.set(0.5);
     this.square.visible = false;
     drawBossMedallion(this.lair, BOSS.radius);
-    this.lair.visible = BOSS_LAIR !== null;
+    this.lair.visible = this.lairAt !== null;
     this.frame.visible = false;
     Assets.load<Texture>({ src: FRAME_URL, data: { autoGenerateMipmaps: true } })
       .then((texture) => {
@@ -269,6 +295,7 @@ export class SeaChart {
       this.frame,
       this.board,
       this.close,
+      this.world.tile.container,
       this.tooltip.container,
     );
     window.addEventListener('keydown', (e) => {
@@ -322,7 +349,7 @@ export class SeaChart {
       show(this.square, `${columnName(square.col)}${square.row + 1}`);
       this.square.position.set(map.x(middleX, middleY), map.y(middleX, middleY));
     }
-    if (BOSS_LAIR) {
+    if (this.lairAt) {
       // Rings spreading from the lair one after another, fading as they go
       const time = performance.now() / 1000;
       for (let i = 0; i < BOSS.rings; i++) {
@@ -340,11 +367,19 @@ export class SeaChart {
     });
     const g = this.marks.clear();
     drawLostCargo(g, state, map, LANDMARK_SIZE);
+    drawGates(g, map, this.gates, GATE.size);
     drawShipArrow(g, ship, map, ME_SIZE);
 
-    if (this.pointing === 'boss') {
+    const { pointing } = this;
+    if (pointing === 'boss') {
       this.tooltip.point(this.bossText, this.lair.x, this.lair.y - BOSS.radius);
-    } else if (this.pointing === 'port' && this.port) {
+    } else if (pointing !== null && pointing !== 'port') {
+      this.tooltip.point(
+        gateText(pointing, ship),
+        map.x(pointing.x, pointing.y),
+        map.y(pointing.x, pointing.y) - GATE.hover,
+      );
+    } else if (pointing === 'port' && this.port) {
       const { x, y, reach } = this.port;
       this.tooltip.point(this.portText, map.x(x, y), map.y(x, y) - reach * map.scale);
     } else {
@@ -399,9 +434,15 @@ export class SeaChart {
     map.screenX = x;
     map.screenY = y;
 
-    const { islands, port } = state.world;
+    const { islands, port, gates } = state.world;
     this.port = port.island;
-    if (BOSS_LAIR) this.lair.position.set(map.x(BOSS_LAIR.x, BOSS_LAIR.y), map.y(BOSS_LAIR.x, BOSS_LAIR.y));
+    this.gates = gates;
+    const lair = this.lairAt;
+    if (lair) this.lair.position.set(map.x(lair.x, lair.y), map.y(lair.x, lair.y));
+    this.world.tile.container.position.set(
+      left + WORLD_BUTTON.inset,
+      top + side - WORLD_BUTTON.inset - WORLD_BUTTON.height,
+    );
 
     const g = this.chart.clear();
     const outline = corners.flatMap(([cx, cy]) => [map.x(cx, cy), map.y(cx, cy)]);
@@ -483,12 +524,30 @@ export class SeaChart {
     const p = map.toWorld(sx, sy);
     const inside = p.x >= 0 && p.y >= 0 && p.x < WORLD_WIDTH && p.y < WORLD_HEIGHT;
     this.hovered = inside ? { col: Math.floor(p.x / MAP_SQUARE), row: Math.floor(p.y / MAP_SQUARE) } : null;
-    if (BOSS_LAIR && Math.hypot(sx - this.lair.x, sy - this.lair.y) <= BOSS.radius * BOSS.hover) {
+    const gate = this.gates.find((g) => Math.hypot(sx - map.x(g.x, g.y), sy - map.y(g.x, g.y)) <= GATE.hover);
+    if (this.lairAt && Math.hypot(sx - this.lair.x, sy - this.lair.y) <= BOSS.radius * BOSS.hover) {
       this.pointing = 'boss';
+    } else if (gate) {
+      this.pointing = gate;
     } else if (this.port && signedDistanceToPolygon(p.x, p.y, this.port.coast) * map.scale < PORT_HOVER) {
       this.pointing = 'port';
     } else {
       this.pointing = null;
     }
   }
+}
+
+/** A gate's tooltip: the sea beyond it, its tier and levels, and whether the ship may sail there */
+function gateText(gate: GatePlace, ship: Ship): TooltipText {
+  const zone = ZONES[gate.to];
+  const [from, to] = zone.levels;
+  const open = zone.tier <= ship.shipClass.tier;
+  return {
+    title: t(zone.name),
+    color: CHART.gate,
+    lines: [
+      t('A tier {tier} sea, levels {from}–{to}', { tier: zone.tier, from, to }),
+      open ? t('Sail into the gate to go there') : t('Needs a ship of tier {tier}', { tier: zone.tier }),
+    ],
+  };
 }

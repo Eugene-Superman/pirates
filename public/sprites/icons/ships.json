@@ -13,6 +13,22 @@
   "corsair": [
    2,
    0
+  ],
+  "frigate": [
+   3,
+   0
+  ],
+  "royalGalleon": [
+   4,
+   0
+  ],
+  "admiral": [
+   5,
+   0
+  ],
+  "shipOfTheLine": [
+   0,
+   1
   ]
  }
 }

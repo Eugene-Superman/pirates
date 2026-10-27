@@ -8,6 +8,7 @@ import type { Cargo } from '../economy/cargo';
 import type { QuestId } from '../economy/quests';
 import type { PathStepId } from '../economy/shipyard';
 import type { GoldReason } from '../records/stats';
+import type { ZoneId } from '../world/zones';
 import { findUnit, isAfloat, unitKind, type Unit, type UnitKind } from './units';
 import { WEAPONS, WEAPON_IDS, damageShare, type HoldReason, type WeaponId } from './weapons';
 
@@ -43,7 +44,7 @@ export interface Strike {
   readonly bonus: number;
   /** Share of the dice's sum the target takes: 1, or OFF_TARGET_SHARE for a weapon not made for it */
   readonly share: number;
-  /** What the attacker's talents multiply the damage by: Broadside, Point blank; 1 without */
+  /** What the attacker's talents (Broadside, Point blank) and a bot's power in its sea multiply the damage by; 1 without */
   readonly boost: number;
   /** The attacker's talents that changed this strike: Steady hands (in `bonus`), Keen eye, Broadside, Point blank */
   readonly talents: readonly TalentId[];
@@ -226,6 +227,18 @@ export type GameEvent =
       readonly at: Point3;
     }
   | {
+      /**
+       * A player's ship sailed into a gate to another sea that won't let it through (world/gates.ts): a ship of a lower
+       * tier than the sea's (`tier`, the one it needs), or one in combat
+       */
+      readonly type: 'gateClosed';
+      readonly shipId: number;
+      readonly to: ZoneId;
+      readonly reason: 'tier' | 'combat';
+      readonly tier: number;
+      readonly at: Point3;
+    }
+  | {
       /** A boss fired a barrage: its shells are marked on the water (state.shells) */
       readonly type: 'barrage';
       readonly shipId: number;
@@ -391,6 +404,8 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
     boost *= PERKS.lastStand.boost;
     talents.push('lastStand');
   }
+  // A bot hits as hard as its sea asks
+  boost *= ship.power;
   const share = damageShare(weapon.id, target.nature);
   const roll = rollVolley(dice, bonus, share * boost, random);
   const strike: Strike = {
@@ -486,7 +501,8 @@ export function strikeOnce(
   source: 'bite' | 'shell',
   random: () => number,
 ) {
-  const roll = rollVolley([weapon], weapon.bonus, 1, random);
+  // A bot's bite or shell as hard as its sea asks
+  const roll = rollVolley([weapon], weapon.bonus, attacker.power, random);
   const strike: Strike = {
     attackerId: attacker.id,
     attackerKind: unitKind(attacker),
@@ -494,7 +510,7 @@ export function strikeOnce(
     ammo: null,
     bonus: weapon.bonus,
     share: 1,
-    boost: 1,
+    boost: attacker.power,
     talents: [],
     dice: [{ gun: null, die: weapon.die, ...roll.rolls[0] }],
   };

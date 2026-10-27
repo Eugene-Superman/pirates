@@ -4,6 +4,7 @@ import { coastAt, coastline, randomIslandShape } from './islandShape';
 import { MAP_SQUARES, WORLD_HEIGHT, WORLD_WIDTH } from './map';
 import paintedCoasts from './paintedCoasts.json';
 import { PORT, type Port } from './port';
+import type { Zone, ZoneId } from './zones';
 
 export { MAP_SQUARE, MAP_SQUARES, WORLD_HEIGHT, WORLD_WIDTH } from './map';
 /** Where a player's ship comes into the game, and comes back after it was sunk: off the port in the middle */
@@ -16,8 +17,6 @@ export interface Palm {
   leanY: number;
 }
 
-const ISLANDS_PER_SQUARE = 0.375; // on average: 24 islands on an 8 × 8 map, open sea between them
-const ISLAND_COUNT = Math.round(ISLANDS_PER_SQUARE * MAP_SQUARES * MAP_SQUARES);
 const PLACING_TRIES = 60; // per island: a spot that is too near another island or the start is thrown away
 const START_CLEARANCE = 400; // world units of open water round the start (off the port) beyond an island's reach
 const ISLAND_GAP = 150; // world units between two islands' reach at least
@@ -40,17 +39,32 @@ export interface Island {
   palms: Palm[];
 }
 
+/** A way out of the sea to another (world/zones.ts): a circle on open water, sailed into to go */
+export interface GatePlace {
+  readonly to: ZoneId;
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+}
+
 // Only what affects gameplay. Decorations live on the client
 export interface WorldData {
+  /** The sea it is (world/zones.ts) */
+  zone: ZoneId;
   /** The port's island first, then the rest */
   islands: Island[];
   port: Port;
+  /** Its gates to the seas next to it: placed on open water once the sea's routes are known (world/gates.ts) */
+  gates: GatePlace[];
 }
 
-// A fixed seed keeps the map the same on every run
-export function createWorld(): WorldData {
-  const islands = createIslands(ISLAND_COUNT, createRandom(42), [PORT.island]);
-  return { islands: [PORT.island, ...islands.map(withPaintedCoast)], port: PORT };
+// The zone's fixed seed keeps its map the same on every run; the starting waters' (24 islands on an 8 × 8 map) is the
+// one it has always had, and its islands take their paintings' coasts
+export function createWorld(zone: Zone): WorldData {
+  const count = Math.round(zone.islands * MAP_SQUARES * MAP_SQUARES);
+  const made = createIslands(count, createRandom(zone.seed), [PORT.island]);
+  const islands = zone.painted ? made.map(withPaintedCoast) : made;
+  return { zone: zone.id, islands: [PORT.island, ...islands], port: PORT, gates: [] };
 }
 
 /**

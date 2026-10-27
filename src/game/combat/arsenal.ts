@@ -44,7 +44,7 @@ export interface DamageDie {
 export interface Gun extends DamageDie {
   readonly id: GunId;
   readonly weapon: WeaponId;
-  /** The ship tier it is made for. Not enforced yet: any ship can fit any gun */
+  /** The ship tier it is made for, which sets its price (economy/shop.ts). Any ship can fit any gun */
   readonly tier: number;
   /** Shown to players */
   readonly name: string;

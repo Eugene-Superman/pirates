@@ -19,8 +19,9 @@ paths:
   (the islands from their paintings, `public/sprites/islands/`: each in slices sorted with the ships by
   `islands.json`'s points, and its shallows, a small picture of a smooth fade stretched under them; a painting is an
   island's whose centre it gives).
-  Until their atlases load, the bots' ships (`botShip3d.ts`, a look per class), the sea monsters (`serpent3d.ts`,
-  `turtle3d.ts`), the chests (`chest3d.ts`), the port (`port3d.ts`, its island drawn as an island) and the islands
+  Until their atlases load, the bots' ships (`botShip3d.ts`, a look per class; the seas' pirate brig, warship and
+  flagship have only that, for now), the sea monsters (`serpent3d.ts`, `turtle3d.ts`; the seas' crab, shark and
+  kraken are only `monster3d.ts`'s simple models, for now), the chests (`chest3d.ts`), the port (`port3d.ts`, its island drawn as an island) and the islands
   (`island3d.ts`, also those with no painting) are drawn as vector models; those files also draw the monsters' and
   chests' water. A painting is never stretched onto its island: the island takes the painting's beach as its coast
   (`paintedCoasts.json` in `game/world/`), so what ships run into is drawn.

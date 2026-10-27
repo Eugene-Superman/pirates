@@ -1,6 +1,6 @@
 // Public API of the game logic. The client imports game/ only through this file,
 // so the logic can later move into a package shared with the server without touching the client
-export { BOT_KINDS, type BotKindId } from './bots/botKinds';
+export { BOT_KINDS, zoneBoss, zoneKinds, type BotKind, type BotKindId } from './bots/botKinds';
 export { isHostile, type BotMind } from './bots/brain';
 export {
   AMMO,
@@ -58,6 +58,7 @@ export {
   questOffered,
   takeQuest,
   turnInQuest,
+  zoneQuests,
   type ActiveQuest,
   type Quest,
   type QuestId,
@@ -96,7 +97,7 @@ export {
   type ShipOffer,
 } from './economy/shipyard';
 export { Game, WRECK_TIME } from './Game';
-export { SAVE_VERSION, type SaveData, type SavedShip } from './save';
+export { SAVE_VERSION, savedZone, type SaveData, type SavedShip } from './save';
 export { GOLD_REASONS, totalGold, totalKills, type GoldReason, type Stats } from './records/stats';
 export type { GameState } from './GameState';
 export { signedDistanceToPolygon } from './lib/geometry';
@@ -117,6 +118,7 @@ export {
   type ShipStats,
 } from './ships/outfit';
 export {
+  ABILITY_LEVELS,
   BRANCHES,
   BRANCH_IDS,
   MAX_LEVEL,
@@ -185,8 +187,11 @@ export {
   WORLD_HEIGHT,
   WORLD_WIDTH,
   islandOutline,
+  type GatePlace,
   type Island,
   type Palm,
 } from './world/World';
+export { GATE_RADIUS } from './world/gates';
+export { START_ZONE, ZONES, ZONE_IDS, isZone, tierZones, type Zone, type ZoneId } from './world/zones';
 export { coastAt } from './world/islandShape';
 export { WALL_THICKNESS, leavePort, onPort, type HarbourWall, type Port } from './world/port';

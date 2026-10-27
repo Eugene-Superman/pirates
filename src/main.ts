@@ -2,7 +2,7 @@ import { Application } from 'pixi.js';
 import { GameClient } from './client/GameClient';
 import { probeGpu } from './client/render/gpu';
 import { Store } from './client/storage/Store';
-import { Game } from './game';
+import { Game, savedZone } from './game';
 
 // Pixels drawn per screen pixel when the processor draws the game: about twice the frame rate, a little blurred
 const SOFTWARE_RESOLUTION = 0.75;
@@ -22,11 +22,13 @@ async function main() {
   // The whole page is the game: a right click is a click in it, never the browser's menu
   window.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  // A seed of its own for every game started: the dice and the bots differ each time (online, the server's)
-  const game = new Game(Math.floor(Math.random() * 2 ** 32));
   // The player's progress and settings, kept in the browser until there is a server
   const store = await Store.open();
-  game.load(store.get('save'));
+  const save = store.get('save');
+  // A seed of its own for every game started: the dice and the bots differ each time (online, the server's). The game
+  // is made for the sea the player is in
+  const game = new Game(Math.floor(Math.random() * 2 ** 32), savedZone(save));
+  game.load(save);
   new GameClient(app, game, store, renderer).start();
 }
 

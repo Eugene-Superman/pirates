@@ -7,7 +7,7 @@ import {
   MAX_QUESTS,
   OUTFIT_IDS,
   QUESTS,
-  QUEST_IDS,
+  zoneQuests,
   REPAIR_HP_PER_GOLD,
   SHIPYARD_LINES,
   SHIP_CLASSES,
@@ -31,6 +31,7 @@ import {
   type OutfitSlot,
   type PlayerLineId,
   type QuestId,
+  type ZoneId,
   type Ship,
   type WeaponId,
 } from '../../game';
@@ -55,6 +56,7 @@ import {
   themedPanel,
 } from './theme';
 import { GOODS_LIST, goodRow } from './goodIcons';
+import { questText, questTitle } from './questText';
 import { Tile, UI, clip, drawCoin, playTap, show, text, tierColor, tint } from './ui';
 import { t } from '../i18n/i18n';
 
@@ -394,7 +396,8 @@ export class PortScreen {
   /** The screen size the dim and the panel were fitted to */
   private fittedTo = '';
 
-  constructor(actions: PortActions, screen: Rectangle, portName: string, confirm: ConfirmDialog) {
+  /** zone: the sea the port is in: its tavern offers that sea's quests */
+  constructor(actions: PortActions, screen: Rectangle, portName: string, confirm: ConfirmDialog, zone: ZoneId) {
     this.actions = actions;
     this.screen = screen;
     this.confirm = confirm;
@@ -429,8 +432,8 @@ export class PortScreen {
     this.message.position.set(PAD, HEIGHT - PAD - 14);
     this.figures.position.set(PAD, HEIGHT - PAD - 13);
 
-    // The tavern: a row per quest
-    QUEST_IDS.forEach((id, i) => this.tavern.addChild(this.questView(id, i * (QUEST_HEIGHT + QUEST_GAP))));
+    // The tavern: a row per quest of its sea
+    zoneQuests(zone).forEach((id, i) => this.tavern.addChild(this.questView(id, i * (QUEST_HEIGHT + QUEST_GAP))));
     this.tavern.position.set(PAD, BODY_TOP.plain);
 
     // A building that isn't open yet
@@ -684,7 +687,7 @@ export class PortScreen {
       show(
         view.about,
         offered
-          ? t(quest.text)
+          ? questText(quest)
           : t('Turn in {n} more tavern quest to hear of it|Turn in {n} more tavern quests to hear of it', {
               n: quest.after - player.progress.questsDone,
             }),
@@ -723,9 +726,9 @@ export class PortScreen {
     count.anchor.set(0.5);
     count.position.copyFrom(dial.position);
     const left = 14 + DIAL * 2 + 16;
-    const title = subheading(t(quest.title), 17);
+    const title = subheading(questTitle(quest), 17);
     title.position.set(left, 9);
-    const about = text(t(quest.text), 12, THEME.dim, {
+    const about = text(questText(quest), 12, THEME.dim, {
       wordWrap: true,
       wordWrapWidth: TAVERN_WIDTH - left - QUEST_RIGHT,
     });
@@ -749,7 +752,7 @@ export class PortScreen {
       if (!taken) return;
       this.confirm.ask(abandonQuestion(taken), () => {
         this.actions.dropQuest(id);
-        this.say(t('"{title}" dropped', { title: t(quest.title) }), THEME.dim);
+        this.say(t('"{title}" dropped', { title: questTitle(quest) }), THEME.dim);
       });
     });
     drop.tile.container.position.set(main.tile.container.x - 6 - QUEST_BUTTON.drop, main.tile.container.y);
@@ -773,7 +776,7 @@ export class PortScreen {
   /** Turns the quest in when it is done, else takes it: trying the other first would sound its refusal */
   private questAction(id: QuestId) {
     const quest = QUESTS[id];
-    const title = t(quest.title);
+    const title = questTitle(quest);
     const taken = this.state?.player.quests.find((q) => q.id === id);
     if (taken && questDone(taken)) {
       if (this.actions.turnInQuest(id)) this.say(t('"{title}" done: +{n} gold', { title, n: quest.reward }), GOLD);

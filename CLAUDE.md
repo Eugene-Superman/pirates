@@ -3,13 +3,17 @@
 Frontend of a browser naval game in the style of _Pirate Storm: Death or Glory_.
 Click on the sea and the ship sails there, steering around islands. Bots (ships and sea monsters, neutral or
 aggressive) roam the sea; the player fights them with cannons and harpoons and repairs between fights (for gold).
-Kills pay gold and experience (each ship's own level, 1–20, and talents: three branches and a signature talent every
-five levels) and leave chests and goods to haul aboard; the port in the middle of the map, a picture of the harbour
+Kills pay gold and experience (each ship's own level, up to ten a tier, 60 at tier 6, and talents: three branches
+and a signature talent every five levels to 20) and leave chests and goods to haul aboard; the port in the middle of the map, a picture of the harbour
 with its buildings to click, has a tavern (bounty quests), a market for the goods, a workshop (the ship's outfit,
 repair), a shipyard and an arsenal (guns, ammo); a guild hall and an auction house wait for the online part.
-A boss, the Smuggler Baron, holds a corner of the sea. The Captain's path leads a new player to the next ship, the
-Coastal Bark, the first of the European line, then to the Corsair, its tier 2; the shipyard shows every line's ships,
-the rest planned for later.
+A boss, the Smuggler Baron, holds a corner of the sea. Past the starting waters lie fourteen more seas, one to three a
+tier of ship (each its own map, bots and boss, reached through gates at its edges; a world chart shows them all), some
+65 hours from the starter sloop to a tier 6 ship at level 60. The Captain's path leads a new player to the next ship, the
+Coastal Bark, the first of the European line, then to the Corsair, its tier 2, the Frigate, its tier 3, the Royal
+Galleon, its tier 4, the Admiral, its tier 5, and the Imperial Ship of the Line, its tier 6 and last; the shipyard shows
+every line's ships, the rest planned for later. The European line is the yardstick the others are balanced against:
+each tier beats two ships of the tier below.
 Camera: classic 2:1 isometric pseudo-3D (no perspective) — the target look of the game.
 
 Stack: TypeScript 7 (strict) + Pixi.js v8 + Vite 8, Prettier + Oxlint. No backend yet, no tests.
@@ -52,7 +56,12 @@ src/
     GameState.ts       everything the client reads and draws
     save.ts            a player's progress as plain data (saveGame), and putting it back checked field by field
                        (loadGame): Game.save() / Game.load()
-    world/World.ts     the world: the port's island and islands placed round it from a fixed seed, the painted ones
+    world/zones.ts     the seas (ZONES): each one's tier, levels, islands' seed, boss's lair, description, its gates to
+                       the sea before and after it, its place on the world chart; START_ZONE (the starting waters)
+    world/gates.ts     the gates on a sea's map: placed on open water, sailed into to leave for the sea beyond
+                       (stepGates, player.departure), closed to a ship of a lower tier or in combat; where a ship coming
+                       in arrives; no bot spawns or wanders near one
+    world/World.ts     the world of a sea: the port's island and islands placed round it from the sea's seed, the painted ones
                        with their paintings' coasts (paintedCoasts.json, written by
                        blender-assets/islands/build_island_art.py), START (off the
                        port: where a player's ship comes in), islandOutline; map.ts (8 × 8 map squares of 1000
@@ -63,7 +72,8 @@ src/
                        route, steering, hull points, guns in slots, ammo and the two of each weapon at hand
                        (ammoBar), fire lock, combat time, repairs
     ships/shipClasses.ts  ship catalog: the classes built, with size, handling, gun slots (or a monster's jaws);
-                       the bots' hulls too; STARTER_SHIP (the starter sloop)
+                       what a line's ship has by its tier (lineTier: its last level, its abilities); a ship bought at
+                       the shipyard comes with no guns (UNARMED); the bots' hulls too; STARTER_SHIP (the starter sloop)
     ships/shipLines.ts the lines players sail (the starter, five of six tiers each, the Forbidden Fleets four ships a
                        tier, and the masterworks bought with doubloons) and their ships, built (a class) or planned (a
                        name, a role, provisional figures and how it is got: SHIP_SOURCES), for the shipyard: lineShip
@@ -74,21 +84,23 @@ src/
                        and sight (grownStats)
     ships/talents.ts   the ship's level from its XP (kills, quests), the talents (three branches of ranked
                        talents, a point a level; a signature talent at levels 5, 10, 15, 20), what they do over time
-                       (stepTalents) and the ability (useAbility)
+                       (stepTalents) and the ability (useAbility); the levels a ship's abilities open at
+                       (ABILITY_LEVELS: only the first is made yet)
     combat/            weapons.ts (cannons, harpoons: how shots fly, what each is made for), arsenal.ts (20 guns and
                        14 ammo from the balance table, each gun with its own reach and reload; the damage dice),
                        barrage.ts (a boss's mortar: marked spots on the water its shells land on),
                        units.ts (anything that can be fired at, by id: ships for now), combat.ts (fire locks,
                        volleys of the guns loaded and in reach, homing projectiles, monsters' bites, damage)
     bots/              botKinds.ts (kinds of bots: hull, neutral or aggressive, how many to a map square, respawn
-                       time, loot; a boss with its lair and escort), brain.ts (what a bot does: wander, attack, fight
+                       time, loot; a boss with its lair and escort; the starting waters' own, and every other sea's
+                       made from archetypes scaled to its tier and levels: hull, power (damage ×), XP, gold: zoneKinds), brain.ts (what a bot does: wander, attack, fight
                        back or run, give up, follow its boss; only bots near a player are awake), spawner.ts (the
                        first bots, and sunk ones replaced near where they sailed, where no player sees; a boss at its
                        lair with its escort)
     economy/           player.ts (a player's gold, the guns and outfit in their hold, fitting guns from it, their
                        progress), loot.ts (bounties for kills, chests and goods dropped and hauled aboard, a player's
                        cargo lost where their ship sank), cargo.ts (goods, the hold), quests.ts (the tavern's bounty
-                       quests), shop.ts (guns, ammo, outfit and repairs bought in port, the outfit fitted there, goods
+                       quests, each sea's own, kills counted in their sea), shop.ts (guns, ammo, outfit and repairs bought in port, the outfit fitted there, goods
                        sold at the market, guns and ammo sold back to the arsenal for a quarter, ammo dealt in by any
                        count up to MAX_AMMO_DEAL; the prices),
                        shipyard.ts (the ships for sale and their terms: the Captain's path; tierMastered, a masterwork's
@@ -106,7 +118,8 @@ src/
                        counting them from the events)
     lib/               math.ts (clamp, normalizeAngle), geometry.ts (points, segments, polygons), random.ts (seeded createRandom)
   client/              BROWSER: Pixi, DOM, input. Reads GameState, never mutates it except through game methods
-    GameClient.ts      wires Game + SceneView + Hud + Sounds + input, runs the frame loop, saves every few seconds
+    GameClient.ts      wires Game + SceneView + Hud + Sounds + input, runs the frame loop, saves every few seconds;
+                       takes the player to another sea (Game.travel: the save for it, then a reload in it)
     storage/           Store.ts: the browser's memory until there is a server (IndexedDB, else localStorage): the
                        progress, the view's settings, the HUD's items, the quest tracker's folds, the sound, the combat
                        log, the language
@@ -131,7 +144,8 @@ src/
                        header, the browser keeps the folds), fullscreen.ts (the game on the whole screen and back),
                        SkillBar.ts (at the bottom, in a painted frame: ten quick slots, 1…0, waiting for what the
                        hold will carry; the skills, painted: the repair and the ability, locked till its talent is
-                       picked, and two locks on those to come; each weapon's plate with its two ammo at hand, Z and X,
+                       picked, and two locks on the second and third abilities, to come (the level each opens at, or
+                       the tier that brings it); each weapon's plate with its two ammo at hand, Z and X,
                        their counts in K and M; ammo dragged out of the loadout drops on them; a tooltip over a skill
                        or an ammo: all about it), Tooltip.ts (a small panel telling what is under the pointer), TalentPanel.ts (the talent tree, K:
                        the signature talents and the three branches on boards, each with its emblem; ranks as
@@ -171,7 +185,11 @@ src/
                        brass medallions in its top corners, the settings and the full screen), SeaChart.ts (the whole world in 8 × 8 squares A1…H8 with the islands drawn as
                        in the game and the ship, in the diamond opening of a painted frame and nothing else; the boss's
                        lair a medallion, its name and the port's under the pointer, the square under it named; the
-                       minimap or M opens it, the button in the frame's corner closes it), chart.ts (what the two maps share: projection, colors),
+                       minimap or M opens it, the button in the frame's corner closes it; the sea's gates, named under the pointer, and a
+                       button to the world chart), WorldChart.ts (every sea, N or the Seas button: a column a tier,
+                       the gates between them, the one picked's description, gates and bots; for now a button jumps
+                       there, for the developer), questText.ts (a quest's title and text with its target and sea
+                       filled in), chart.ts (what the two maps share: projection, colors),
                        hudItems.ts (every metric and control the settings can show, grouped), SettingsPanel.ts (dev
                        settings: all controls, and checkboxes for what is also on the screen), ui.ts (the HUD's
                        colors, clickable tiles and buttons, icons, HudWindow: a window over the game, in a look of
@@ -192,7 +210,9 @@ src/
       models/          island3d.ts (low-poly islands, until their paintings load), port3d.ts
                        (the port's walls, quay, houses, lighthouse and flag, until
                        its pictures load; then its lamp and flags over them), botShip3d.ts
-                       (the bots' ships as vector models, until their atlases load), serpent3d.ts and turtle3d.ts (sea monsters:
+                       (the bots' ships as vector models, until their atlases load; the seas' pirate brig, warship
+                       and flagship only so, for now), monster3d.ts (the seas' crab, shark and kraken, vector-drawn,
+                       until they are modelled), gate3d.ts (a gate to another sea on the water), serpent3d.ts and turtle3d.ts (sea monsters:
                        their water, the serpent's body bending as it swims, and their bodies until their atlases load),
                        projectile3d.ts (cannonball, harpoon), chest3d.ts (floating loot: a chest, crates of goods, lost
                        cargo) — 3D models; ShipSprite.ts — a ship from its Blender atlases, animated ones too (the player's,

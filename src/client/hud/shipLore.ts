@@ -26,7 +26,7 @@ export const SHIP_LORE: Readonly<Record<LineShipId, string>> = {
   corsair:
     "A raider under a royal letter of marque: lean, quick for its guns and painted in the king's blue. Its captains take what the crown's enemies carry and keep a share of it.",
   frigate:
-    'The eyes of the navy: a long, fast hull with one gun deck and the tallest masts in the fleet. It finds the enemy first, and when it must, it fights well above its size.',
+    'The eyes of the navy: a long, fast hull with two gun decks and raked masts under sharp orange and lilac sails. It finds the enemy first, and when it must, it fights well above its size.',
   royalGalleon:
     'A deep hull with gilded galleries that brings the treasure fleets home. Its holds are full of silver and its decks bristle with guns, for every pirate knows what it carries.',
   admiral:

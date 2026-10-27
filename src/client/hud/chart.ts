@@ -1,5 +1,14 @@
 import type { Graphics } from 'pixi.js';
-import { BOT_KINDS, MAP_SQUARE, MAP_SQUARES, type GameState, type Island, type Ship } from '../../game';
+import {
+  MAP_SQUARE,
+  MAP_SQUARES,
+  zoneBoss,
+  type GameState,
+  type GatePlace,
+  type Island,
+  type Ship,
+  type ZoneId,
+} from '../../game';
 
 /**
  * Which way the screen's right and up point on the water (unit vectors in world coordinates). The maps turn the world
@@ -23,10 +32,13 @@ export const CHART = {
   route: 0xffffff,
   lost: 0xff8a2a, // the player's cargo floating where their ship went down
   boss: 0xff4a3a,
+  gate: 0x7fe3ff, // a gate to another sea
 } as const;
 
-/** Where the starting waters' boss has its lair */
-export const BOSS_LAIR = BOT_KINDS.baron.boss?.lair ?? null;
+/** Where a sea's boss has its lair, if it has a boss */
+export function bossLair(zone: ZoneId) {
+  return zoneBoss(zone)?.boss?.lair ?? null;
+}
 
 const LETTER_A = 65;
 
@@ -138,11 +150,22 @@ export function drawLostCargo(g: Graphics, state: GameState, map: MapProjection,
   }
 }
 
-/** The boss's lair, seen or not: a red ring round a dot. `size` scales it, pixels */
-export function drawBossLair(g: Graphics, map: MapProjection, size: number) {
-  if (!BOSS_LAIR) return;
-  const x = map.x(BOSS_LAIR.x, BOSS_LAIR.y);
-  const y = map.y(BOSS_LAIR.x, BOSS_LAIR.y);
+/** The sea's gates to other seas: a pale blue ring round an arrow out. `size` scales them, pixels */
+export function drawGates(g: Graphics, map: MapProjection, gates: readonly GatePlace[], size: number) {
+  for (const gate of gates) {
+    const x = map.x(gate.x, gate.y);
+    const y = map.y(gate.x, gate.y);
+    g.circle(x, y, size * 1.9).stroke({ width: 2, color: CHART.gate, alpha: 0.9 });
+    g.poly([x - size, y - size * 0.8, x + size, y, x - size, y + size * 0.8]).fill({ color: CHART.gate });
+  }
+}
+
+/** A sea's boss's lair, seen or not: a red ring round a dot. `size` scales it, pixels */
+export function drawBossLair(g: Graphics, map: MapProjection, size: number, zone: ZoneId) {
+  const lair = bossLair(zone);
+  if (!lair) return;
+  const x = map.x(lair.x, lair.y);
+  const y = map.y(lair.x, lair.y);
   g.circle(x, y, size * 1.8).stroke({ width: 2, color: CHART.boss, alpha: 0.85 });
   g.circle(x, y, size * 0.6).fill({ color: CHART.boss });
 }

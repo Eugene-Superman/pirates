@@ -13,7 +13,8 @@ export interface Good {
 
 // Every piece takes one place in the hold. Goods are a small extra next to a bounty: what a wreck drops is worth
 // about a tenth of it on average (botKinds.ts drops a piece or two now and then), so carrying it home is worth the
-// trip but never the point of a fight. Holds are roomy, so a full one is a long voyage's haul
+// trip but never the point of a fight. Holds are small on the first ships (the sloop's 10 places, a tier 6 ship's
+// 100), so a full one is a reason to sail home
 // prettier-ignore
 export const GOODS: Readonly<Record<GoodId, Good>> = {
   fish: { id: 'fish', name: 'Fish', price: 1 },

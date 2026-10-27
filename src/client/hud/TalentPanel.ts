@@ -2,7 +2,6 @@ import { Container, FillGradient, Graphics, Text, type Rectangle } from 'pixi.js
 import {
   BRANCHES,
   BRANCH_IDS,
-  MAX_LEVEL,
   MILESTONES,
   ROW_POINTS,
   TALENTS,
@@ -420,7 +419,8 @@ export class TalentPanel {
       });
     });
     column.container.addChild(...ors);
-    if (maxLevel >= MAX_LEVEL) return y - CARD.gap;
+    // The whole tree is open by its last milestone: the levels past it give points for it
+    if (maxLevel >= MILESTONES[MILESTONES.length - 1]) return y - CARD.gap;
     const more = text(
       t('This ship goes up to level {level}: the rest of the tree comes with a ship of a higher tier', {
         level: maxLevel,

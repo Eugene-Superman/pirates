@@ -62,8 +62,8 @@ export const RU: Readonly<Record<string, string>> = {
   'FPS: {fps}   longest frame: {ms} ms': 'FPS: {fps}   самый долгий кадр: {ms} мс',
   "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings":
     'Нет графического ускорения: игру рисует процессор, в меньшем разрешении. Включите его в настройках браузера',
-  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold, P captain's mastery":
-    'Клик по морю — плыть, по порту — зайти в него · клик по кораблю или чудовищу — выбрать цель, двойной клик или Пробел — огонь, Esc — стоп · Q/E оружие, R ремонт (за золото), F умение, K таланты, I статистика, H трюм, P мастерство капитана',
+  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold, P captain's mastery, N world chart":
+    'Клик по морю — плыть, по порту — зайти в него · клик по кораблю или чудовищу — выбрать цель, двойной клик или Пробел — огонь, Esc — стоп · Q/E оружие, R ремонт (за золото), F умение, K таланты, I статистика, H трюм, P мастерство капитана, N карта мира',
   'Intact 100%': 'Целый 100%',
   'Minor 70%': 'Поцарапан 70%',
   'Heavy 45%': 'Побит 45%',
@@ -216,8 +216,11 @@ export const RU: Readonly<Record<string, string>> = {
   'Ability (F)': 'Умение (F)',
   'Opens with a signature talent at level {level}: pick it in the talents (K)':
     'Открывается особым талантом на {level} уровне: выберите его в талантах (K)',
-  Locked: 'Закрыто',
-  'A skill still to come': 'Это умение ещё будет',
+  'Second ability': 'Второе умение',
+  'Third ability': 'Третье умение',
+  'Opens at level {level}: still to come': 'Откроется на {level} уровне: ещё будет',
+  'Ships of tier 4 and up have it': 'Есть у кораблей 4 ранга и выше',
+  'Ships of tier 6 have it': 'Есть у кораблей 6 ранга',
   'Click or {key}: load it': 'Щёлкните или {key}: зарядить',
   'No ammo at hand': 'Под рукой нет боеприпасов',
   'Click to put some here in the loadout (L)': 'Щёлкните, чтобы положить их сюда в вооружении (L)',
@@ -338,7 +341,7 @@ export const RU: Readonly<Record<string, string>> = {
   '+5% turning a rank': '+5% поворота за очко',
   '+5% sight a rank': '+5% обзора за очко',
   Quartermaster: 'Квартирмейстер',
-  '+10 places in the hold a rank': '+10 мест в трюме за очко',
+  '+10% room in the hold a rank': '+10% места в трюме за очко',
   'Bounty hunter': 'Ловец наград',
   '+7% gold for every kill a rank': '+7% золота за каждую добычу, за очко',
   'Treasure hunter': 'Искатель сокровищ',
@@ -878,8 +881,8 @@ export const RU: Readonly<Record<string, string>> = {
     'Построен на верфях Солёного Ветра для береговых патрулей: вдвое больше пушек, чем у шлюпа, за крепким дубовым корпусом, две мачты и королевский герб на гроте. Не самый быстрый на море, но за себя постоит.',
   "A raider under a royal letter of marque: lean, quick for its guns and painted in the king's blue. Its captains take what the crown's enemies carry and keep a share of it.":
     'Рейдер с королевским каперским патентом: стройный, быстрый для своих пушек, выкрашенный в королевскую синь. Его капитаны забирают всё, что везут враги короны, и оставляют себе долю.',
-  'The eyes of the navy: a long, fast hull with one gun deck and the tallest masts in the fleet. It finds the enemy first, and when it must, it fights well above its size.':
-    'Глаза флота: длинный быстрый корпус с одной пушечной палубой и самыми высокими мачтами во флоте. Он первым находит врага, а когда нужно, дерётся так, будто вдвое больше.',
+  'The eyes of the navy: a long, fast hull with two gun decks and raked masts under sharp orange and lilac sails. It finds the enemy first, and when it must, it fights well above its size.':
+    'Глаза флота: длинный быстрый корпус с двумя пушечными палубами и наклонёнными мачтами под острыми оранжево-сиреневыми парусами. Он первым находит врага, а когда нужно, дерётся так, будто вдвое больше.',
   'A deep hull with gilded galleries that brings the treasure fleets home. Its holds are full of silver and its decks bristle with guns, for every pirate knows what it carries.':
     'Глубокий корпус с позолоченными галереями, ведущий домой серебряные флоты. Его трюмы полны серебра, а палубы ощетинились пушками, ведь каждый пират знает, что он везёт.',
   "The flagship of a squadron, the admiral's pennant at the main and a band playing on the quarterdeck. Its signals move whole fleets, and its broadsides end the battles they start.":
@@ -935,6 +938,9 @@ export const RU: Readonly<Record<string, string>> = {
   'The throne of the drowned kings, raised from the deepest trench of the sea. Its runes burn like coals, its guns were cast in no forge of this world, and the sea itself makes way for it.':
     'Трон утонувших королей, поднятый из глубочайшей впадины моря. Его руны тлеют, как угли, его пушки отлиты не в кузне этого мира, и само море расступается перед ним.',
   'Cannons + harpoon guns': 'Пушки + гарпунные пушки',
+  Levels: 'Уровни',
+  'up to {level}': 'до {level}',
+  Abilities: 'Умения',
   Obtained: 'Как получить',
   Free: 'Бесплатно',
   'to be set': 'определится позже',
@@ -1262,4 +1268,95 @@ export const RU: Readonly<Record<string, string>> = {
   Abandon: 'Отказаться',
   'Full screen': 'На весь экран',
   'Leave full screen': 'Выйти из полноэкранного режима',
+  'Starting Waters': 'Стартовые воды',
+  'Coral Coast': 'Коралловый берег',
+  "Smugglers' Straits": 'Проливы контрабандистов',
+  'Windward Isles': 'Наветренные острова',
+  'Fog Banks': 'Туманные отмели',
+  'Shipwreck Shoals': 'Отмели кораблекрушений',
+  'Storm Reach': 'Штормовой простор',
+  'Kraken Deep': 'Бездна кракена',
+  'Black Reefs': 'Чёрные рифы',
+  'Iron Sea': 'Железное море',
+  'Ember Isles': 'Тлеющие острова',
+  "Serpent's Maw": 'Пасть змея',
+  'Frozen Expanse': 'Ледяной простор',
+  'Abyssal Trench': 'Бездонная впадина',
+  'Crown Waters': 'Коронные воды',
+  'Pirate brig': 'Пиратский бриг',
+  Warship: 'Военный корабль',
+  'Pirate flagship': 'Пиратский флагман',
+  'Giant crab': 'Гигантский краб',
+  'Great shark': 'Большая акула',
+  Kraken: 'Кракен',
+  'Bounty: {target}': 'Награда: {target}',
+  'Hunt: {target}': 'Охота: {target}',
+  'Wanted: {target}': 'Разыскивается: {target}',
+  'The terror of {zone}': 'Ужас моря «{zone}»',
+  'The harbour master of {zone} pays for {count} of them sunk.':
+    'Начальник порта моря «{zone}» платит за {count} потопленных.',
+  'The cook of {zone} wants {count} of them, and mind their jaws.':
+    'Повару моря «{zone}» нужно {count} таких, и берегитесь челюстей.',
+  '{count} of them prey on the ships of {zone}. Hunt them down.':
+    'В море «{zone}» на корабли охотятся такие. Добудьте {count}.',
+  'One {target} rules the sea lanes of {zone}. Sink it.': 'Путями моря «{zone}» владеет {target}. Потопите его.',
+  'Sink the {target} at its lair, and its escort scatters.': 'Потопите {target} в его логове, и охрана разбежится.',
+  'World chart (N)': 'Карта мира (N)',
+  'A tier {tier} sea, levels {from}–{to}': 'Море {tier} ранга, уровни {from}–{to}',
+  'Sail into the gate to go there': 'Проплывите через врата, чтобы туда попасть',
+  'Needs a ship of tier {tier}': 'Нужен корабль {tier} ранга',
+  'World chart': 'Карта мира',
+  'Every sea, by the tier of ship it is for: its gates lead to the next':
+    'Все моря по рангу корабля, для которого они: их врата ведут к следующему',
+  Starter: 'Стартовое',
+  'Lv {from}–{to}': 'Ур. {from}–{to}',
+  '{sea}: needs a ship of tier {tier}': '{sea}: нужен корабль {tier} ранга',
+  '{sea}: not in combat': '{sea}: не во время боя',
+  'The gate to {sea} is closed: it needs a ship of tier {tier}':
+    'Врата в море «{sea}» закрыты: нужен корабль {tier} ранга',
+  'The gate to {sea} is closed while you are in combat': 'Врата в море «{sea}» закрыты, пока вы в бою',
+  'Calm waters round the port where every captain begins: fishing boats, merchants, smugglers and the odd sea monster. The Smuggler Baron holds the north-east.':
+    'Спокойные воды вокруг порта, где начинает каждый капитан: рыбацкие лодки, торговцы, контрабандисты и изредка морские чудовища. На северо-востоке хозяйничает Барон контрабандистов.',
+  'Shallow reefs and lagoons, the first sea of a ship of the line: traders and pirate brigs, turtles on the reefs, serpents in the channels.':
+    'Мелкие рифы и лагуны, первое море корабля линии: торговцы и пиратские бриги, черепахи на рифах, змеи в протоках.',
+  'Narrow straits between rocky isles where contraband changes hands. The pirates here sail in numbers.':
+    'Узкие проливы между скалистыми островами, где контрабанда переходит из рук в руки. Пираты здесь ходят стаями.',
+  'Isles battered by the trade winds, where the pirates of the straits winter and the sharks follow the fleets.':
+    'Острова, которые хлещут пассаты: здесь зимуют пираты проливов, а за флотами плывут акулы.',
+  'A sea under a grey blanket of fog: ships come out of it at close range, and so do the beasts.':
+    'Море под серым одеялом тумана: корабли выныривают из него совсем рядом, и чудовища тоже.',
+  'Shoals strewn with the wrecks of the fleets that tried to cross them: rich salvage, and those who guard it.':
+    'Отмели, усеянные обломками флотов, пытавшихся их пересечь: богатая добыча и те, кто её стережёт.',
+  'Open ocean where the storms never quite die down. Warships of the old navies patrol it.':
+    'Открытый океан, где штормы никогда до конца не стихают. Его патрулируют военные корабли старых флотов.',
+  "Waters over a chasm with no bottom: the kraken's own, and the beasts that feed on what it leaves.":
+    'Воды над бездной без дна: владения кракена и чудовищ, что кормятся его объедками.',
+  'Black coral reefs that tear a careless hull open. The strongest pirate fleets hide among them.':
+    'Чёрные коралловые рифы, вспарывающие неосторожный корпус. Среди них прячутся сильнейшие пиратские флоты.',
+  'Grey waters round the old naval fortresses, where warships still fight a war that ended long ago.':
+    'Серые воды вокруг старых морских крепостей, где военные корабли до сих пор ведут давно закончившуюся войну.',
+  "Volcanic isles under clouds of ash, the sea warm and steaming, the pirates' forges smoking on the shores.":
+    'Вулканические острова под тучами пепла: море тёплое и парит, на берегах дымят пиратские кузни.',
+  'A ring of jagged isles round a whirlpool, where the great serpents and the boldest crews meet.':
+    'Кольцо зазубренных островов вокруг водоворота, где сходятся великие змеи и самые дерзкие команды.',
+  'Ice floes and frozen isles at the top of the world: only the toughest ships of the line sail them.':
+    'Льдины и замёрзшие острова на макушке мира: здесь ходят только самые крепкие корабли линии.',
+  'Over the deepest trench of the sea, where the oldest monsters rise to the surface.':
+    'Над глубочайшей впадиной моря, откуда на поверхность поднимаются древнейшие чудовища.',
+  'The last sea: the treasure fleets of the crowns, and the admirals who guard them.':
+    'Последнее море: сокровищные флоты корон и адмиралы, которые их стерегут.',
+  'Sail there (developer)': 'Перейти туда (разработчик)',
+  'Click a sea to read about it; sail into its gates to go there':
+    'Кликните по морю, чтобы прочитать о нём; чтобы попасть туда, проплывите через его врата',
+  'The starting waters, levels {from}–{to}': 'Стартовые воды, уровни {from}–{to}',
+  'You are here': 'Вы здесь',
+  'Open to your ship': 'Открыто для вашего корабля',
+  Gates: 'Врата',
+  'West gate: {sea} (tier {tier})': 'Западные врата: {sea} ({tier} ранг)',
+  'East gate: {sea} (tier {tier})': 'Восточные врата: {sea} ({tier} ранг)',
+  'What sails it': 'Кто здесь плавает',
+  boss: 'босс',
+  aggressive: 'агрессивный',
+  neutral: 'нейтральный',
+  Seas: 'Моря',
 };

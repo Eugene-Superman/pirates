@@ -19,13 +19,19 @@ export interface ShipOffer {
 }
 
 // The ladder, in order: the next one the player doesn't own is the goal. The Coastal Bark is the goal of the starting
-// waters: a couple of hours of play. The level is about where the starting bots stop paying full XP
-// (ships/talents.ts, xpForKill); the gold is some 80 kills with their cargo, less the repairs. The Corsair asks for a
-// Coastal Bark well sailed (the level is the ship's sailed now, the quests are counted from the start), and three
-// times the gold
+// waters: a couple of hours of play, the starter sloop at its last level (10); the gold is some 80 kills with their
+// cargo, less the repairs. Each next ship asks for the one before it at its last level (the level is the ship's sailed now, the quests are counted from the start):
+// the Corsair a Coastal Bark at 10, and three times the gold; the Frigate a Corsair at 20, and near three times the
+// Corsair's gold again; the Royal Galleon a Frigate at 30, and two and a half times the Frigate's gold; the Admiral a
+// Royal Galleon at 40, and two and a half times the Galleon's gold; the Ship of the Line, the line's last, an Admiral
+// at 50, and two and a half times the Admiral's gold
 export const SHIP_OFFERS: readonly ShipOffer[] = [
-  { shipClass: 'coastalBark', price: 3000, level: 7, quests: 5, baron: true },
-  { shipClass: 'corsair', price: 9000, level: 12, quests: 12, baron: false },
+  { shipClass: 'coastalBark', price: 3000, level: 10, quests: 5, baron: true },
+  { shipClass: 'corsair', price: 9000, level: 10, quests: 12, baron: false },
+  { shipClass: 'frigate', price: 24000, level: 20, quests: 20, baron: false },
+  { shipClass: 'royalGalleon', price: 60000, level: 30, quests: 30, baron: false },
+  { shipClass: 'admiral', price: 150000, level: 40, quests: 45, baron: false },
+  { shipClass: 'shipOfTheLine', price: 375000, level: 50, quests: 65, baron: false },
 ];
 
 /** A step of the path, as the HUD shows it: done or not, and how far for a counted one */
@@ -91,7 +97,7 @@ export function termsMet(state: GameState, player: Player) {
 
 /**
  * Whether the player has mastered a tier: has a ship of it at its class's last level, sailed or laid up, of a line
- * other than the masterworks (the starter's sloop counts for tier 1). A masterwork of the tier asks for it before it
+ * other than the masterworks (the starter sloop is tier 0: it opens none). A masterwork of the tier asks for it before it
  * is sold (ships/shipLines.ts)
  */
 export function tierMastered(state: GameState, player: Player, tier: number) {
