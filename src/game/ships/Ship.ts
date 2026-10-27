@@ -7,6 +7,7 @@ import type { Point } from '../lib/geometry';
 import { newPilotMemory, type Helm } from '../navigation/pilot';
 import { hullReach, type Body, type Hull } from '../physics/hull';
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../world/World';
+import type { ZoneId } from '../world/zones';
 import { MAX_HEALTH, damageStage, damagedSpeed, type DamageStage } from './damage';
 import {
   OUTFITS,
@@ -141,6 +142,13 @@ export class Ship implements Body {
   mayDock = true;
   /** How a bot thinks; null for a player's ship */
   bot: BotMind | null = null;
+  /**
+   * What its guns' and jaws' damage is multiplied by: a bot's strength in its sea (bots/botKinds.ts, `power`); 1 for a
+   * player's ship
+   */
+  power = 1;
+  /** The gate (world/gates.ts) it is in now, if any: a gate tells why it is closed once a time it is sailed into */
+  gate: ZoneId | null = null;
 
   constructor(shipClass: ShipClass, id: number) {
     this.id = id;
@@ -153,7 +161,11 @@ export class Ship implements Body {
     this.tuned = { maxSpeed, minSpeed, acceleration, deceleration, turnSpeed, viewRange, maxHp: hp };
     this.figures = grownStats(this.tuned, addShares([]));
     this.hp = this.figures.maxHp;
-    this.guns = { cannon: [...shipClass.startingGuns.cannon], harpoon: [...shipClass.startingGuns.harpoon] };
+    const { slots, startingGuns } = shipClass;
+    this.guns = {
+      cannon: slots.cannon.map((_, i) => startingGuns.cannon[i] ?? null),
+      harpoon: slots.harpoon.map((_, i) => startingGuns.harpoon[i] ?? null),
+    };
     this.reloads = { cannon: this.guns.cannon.map(() => 0), harpoon: this.guns.harpoon.map(() => 0) };
     // A ship with guns of one weapon only (a bot's) fires those
     if (this.guns.cannon.every((gun) => gun === null) && this.guns.harpoon.some((gun) => gun !== null)) {
@@ -220,7 +232,7 @@ export class Ship implements Body {
 
   /** Places in the hold for goods: the class's, more with Quartermaster */
   get holdSize() {
-    return this.shipClass.hold + PERKS.hold * this.rank('quartermaster');
+    return Math.round(this.shipClass.hold * (1 + PERKS.hold * this.rank('quartermaster')));
   }
 
   /**
@@ -231,6 +243,13 @@ export class Ship implements Body {
     if (id !== null && OUTFITS[id].slot !== slot) return;
     this.outfit[slot] = id;
     this.refit();
+  }
+
+  /** Its hull points, whole, in place of its class's: a bot as tough as its sea asks (bots/spawner.ts) */
+  setHull(hp: number) {
+    this.tuned = { ...this.tuned, maxHp: hp };
+    this.refit();
+    this.hp = this.maxHp;
   }
 
   /** Changes how far the crew sees by `delta` world units, before the outfit. For tuning with the debug buttons */

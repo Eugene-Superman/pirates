@@ -5,6 +5,7 @@ import type { BotSprites } from '../models/BotSprites';
 import { drawBotShip } from '../models/botShip3d';
 import { drawSerpent, type SpinePoint } from '../models/serpent3d';
 import { drawTurtle } from '../models/turtle3d';
+import { drawMonster, isMonsterModel } from '../models/monster3d';
 import type { SceneObject } from '../sceneObjects';
 import { smoothstep } from './foam';
 
@@ -116,6 +117,7 @@ export class Wrecks {
             if (w.kind === 'seaSerpent') {
               if (w.spine) drawSerpent(painter, w.spine, time, 0, 0, sink);
             } else if (w.kind === 'seaTurtle') drawTurtle(painter, pose, time, 0, 0, sink);
+            else if (isMonsterModel(w.kind)) drawMonster(painter, pose, w.kind, time, 0, 0, sink);
             else drawBotShip(painter, pose, w.kind, w.guns, time, 0, sink);
           },
         };

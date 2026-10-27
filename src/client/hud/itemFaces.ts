@@ -505,6 +505,8 @@ function shipFace(id: LineShipId, actions: ShopActions): ItemFace {
       shipFigure('Cannons + harpoon guns', id, figures, (of) => `${of.cannons} + ${of.harpoons}`),
       shipFigure('Hold', id, figures, (of) => String(of.hold)),
       shipFigure('Sight', id, figures, (of) => String(of.viewRange)),
+      shipFigure('Levels', id, figures, (of) => t('up to {level}', { level: of.maxLevel })),
+      shipFigure('Abilities', id, figures, (of) => String(of.abilities)),
       { label: 'Obtained', value: t(source.name) },
       {
         label: 'Price',

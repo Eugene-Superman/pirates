@@ -16,8 +16,10 @@ import {
   type UnitKind,
   QUESTS,
   TALENTS,
+  ZONES,
 } from '../../game';
 import { t } from '../i18n/i18n';
+import { questTitle } from './questText';
 
 /**
  * What an entry is about: damage the player did or took, a unit they sank, their own ship going down, a repair, gold,
@@ -290,7 +292,7 @@ export class CombatLog {
           event.reason === 'bounty' && event.kind
             ? t('Bounty for the {name}', { name: name.toLowerCase(), Name: name })
             : event.reason === 'quest' && event.quest
-              ? t('Quest "{title}" turned in', { title: t(QUESTS[event.quest].title) })
+              ? t('Quest "{title}" turned in', { title: questTitle(QUESTS[event.quest]) })
               : event.reason === 'market'
                 ? t('Goods sold at the market')
                 : event.reason === 'arsenal'
@@ -328,6 +330,16 @@ export class CombatLog {
       case 'holdFull':
         if (event.shipId === me)
           this.add('note', state.time, t('The hold is full: sell at the port market'), [], 'plain');
+        break;
+      case 'gateClosed':
+        if (event.shipId === me) {
+          const sea = t(ZONES[event.to].name);
+          const why =
+            event.reason === 'tier'
+              ? t('The gate to {sea} is closed: it needs a ship of tier {tier}', { sea, tier: event.tier })
+              : t('The gate to {sea} is closed while you are in combat', { sea });
+          this.add('note', state.time, why, [], 'plain');
+        }
         break;
       case 'cargoLost':
         if (event.shipId === me) {

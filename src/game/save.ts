@@ -1,5 +1,6 @@
 import { AMMO, AMMO_IDS, GUNS, type AmmoId, type GunId } from './combat/arsenal';
 import { WEAPON_IDS, type WeaponId } from './combat/weapons';
+import type { Player } from './economy/player';
 import { MAX_QUESTS, QUESTS, QUEST_IDS, type QuestId } from './economy/quests';
 import type { GameState } from './GameState';
 import type { NavGrid } from './navigation/NavGrid';
@@ -10,7 +11,9 @@ import { GOOD_IDS, cargoCount, type Cargo } from './economy/cargo';
 import { isSailable, type PathStepId } from './economy/shipyard';
 import { Ship } from './ships/Ship';
 import { SHIP_CLASSES, type ShipClassId } from './ships/shipClasses';
+import { arrivalPoint } from './world/gates';
 import { START } from './world/World';
+import { START_ZONE, isZone, type ZoneId } from './world/zones';
 import { GOLD_REASONS, STAT_COUNTS, copyStats, type Stats } from './records/stats';
 
 /**
@@ -21,11 +24,17 @@ import { GOLD_REASONS, STAT_COUNTS, copyStats, type Stats } from './records/stat
 save starts them at 0, but for the quests turned in, which the Captain's path counted). 7: the Corsair renamed the
 Coastal Bark (`coastalBark`), the first of the European line. 8: gold earned at the arsenal in the stats (an older
 save starts it at 0). 9: each ship's ammo at hand on the skill bar, two kinds a weapon (an older save's ship takes the
-one loaded and the next it carries)
+one loaded and the next it carries). 10: the sea the player is in, and the one their ship sailed in from (an older
+save is in the starting waters); the holds made smaller
  */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 /** The first version whose talents fit the tree of now */
 const RANKED_TALENTS = 4;
+/**
+ * The first version with the holds of now: an older save's cargo, from a bigger hold, comes back whole, the hold
+ * over-full (nothing more hauled aboard) till it is sold or thrown overboard
+ */
+const SMALL_HOLDS = 10;
 /** Classes renamed since a version: an older save's ship of the old name sails as the new one */
 const RENAMED_CLASSES: readonly { readonly before: number; readonly from: string; readonly to: ShipClassId }[] = [
   { before: 7, from: 'corsair', to: 'coastalBark' },
@@ -63,6 +72,10 @@ export interface SavedShip {
  */
 export interface SaveData {
   readonly version: number;
+  /** The sea the player is in (world/zones.ts): the game is made for it */
+  readonly zone: ZoneId;
+  /** The sea their ship has just sailed in from: it comes in off the gate back to it; null once it is in */
+  readonly arrival: ZoneId | null;
   readonly player: {
     readonly gold: number;
     readonly hold: Partial<Record<GunId, number>>;
@@ -102,6 +115,8 @@ export function saveGame(state: GameState): SaveData {
   const { player, ship } = state;
   return {
     version: SAVE_VERSION,
+    zone: state.world.zone,
+    arrival: null,
     player: {
       gold: player.gold,
       hold: { ...player.hold },
@@ -178,9 +193,16 @@ function isQuest(value: unknown): value is QuestId {
   return typeof value === 'string' && (QUEST_IDS as readonly string[]).includes(value);
 }
 
+/** The sea a save is in, to make its game for: the starting waters for an older save, or none */
+export function savedZone(data: unknown): ZoneId {
+  const zone = record(data)?.zone;
+  return isZone(zone) ? zone : START_ZONE;
+}
+
 /**
- * Puts a saved player's progress back into a new game: what is valid of it, field by field; the rest stays as a new
- * player's. A ship saved on land or off the map comes back at START, a sunk one whole at START, a docked one in port.
+ * Puts a saved player's progress back into a new game (made for its sea, savedZone): what is valid of it, field by
+ * field; the rest stays as a new player's. A ship that has just sailed in from another sea comes in off the gate back
+ * to it. A ship saved on land or off the map comes back at START, a sunk one whole at START, a docked one in port.
  * Returns whether there was a save to load
  */
 export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean {
@@ -240,12 +262,19 @@ export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean
     state.ship = sailed;
     ship = sailed;
   }
-  loadShip(ship, saved, save.version);
+  stow(player, loadShip(ship, saved, save.version));
 
   const hp = count(saved.hp);
   const x = finite(saved.x);
   const y = finite(saved.y);
   const afloat = hp !== null && hp > 0;
+  if (isZone(save.arrival)) {
+    const spot = arrivalPoint(state, nav, save.arrival, routeClearance(ship)) ?? START;
+    ship.x = spot.x;
+    ship.y = spot.y;
+    ship.rotation = Math.atan2(state.world.port.island.y - spot.y, state.world.port.island.x - spot.x);
+    return loadFleet(state, purse, save.version);
+  }
   const open = x !== null && y !== null && nav.clearanceAt(x, y) >= routeClearance(ship);
   if (afloat && open) {
     ship.x = x;
@@ -261,40 +290,52 @@ export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean
     ship.y = mooring.y;
     ship.dock(mooring);
   }
+  return loadFleet(state, purse, save.version);
+}
 
-  // The ships laid up in port: one of each class, none of the sailed one's; each put through a ship of its class,
-  // so what is kept is valid
+/**
+ * The ships laid up in port: one of each class, none of the sailed one's; each put through a ship of its class, so
+ * what is kept is valid. True: there was a save
+ */
+function loadFleet(state: GameState, purse: Fields | null, version: number) {
+  const { player, ship } = state;
   const fleet = purse?.fleet;
-  if (Array.isArray(fleet)) {
-    for (const item of fleet) {
-      const laidUp = record(item);
-      const id = laidUp && sailable(laidUp.shipClass, save.version);
-      if (!laidUp || !id || id === ship.shipClass.id) continue;
-      if (player.fleet.some((kept) => kept.shipClass === id)) continue;
-      const kept = new Ship(SHIP_CLASSES[id], ship.id);
-      loadShip(kept, laidUp, save.version);
-      player.fleet.push({ ...saveShip(kept), docked: true });
-    }
+  if (!Array.isArray(fleet)) return true;
+  for (const item of fleet) {
+    const laidUp = record(item);
+    const id = laidUp && sailable(laidUp.shipClass, version);
+    if (!laidUp || !id || id === ship.shipClass.id) continue;
+    if (player.fleet.some((kept) => kept.shipClass === id)) continue;
+    const kept = new Ship(SHIP_CLASSES[id], ship.id);
+    stow(player, loadShip(kept, laidUp, version));
+    player.fleet.push({ ...saveShip(kept), docked: true });
   }
   return true;
+}
+
+/** Guns a saved ship can't carry any more, into the player's hold */
+function stow(player: Player, guns: readonly GunId[]) {
+  for (const gun of guns) player.hold[gun] = (player.hold[gun] ?? 0) + 1;
 }
 
 /**
  * Puts a saved ship's fittings back into a ship of its class: guns, ammo, the weapon picked, experience and talents,
  * cargo, outfit and hull (a wrecked one comes back whole). What is not valid is left as the new ship's. Where it is
- * is the caller's
+ * is the caller's. Returns the saved guns in slots its class no longer has: the player's hold takes them
  */
-export function loadShip(ship: Ship, data: unknown, version: number) {
+export function loadShip(ship: Ship, data: unknown, version: number): GunId[] {
+  const left: GunId[] = [];
   const saved = record(data);
-  if (!saved) return;
+  if (!saved) return left;
   const guns = record(saved.guns);
   for (const weapon of WEAPON_IDS) {
     const slots: unknown = guns?.[weapon];
     if (!Array.isArray(slots)) continue;
-    ship.guns[weapon].forEach((_, slot) => {
-      const gun: unknown = slots[slot];
-      if (gun === null) ship.fitGun(weapon, slot, null);
-      else if (isGun(gun) && GUNS[gun].weapon === weapon) ship.fitGun(weapon, slot, gun);
+    slots.forEach((gun: unknown, slot) => {
+      const valid = isGun(gun) && GUNS[gun].weapon === weapon;
+      if (slot >= ship.guns[weapon].length) {
+        if (valid) left.push(gun);
+      } else if (gun === null || valid) ship.fitGun(weapon, slot, gun);
     });
   }
   const ammo = record(saved.ammo);
@@ -338,8 +379,9 @@ export function loadShip(ship: Ship, data: unknown, version: number) {
   }
   // After the talents: Quartermaster makes the hold bigger
   const cargo = record(saved.cargo);
+  const room = version < SMALL_HOLDS ? Infinity : ship.holdSize;
   for (const id of GOOD_IDS) {
-    const n = Math.min(count(cargo?.[id]) ?? 0, ship.holdSize - cargoCount(ship.cargo));
+    const n = Math.min(count(cargo?.[id]) ?? 0, room - cargoCount(ship.cargo));
     if (n > 0) ship.cargo[id] = n;
   }
   const outfit = record(saved.outfit);
@@ -351,4 +393,5 @@ export function loadShip(ship: Ship, data: unknown, version: number) {
   const hp = count(saved.hp);
   if (hp !== null && hp > 0) ship.takeDamage(ship.maxHp - hp);
   readStats(saved.stats, ship.stats);
+  return left;
 }

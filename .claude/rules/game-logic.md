@@ -22,7 +22,7 @@ paths:
   (reloads, volleys and bites at attack targets, projectiles landing) → a boss's barrages fired and shells landing
   (`stepBarrages`) → loot (`stepLoot`: bounties, XP, quest kills, chests and goods dropped, a player's cargo lost) →
   repairs → chests sunk or hauled aboard (`stepChests`) → bots sunk this update taken out, due ones spawned
-  (`stepSpawns`) → players' ships in the harbour's basin docked (`stepDocking`) → a player's wreck brought back once
+  (`stepSpawns`) → players' ships in the harbour's basin docked (`stepDocking`) → a player's ship sailing into a gate leaves for the sea beyond (`stepGates`) → a player's wreck brought back once
   `WRECK_TIME` is up → the stats counted from the update's events (`stepStats`, last).
 - `state.events` (shots, impacts, bites, damage, destroyed units, repair steps, gold paid, XP, levels, talents, cargo…)
   are made by an update and read by the client in `view.update` right after it; the next update clears them. Events
@@ -77,15 +77,40 @@ paths:
   or slows down towards the helm's speed. The helm comes from the pilot.
 - `ship.bot` is the bot's mind (`bots/brain.ts`), `null` for a player's ship. A bot's ammo never runs out (`infiniteAmmo`).
 
+## Seas (`world/zones.ts`, `world/gates.ts`)
+
+- The game is in one sea at a time (`ZONES`, `state.world.zone`): `new Game(seed, zone)` builds its world from the
+  sea's seed (`createWorld(zone)`: the starting waters' is seed 42, its islands painted; the others' are vector-drawn)
+  and puts in the sea's bots (`zoneKinds`). A sea is for a tier of ship and some of its levels (`tier`, `levels`);
+  its `gates` (west to the sea before it, east to the next) are moved to open water once the routes are known
+  (`placeGates`). A player's ship in one leaves (`stepGates` sets `player.departure`, a player's own: online, each
+  goes their way), unless the sea's tier is above its ship's or it is in combat (a `gateClosed` event as it sails in;
+  one that waits in the gate goes once its fight is over). `Game.travel(to)` makes the save for the other sea
+  (`zone`, and `arrival`: the sea it came from, so it comes in off the gate back to it, `arrivalPoint`); the client
+  keeps it and makes the new sea's game from it (`savedZone`). No bot spawns or wanders near a gate (`nearGate`).
+- The starting waters keep their own bots, as balanced; every other sea's are made from `ARCHETYPES` (a trader, a
+  raider, a grazer, a pirate, a hunter, an elite, a boss with its escort) at the sea's tier and levels (`TIER_BOTS`):
+  a kind's `hp` (`ship.setHull`) and `power` (`ship.power`: every volley, bite and shell it does is multiplied by
+  it, as a talent's boost) make its hull do as the sea asks. Its `tier` weighs its XP: `xpForKill` pays a ship a
+  quarter for a bot a tier below it, a point for one further down, all of it for one above; within the tier, by levels.
+- Each sea's tavern offers its own quests (`zoneQuests`: the starting waters' six, the others' made from their bots),
+  counted only for kills in their sea; they are turned in at any tavern.
+
 ## Levels, talents and outfit (`ships/talents.ts`, `ships/outfit.ts`)
 
-- Every ship levels on its own, from 1 to its class's `maxLevel` (10 for the starter sloop, 20 for a line's ships;
-  `MAX_LEVEL`): `xp` from kills (`xpForKill`: less for a bot far below the ship) and quests (`gainXp`, `xp` and
+- What a ship of a line players sail has by its tier, whatever the line, is `lineTier` (`ships/shipClasses.ts`): its
+  `maxLevel`, ten a tier (the starter sloop's 10, as tier 1's; 60 at tier 6, `MAX_LEVEL`), its `abilities` (one up to
+  tier 3, two at tiers 4 and 5, three at tier 6). The European line is the yardstick the others are balanced against:
+  its hull is set for a fight of 20–30 s between two ships of a tier with their tier's guns in every cannon slot, and a
+  ship is meant to beat two of the tier below (the arsenal is still to be balanced for both). A ship bought at the
+  shipyard comes with no guns (`UNARMED`): only the starter sloop and the bots' hulls have `startingGuns`.
+- Every ship levels on its own, from 1 to its class's `maxLevel`: `xp` from kills (`xpForKill`: less for a bot far below the ship) and quests (`gainXp`, `xp` and
   `level` events). XP beyond the class's last level is lost. `giveLevels` is the HUD's debug buttons: a level up or
   down, within the class's; a level lost takes the talents again through `learnTalents`, as a save does.
 - Talents: a point at every level from 2 that isn't a milestone, spent a rank at a time in three branches (`BRANCHES`),
   a branch's next row opening with `ROW_POINTS` spent in it; the milestone levels (`MILESTONES`: 5, 10, 15, 20) offer
-  one of two signature talents instead, the level 5 one an ability (`useAbility`, F). `talentBlock` says why one
+  one of two signature talents instead, the level 5 one an ability (`useAbility`, F); the levels past 20 give points.
+  A ship's other abilities open at `ABILITY_LEVELS` (25, 45) on a ship that has them: still to be made. `talentBlock` says why one
   can't be taken; `ship.learnTalent` keeps to the rules, `forgetTalents` is the shipwright's (`resetTalents`). Their
   numbers are `PERKS`. `stepTalents` does what they do over time.
 - Outfit: one piece to a slot (`OUTFIT_SLOTS`: sails, hull, rudder, lookout), in tiers; each adds shares of the class's
@@ -124,7 +149,7 @@ paths:
   — or buys more of it, which goes back to an empty place. A save puts the bar back as it was, not through
   `setAmmoSlot`, so a ship holding fire comes back holding fire.
 - A ship class has gun `slots` per weapon; `ship.guns` holds the gun fitted in each (`fitGun`), one of `GUNS` in
-  `arsenal.ts`. Every gun has its own `range` and `reload` (`ship.reloads[weapon][slot]`). A volley fires every fitted
+  `arsenal.ts`; any ship fits any gun and fires any ammo, whatever its tier. Every gun has its own `range` and `reload` (`ship.reloads[weapon][slot]`). A volley fires every fitted
   gun of the selected weapon that is loaded, within reach of the target and has a shot of the loaded ammo (`loadAmmo`,
   `ship.ammo`), as one projectile from the middle of them; the `shot` event lists every muzzle. Cannons fire from the
   side facing the target.
@@ -207,11 +232,13 @@ paths:
   `setTarget` and `attack` ignored, it sails on to the `mooring` and lies there. `leavePort` sails it out through the
   entrance to the `roadstead`; `mayDock` keeps it from docking again until it has sailed `UNDOCK_MARGIN` beyond the
   basin. No bot spawns or wanders within `HARBOUR_CLEAR` of the basin (`nearHarbour`), so the way in stays clear.
-- `save.ts`: `saveGame` makes plain `SaveData` of a player's progress (the purse, the hold of guns and outfit, quests,
+- `save.ts`: `saveGame` makes plain `SaveData` of a player's progress (the sea they are in, the purse, the hold of guns and outfit, quests,
   the Captain's path, the fleet laid up in port, the stats, and the ship: its class, place, hull, guns, ammo, the ammo
   loaded and at hand, weapon, outfit, XP and talents, cargo, stats, whether it is in port); `loadGame` checks every field and keeps only the valid
   ones (a ship on land or off the map comes back at `START`; talents are put back through `learnTalent`, so only what
-  the rules allow). No bots, chests or time: the sea is made afresh. Bump `SAVE_VERSION` when the shape changes (an
+  the rules allow; a saved gun in a slot the class no longer has goes into the player's hold:
+  `loadShip` returns them; a save from before `SMALL_HOLDS` keeps all its cargo, the hold over-full till it is
+  sold). No bots, chests or time: the sea is made afresh. Bump `SAVE_VERSION` when the shape changes (an
   older save is read field by field); a class renamed goes in `RENAMED_CLASSES`, so an older save's ship sails on
   under its new id. The client keeps the save until there is a server.
 

@@ -1,5 +1,5 @@
 import { Container, Text, TextStyle } from 'pixi.js';
-import { GOODS, GOOD_IDS, TALENTS, findUnit, isAfloat, type GameEvent, type GameState } from '../../../game';
+import { GOODS, GOOD_IDS, TALENTS, ZONES, findUnit, isAfloat, type GameEvent, type GameState } from '../../../game';
 import type { Camera3D } from '../../render/Camera3D';
 import { t } from '../../i18n/i18n';
 
@@ -114,6 +114,13 @@ export class DamageNumbers {
         this.spawn(STYLES.cargo, goods.join('  '), event.shipId, event.at, CARGO_RAISE);
       } else if (event.type === 'holdFull' && event.shipId === state.ship.id) {
         this.spawn(STYLES.full, t('Hold full'), event.shipId, event.at, CARGO_RAISE);
+      } else if (event.type === 'gateClosed' && event.shipId === state.ship.id) {
+        const sea = t(ZONES[event.to].name);
+        const why =
+          event.reason === 'tier'
+            ? t('{sea}: needs a ship of tier {tier}', { sea, tier: event.tier })
+            : t('{sea}: not in combat', { sea });
+        this.spawn(STYLES.full, why, event.shipId, event.at, CARGO_RAISE);
       }
     }
     for (const f of this.floaters) {

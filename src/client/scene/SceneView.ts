@@ -41,6 +41,8 @@ import { PortSprites } from './models/PortSprites';
 import { BotSprites } from './models/BotSprites';
 import { ChestSprites } from './models/ChestSprites';
 import { botShipTop, drawBotShip } from './models/botShip3d';
+import { drawGate } from './models/gate3d';
+import { drawMonster, drawMonsterWater, isMonsterModel, monsterTop } from './models/monster3d';
 import { drawProjectile, drawProjectileShadow } from './models/projectile3d';
 import { SPINE, drawSerpent, drawSerpentWater, type SpinePoint } from './models/serpent3d';
 import { ShipSprite } from './models/ShipSprite';
@@ -105,7 +107,7 @@ function head(serpent: Ship) {
 
 /** How high a unit stands, world units: the top of a ship's mast, a monster's height. Its hit point bar is over it */
 function unitTop(unit: Unit) {
-  return botShipTop(unit.shipClass.id) ?? unit.height;
+  return botShipTop(unit.shipClass.id) ?? monsterTop(unit.shipClass.id) ?? unit.height;
 }
 
 // Pseudo-3D: the world has height and the camera looks at it at an angle.
@@ -279,6 +281,10 @@ export class SceneView {
     for (const island of drawn) if (!this.islandSprites.has(island)) drawIslandGround(painter, island);
 
     this.drawWorldBorder();
+    // The gates to other seas, on the water
+    for (const gate of world.gates) {
+      if (painter.isVisible(gate.x, gate.y, 0, gate.radius + ISLAND_MARGIN)) drawGate(painter, gate, time);
+    }
 
     // Only the islands on the screen can fade a wake that is: hundreds of them would cost a lot per point
     this.wake.draw(camera, ship, time, islands);
@@ -308,8 +314,10 @@ export class SceneView {
     // wrecks; ships' water is their wake
     for (const other of others) {
       const spine = this.spines.get(other.id);
+      const kind = other.shipClass.id;
       if (spine) drawSerpentWater(painter, spine, time);
-      else if (other.shipClass.id === 'seaTurtle') drawTurtleWater(painter, other, time);
+      else if (kind === 'seaTurtle') drawTurtleWater(painter, other, time);
+      else if (isMonsterModel(kind)) drawMonsterWater(painter, other, kind, time);
     }
     this.wrecks.drawWater(painter, time);
     // Chests in sight: a ring of foam round each
@@ -371,9 +379,11 @@ export class SceneView {
       objects.push({
         depth: painter.depth([other.x, other.y, other.height / 2]),
         draw: (p) => {
+          const kind = other.shipClass.id;
           if (spine) drawSerpent(p, spine, time, shake, lunge);
-          else if (other.shipClass.id === 'seaTurtle') drawTurtle(p, other, time, shake, lunge);
-          else drawBotShip(p, other, other.shipClass.id, other.shipClass.slots.cannon, time, shake);
+          else if (kind === 'seaTurtle') drawTurtle(p, other, time, shake, lunge);
+          else if (isMonsterModel(kind)) drawMonster(p, other, kind, time, shake, lunge);
+          else drawBotShip(p, other, kind, other.shipClass.slots.cannon, time, shake);
         },
       });
     }

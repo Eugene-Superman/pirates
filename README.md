@@ -38,13 +38,18 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    The game opens in your browser automatically at <http://localhost:5173>.
    Code changes reload the page on save.
 
-4. Play: click (or tap) on the sea to set a course; the ship finds its way round islands. Hold the button and drag to
+4. Seas: the starting waters are the first of fifteen, one to three a tier of ship. Each has gates at its west and east
+   edges to the sea before and after it: sail into one to go (a sea of a higher tier than your ship's stays closed).
+   N, or the Seas button, opens the world chart: every sea, its gates, what sails it; for now its button takes you to
+   any sea at once, for testing.
+5. Play: click (or tap) on the sea to set a course; the ship finds its way round islands. Hold the button and drag to
    steer continuously. Bots sail the sea: fishing boats, merchants and turtles leave you alone, smugglers and sea
    serpents attack when you come near. Click one to pick it out (its hull shows at the top), double-click it or press
    Space to fire the selected weapon at it, Escape to stop. Kills and quests give experience: every ship has its own
-   level, from 1: the starter sloop's go up to 10, a line's ships' to 20. Each level from 2 gives a talent point for three branches (Gunnery, Seamanship, Hull and crew),
+   level, from 1, up to ten a tier: the starter sloop's and a tier 1 ship's go up to 10, a tier 6 ship's to 60. Each level from 2 gives a talent point for three branches (Gunnery, Seamanship, Hull and crew),
    ranked, a branch's next row opening with points spent in it; levels 5, 10, 15 and 20 (those a ship reaches) offer
-   one of two signature talents instead (the level 5 one is an ability, F). K opens the tree; a button by your ship's frame lights up when
+   one of two signature talents instead (the level 5 one is an ability, F; ships of tier 4 and up will have a second at
+   level 25, tier 6 a third at 45). A ship bought at the shipyard comes with no guns: fit yours from the hold. K opens the tree; a button by your ship's frame lights up when
    something waits to be picked; the shipwright forgets them all for a little gold. R repairs the hull out of combat,
    for a little gold (1 for every 10 hull; the shipwright in port does it at once, for more); L opens the loadout
    (the ship's gun slots, its ammo at hand and what waits in the hold: click or drag a gun into a slot, drag ammo onto
@@ -73,13 +78,18 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    in the top-right corner, under your quests, lists what the shipyard asks (a first kill, a talent, a repair at sea, a sale; quests turned in, a
    level, the Smuggler Baron sunk, the price). The Baron's brig sails in the north-east with two smugglers; his mortar
    marks red circles on the water where its shells will land — sail out of them. With every term met, the shipyard
-   sells the Coastal Bark: it starts at level 1 (up to 20) with talents of its own, and your sloop stays in port with
+   sells the Coastal Bark: it starts at level 1 (up to 10) with talents of its own, and your sloop stays in port with
    everything on it. Then the path leads on to the Corsair, the line's tier 2: a three-master with three tiers of guns,
-   for the Coastal Bark at level 12, twelve quests and 9,000 gold. The shipyard's My ships lists your ships: take the
-   helm of any of them there. A tab for each line
-   shows its ships (the Forbidden Fleets four a tier, each with how it will be won and in what currency), and Buy the
-   masterworks, for doubloons; all but the Coastal Bark and the Corsair are planned, with provisional figures and their
-   legends.
+   for the Coastal Bark at level 10, twelve quests and 9,000 gold; to the Frigate, its tier 3, a bigger, faster ship
+   under orange and lilac sails, for the Corsair at level 20, twenty quests and 24,000 gold; to the Royal Galleon, its
+   tier 4, a wide four-master under silver sails and gilt crowns, for the Frigate at level 30, thirty quests and 60,000
+   gold; to the Admiral, its tier 5, a black and gold three-decker under towering black sails, for the Royal Galleon
+   at level 40, forty-five quests and 150,000 gold; and to the Imperial Ship of the Line, its tier 6 and last, a
+   golden three-decker under the tallest sails afloat with a gilt shark's tail, for the Admiral at level 50,
+   sixty-five quests and 375,000 gold. The shipyard's My ships lists your ships: take the helm of any of them there. A
+   tab for each line shows its ships (the Forbidden Fleets four a tier, each with how it will be won and in what
+   currency), and Buy the masterworks, for doubloons; all but the European line are planned, with provisional figures
+   and their legends.
 
    Your ship's hull, level, gold, doubloons and hold are in the top-left corner, speed and FPS under it; the quests
    you have taken (✕ gives one up, once you say yes) and the Captain's path are in the top-right corner, each folded

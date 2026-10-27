@@ -62,8 +62,8 @@ export const UK: Readonly<Record<string, string>> = {
   'FPS: {fps}   longest frame: {ms} ms': 'FPS: {fps}   найдовший кадр: {ms} мс',
   "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings":
     'Немає графічного прискорення: гру малює процесор, у меншій роздільності. Увімкніть його в налаштуваннях браузера',
-  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold, P captain's mastery":
-    'Клік по морю — плисти, по порту — зайти в нього · клік по кораблю чи чудовиську — обрати ціль, подвійний клік або Пробіл — вогонь, Esc — стоп · Q/E зброя, R ремонт (за золото), F уміння, K таланти, I статистика, H трюм, P майстерність капітана',
+  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold, P captain's mastery, N world chart":
+    'Клік по морю — плисти, по порту — зайти в нього · клік по кораблю чи чудовиську — обрати ціль, подвійний клік або Пробіл — вогонь, Esc — стоп · Q/E зброя, R ремонт (за золото), F уміння, K таланти, I статистика, H трюм, P майстерність капітана, N карта світу',
   'Intact 100%': 'Цілий 100%',
   'Minor 70%': 'Подряпаний 70%',
   'Heavy 45%': 'Побитий 45%',
@@ -217,8 +217,11 @@ export const UK: Readonly<Record<string, string>> = {
   'Ability (F)': 'Уміння (F)',
   'Opens with a signature talent at level {level}: pick it in the talents (K)':
     'Відкривається особливим талантом на {level} рівні: оберіть його в талантах (K)',
-  Locked: 'Закрито',
-  'A skill still to come': 'Це вміння ще буде',
+  'Second ability': 'Друге вміння',
+  'Third ability': 'Третє вміння',
+  'Opens at level {level}: still to come': 'Відкриється на {level} рівні: ще буде',
+  'Ships of tier 4 and up have it': 'Є в кораблів 4 рангу й вище',
+  'Ships of tier 6 have it': 'Є в кораблів 6 рангу',
   'Click or {key}: load it': 'Клацніть або {key}: зарядити',
   'No ammo at hand': 'Під рукою немає боєприпасів',
   'Click to put some here in the loadout (L)': 'Клацніть, щоб покласти їх сюди в озброєнні (L)',
@@ -338,7 +341,7 @@ export const UK: Readonly<Record<string, string>> = {
   '+5% turning a rank': '+5% повороту за очко',
   '+5% sight a rank': '+5% огляду за очко',
   Quartermaster: 'Квартирмейстер',
-  '+10 places in the hold a rank': '+10 місць у трюмі за очко',
+  '+10% room in the hold a rank': '+10% місця в трюмі за очко',
   'Bounty hunter': 'Шукач нагород',
   '+7% gold for every kill a rank': '+7% золота за кожну здобич, за очко',
   'Treasure hunter': 'Шукач скарбів',
@@ -879,8 +882,8 @@ export const UK: Readonly<Record<string, string>> = {
     'Збудований на верфях Солоного Вітру для берегових патрулів: удвічі більше гармат, ніж у шлюпа, за міцним дубовим корпусом, дві щогли й королівський герб на гроті. Не найшвидший на морі, але за себе постоїть.',
   "A raider under a royal letter of marque: lean, quick for its guns and painted in the king's blue. Its captains take what the crown's enemies carry and keep a share of it.":
     'Рейдер із королівським каперським патентом: стрункий, швидкий як на свої гармати, пофарбований у королівську синь. Його капітани забирають усе, що везуть вороги корони, і лишають собі частку.',
-  'The eyes of the navy: a long, fast hull with one gun deck and the tallest masts in the fleet. It finds the enemy first, and when it must, it fights well above its size.':
-    'Очі флоту: довгий швидкий корпус з однією гарматною палубою й найвищими щоглами у флоті. Він першим знаходить ворога, а коли треба, б’ється так, ніби вдвічі більший.',
+  'The eyes of the navy: a long, fast hull with two gun decks and raked masts under sharp orange and lilac sails. It finds the enemy first, and when it must, it fights well above its size.':
+    'Очі флоту: довгий швидкий корпус із двома гарматними палубами й похилими щоглами під гострими помаранчево-бузковими вітрилами. Він першим знаходить ворога, а коли треба, б’ється так, ніби вдвічі більший.',
   'A deep hull with gilded galleries that brings the treasure fleets home. Its holds are full of silver and its decks bristle with guns, for every pirate knows what it carries.':
     'Глибокий корпус із позолоченими галереями, що веде додому срібні флоти. Його трюми повні срібла, а палуби наїжачені гарматами, бо кожен пірат знає, що він везе.',
   "The flagship of a squadron, the admiral's pennant at the main and a band playing on the quarterdeck. Its signals move whole fleets, and its broadsides end the battles they start.":
@@ -936,6 +939,9 @@ export const UK: Readonly<Record<string, string>> = {
   'The throne of the drowned kings, raised from the deepest trench of the sea. Its runes burn like coals, its guns were cast in no forge of this world, and the sea itself makes way for it.':
     'Трон потонулих королів, піднятий із найглибшої западини моря. Його руни жевріють, як вуглини, його гармати відлиті не в кузні цього світу, і саме море розступається перед ним.',
   'Cannons + harpoon guns': 'Гармати + гарпунні гармати',
+  Levels: 'Рівні',
+  'up to {level}': 'до {level}',
+  Abilities: 'Уміння',
   Obtained: 'Як здобути',
   Free: 'Безкоштовно',
   'to be set': 'визначиться згодом',
@@ -1263,4 +1269,95 @@ export const UK: Readonly<Record<string, string>> = {
   Abandon: 'Відмовитися',
   'Full screen': 'На весь екран',
   'Leave full screen': 'Вийти з повного екрана',
+  'Starting Waters': 'Стартові води',
+  'Coral Coast': 'Кораловий берег',
+  "Smugglers' Straits": 'Протоки контрабандистів',
+  'Windward Isles': 'Навітряні острови',
+  'Fog Banks': 'Туманні мілини',
+  'Shipwreck Shoals': 'Мілини корабельних аварій',
+  'Storm Reach': 'Штормовий простір',
+  'Kraken Deep': 'Безодня кракена',
+  'Black Reefs': 'Чорні рифи',
+  'Iron Sea': 'Залізне море',
+  'Ember Isles': 'Жаристі острови',
+  "Serpent's Maw": 'Паща змія',
+  'Frozen Expanse': 'Крижаний простір',
+  'Abyssal Trench': 'Бездонна западина',
+  'Crown Waters': 'Коронні води',
+  'Pirate brig': 'Піратський бриг',
+  Warship: 'Військовий корабель',
+  'Pirate flagship': 'Піратський флагман',
+  'Giant crab': 'Гігантський краб',
+  'Great shark': 'Велика акула',
+  Kraken: 'Кракен',
+  'Bounty: {target}': 'Нагорода: {target}',
+  'Hunt: {target}': 'Полювання: {target}',
+  'Wanted: {target}': 'Розшукується: {target}',
+  'The terror of {zone}': 'Жах моря «{zone}»',
+  'The harbour master of {zone} pays for {count} of them sunk.':
+    'Начальник порту моря «{zone}» платить за {count} потоплених.',
+  'The cook of {zone} wants {count} of them, and mind their jaws.':
+    'Кухарю моря «{zone}» треба {count} таких, і стережіться щелеп.',
+  '{count} of them prey on the ships of {zone}. Hunt them down.':
+    'У морі «{zone}» на кораблі полюють такі. Вполюйте {count}.',
+  'One {target} rules the sea lanes of {zone}. Sink it.': 'Шляхами моря «{zone}» володарює {target}. Потопіть його.',
+  'Sink the {target} at its lair, and its escort scatters.': 'Потопіть {target} у його лігві, і охорона розбіжиться.',
+  'World chart (N)': 'Карта світу (N)',
+  'A tier {tier} sea, levels {from}–{to}': 'Море {tier} рангу, рівні {from}–{to}',
+  'Sail into the gate to go there': 'Пропливіть крізь браму, щоб туди потрапити',
+  'Needs a ship of tier {tier}': 'Потрібен корабель {tier} рангу',
+  'World chart': 'Карта світу',
+  'Every sea, by the tier of ship it is for: its gates lead to the next':
+    'Усі моря за рангом корабля, для якого вони: їхні брами ведуть до наступного',
+  Starter: 'Стартове',
+  'Lv {from}–{to}': 'Рів. {from}–{to}',
+  '{sea}: needs a ship of tier {tier}': '{sea}: потрібен корабель {tier} рангу',
+  '{sea}: not in combat': '{sea}: не під час бою',
+  'The gate to {sea} is closed: it needs a ship of tier {tier}':
+    'Брама до моря «{sea}» зачинена: потрібен корабель {tier} рангу',
+  'The gate to {sea} is closed while you are in combat': 'Брама до моря «{sea}» зачинена, поки ви в бою',
+  'Calm waters round the port where every captain begins: fishing boats, merchants, smugglers and the odd sea monster. The Smuggler Baron holds the north-east.':
+    'Спокійні води довкола порту, де починає кожен капітан: рибальські човни, торговці, контрабандисти й зрідка морські чудовиська. На північному сході панує Барон контрабандистів.',
+  'Shallow reefs and lagoons, the first sea of a ship of the line: traders and pirate brigs, turtles on the reefs, serpents in the channels.':
+    'Мілкі рифи й лагуни, перше море корабля лінійки: торговці й піратські бриги, черепахи на рифах, змії в протоках.',
+  'Narrow straits between rocky isles where contraband changes hands. The pirates here sail in numbers.':
+    'Вузькі протоки між скелястими островами, де контрабанда переходить з рук у руки. Пірати тут ходять зграями.',
+  'Isles battered by the trade winds, where the pirates of the straits winter and the sharks follow the fleets.':
+    'Острови, які шмагають пасати: тут зимують пірати проток, а за флотами пливуть акули.',
+  'A sea under a grey blanket of fog: ships come out of it at close range, and so do the beasts.':
+    'Море під сірою ковдрою туману: кораблі виринають з нього зовсім поруч, і чудовиська теж.',
+  'Shoals strewn with the wrecks of the fleets that tried to cross them: rich salvage, and those who guard it.':
+    'Мілини, всіяні уламками флотів, що пробували їх перетнути: багата здобич і ті, хто її стереже.',
+  'Open ocean where the storms never quite die down. Warships of the old navies patrol it.':
+    'Відкритий океан, де шторми ніколи до кінця не вщухають. Його патрулюють військові кораблі старих флотів.',
+  "Waters over a chasm with no bottom: the kraken's own, and the beasts that feed on what it leaves.":
+    'Води над безоднею без дна: володіння кракена й чудовиськ, що живляться його рештками.',
+  'Black coral reefs that tear a careless hull open. The strongest pirate fleets hide among them.':
+    'Чорні коралові рифи, що розпорюють необережний корпус. Серед них ховаються найсильніші піратські флоти.',
+  'Grey waters round the old naval fortresses, where warships still fight a war that ended long ago.':
+    'Сірі води довкола старих морських фортець, де військові кораблі досі ведуть давно скінчену війну.',
+  "Volcanic isles under clouds of ash, the sea warm and steaming, the pirates' forges smoking on the shores.":
+    'Вулканічні острови під хмарами попелу: море тепле й паруе, на берегах димлять піратські кузні.',
+  'A ring of jagged isles round a whirlpool, where the great serpents and the boldest crews meet.':
+    'Кільце зазубрених островів довкола виру, де сходяться великі змії й найзухваліші команди.',
+  'Ice floes and frozen isles at the top of the world: only the toughest ships of the line sail them.':
+    'Крижини й замерзлі острови на верхівці світу: тут ходять лише найміцніші кораблі лінійки.',
+  'Over the deepest trench of the sea, where the oldest monsters rise to the surface.':
+    'Над найглибшою западиною моря, звідки на поверхню здіймаються найдавніші чудовиська.',
+  'The last sea: the treasure fleets of the crowns, and the admirals who guard them.':
+    'Останнє море: скарбові флоти корон і адмірали, що їх стережуть.',
+  'Sail there (developer)': 'Перейти туди (розробник)',
+  'Click a sea to read about it; sail into its gates to go there':
+    'Клікніть по морю, щоб прочитати про нього; щоб потрапити туди, пропливіть крізь його браму',
+  'The starting waters, levels {from}–{to}': 'Стартові води, рівні {from}–{to}',
+  'You are here': 'Ви тут',
+  'Open to your ship': 'Відкрите для вашого корабля',
+  Gates: 'Брами',
+  'West gate: {sea} (tier {tier})': 'Західна брама: {sea} ({tier} ранг)',
+  'East gate: {sea} (tier {tier})': 'Східна брама: {sea} ({tier} ранг)',
+  'What sails it': 'Хто тут плаває',
+  boss: 'бос',
+  aggressive: 'агресивний',
+  neutral: 'нейтральний',
+  Seas: 'Моря',
 };

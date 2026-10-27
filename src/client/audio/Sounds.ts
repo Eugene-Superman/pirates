@@ -224,6 +224,7 @@ export class Sounds {
           if (mine(event) && !paid('chest')) this.play('cargo', 1, 0);
           break;
         case 'holdFull':
+        case 'gateClosed':
         case 'repairStopped':
           if (mine(event)) this.play('error', 1, 0);
           break;

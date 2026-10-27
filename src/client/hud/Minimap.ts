@@ -5,6 +5,7 @@ import {
   CHART,
   MapProjection,
   drawBossLair,
+  drawGates,
   drawIsland,
   drawLostCargo,
   drawRoute,
@@ -285,7 +286,8 @@ export class Minimap {
         .stroke({ width: 1, color: 0x3a2400 });
     }
     drawLostCargo(g, state, map, LANDMARK_SIZE);
-    drawBossLair(g, map, LANDMARK_SIZE);
+    drawBossLair(g, map, LANDMARK_SIZE, state.world.zone);
+    drawGates(g, map, state.world.gates, LANDMARK_SIZE);
     drawShipArrow(g, ship, map, ME_SIZE);
   }
 

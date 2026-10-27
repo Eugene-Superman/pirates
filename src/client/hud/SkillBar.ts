@@ -1,7 +1,7 @@
 import { Assets, Container, Graphics, Rectangle, Sprite, type Text, type Texture } from 'pixi.js';
 import {
+  ABILITY_LEVELS,
   AMMO,
-  MILESTONES,
   OFF_TARGET_SHARE,
   PERKS,
   REPAIR_HP_PER_GOLD,
@@ -109,8 +109,8 @@ const AMMO_KEYS = ['Z', 'X'] as const;
 // The key that picks each weapon (keyboardInput.ts), shown on its plate
 const WEAPON_KEYS: Readonly<Record<WeaponId, string>> = { cannon: 'Q', harpoon: 'E' };
 const NATURE_NAMES = { creature: 'to creatures', object: 'to ships and objects' } as const;
-// The level the ability's talents open at: the first milestone
-const ABILITY_LEVEL = MILESTONES[0];
+// The level the first ability's talents open at
+const ABILITY_LEVEL = ABILITY_LEVELS[0];
 
 /** A box of the frame's picture on the screen, in whole pixels from the bar's top left corner */
 function onScreen(box: Box) {
@@ -299,7 +299,8 @@ interface Group {
 /**
  * The bar at the bottom of the screen, in a painted frame of wood and brass (`FRAME`). On top, ten quick slots, keys
  * 1…0, waiting for what the hold will carry to use at sea. Under them on the left, the skills, painted: the repair (R)
- * and the ship's ability (F; a lock until its talent is picked at level 5), and two locks on skills to come; on the
+ * and the ship's ability (F; a lock until its talent is picked at level 5), and two locks on its second and third
+ * abilities, still to come (a ship of a lower tier has none: they say which tier brings them); on the
  * right, each weapon's plate (a click on it, or its key, Q or E, picks it) with its two kinds of ammo at hand under it
  * (Ship.ammoBar, put there in the loadout: their counts, the loaded one lit, a click or Z or X loads the other; an
  * empty place, as one whose ammo has run out is, shows a plus that opens the loadout). Ammo dragged out of the loadout
@@ -321,7 +322,7 @@ export class SkillBar {
   private readonly ability: SkillWell;
   private readonly abilitySweep = new Graphics();
   private readonly abilityCount = label('', FONT.countdown, THEME.text);
-  /** The wells of the skills to come, locked */
+  /** The wells of the second and third abilities, to come: locked */
   private readonly toCome: readonly SkillWell[];
   /** The ability the skills' faces were laid for, '' to lay them again (the pictures have loaded) */
   private facesFor = '';
@@ -337,7 +338,7 @@ export class SkillBar {
 
     this.repair = skillWell(FRAME.skills[0], actions.repair, repairHint);
     this.ability = skillWell(FRAME.skills[1], actions.useAbility, abilityHint);
-    this.toCome = [FRAME.skills[2], FRAME.skills[3]].map((box) => skillWell(box, null, lockedHint));
+    this.toCome = [FRAME.skills[2], FRAME.skills[3]].map((box, i) => skillWell(box, null, toComeHint(i + 1)));
     this.repair.well.content.addChild(this.repairArc, this.repairCount, keyLabel('R', this.repair.well));
     this.ability.well.content.addChild(this.abilitySweep, this.abilityCount, keyLabel('F', this.ability.well));
     for (const [{ well }, count] of [
@@ -696,9 +697,20 @@ function abilityHint({ ship }: GameState): TooltipText {
   return { title: t(TALENTS[ability].name), lines: [t(TALENTS[ability].text)] };
 }
 
-/** A skill to come's tooltip */
-function lockedHint(): TooltipText {
-  return { title: t('Locked'), color: THEME.dim, lines: [t('A skill still to come')] };
+/**
+ * The tooltip of an ability still to come (`index`: 1 for the second, 2 for the third): the level it opens at on a
+ * ship that has it, or the tier that brings it
+ */
+function toComeHint(index: number): Hint {
+  return ({ ship }) => {
+    const title = t(index === 1 ? 'Second ability' : 'Third ability');
+    if (index < ship.shipClass.abilities) {
+      const level = ABILITY_LEVELS[index];
+      return { title, color: THEME.dim, lines: [t('Opens at level {level}: still to come', { level })] };
+    }
+    const tier = index === 1 ? 'Ships of tier 4 and up have it' : 'Ships of tier 6 have it';
+    return { title, color: THEME.dim, lines: [t(tier)] };
+  };
 }
 
 /**

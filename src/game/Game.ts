@@ -15,8 +15,10 @@ import { Ship } from './ships/Ship';
 import { SHIP_CLASSES, STARTER_SHIP } from './ships/shipClasses';
 import { stepTalents } from './ships/talents';
 import { stepStats } from './records/tally';
+import { placeGates, stepGates } from './world/gates';
 import { stepDocking } from './world/port';
 import { START, createWorld } from './world/World';
+import { START_ZONE, ZONES, type ZoneId } from './world/zones';
 
 // World units a ship moves at most between two collision checks: less than the thinnest pair of hulls can overlap by
 // (two sea serpents: 4 + 4), so nothing is skipped over at any speed or frame rate
@@ -53,14 +55,16 @@ export class Game {
 
   /**
    * seed: the match's own, so each match rolls its own dice and places its own bots. Online the server will pick it and
-   * send it to the clients; the map stays the same whatever it is (its seed is fixed, World.ts)
+   * send it to the clients; the map stays the same whatever it is (each sea's seed is fixed, world/zones.ts).
+   * zone: the sea the game is in (the player's, from their save): one sea a game, a gate to another makes a new one
    */
-  constructor(seed: number) {
+  constructor(seed: number, zone: ZoneId = START_ZONE) {
     this.random = createRandom(streamSeed(seed, COMBAT_STREAM));
     this.botRandom = createRandom(streamSeed(seed, BOT_STREAM));
     this.lootRandom = createRandom(streamSeed(seed, LOOT_STREAM));
-    const world = createWorld();
+    const world = createWorld(ZONES[zone]);
     this.nav = new NavGrid(world);
+    world.gates = placeGates(ZONES[zone], this.nav);
     let nextId = 1;
     const ship = new Ship(SHIP_CLASSES[STARTER_SHIP], nextId++);
     ship.x = START.x;
@@ -84,6 +88,15 @@ export class Game {
   /** The player's progress, to keep between games (save.ts) */
   save(): SaveData {
     return saveGame(this.state);
+  }
+
+  /**
+   * The player's progress to take to another sea (a gate sailed into, or the world chart's jump): their ship there,
+   * coming in off the gate back to this one (or at the start, where there is none). The client keeps it and makes the
+   * game of that sea from it
+   */
+  travel(to: ZoneId): SaveData {
+    return { ...saveGame(this.state), zone: to, arrival: this.state.world.zone };
   }
 
   /** Puts a kept progress back: right after the game is made. Anything not valid in it is left as new */
@@ -131,6 +144,7 @@ export class Game {
     stepChests(state);
     stepSpawns(state, this.nav, this.botRandom);
     stepDocking(state);
+    stepGates(state);
     this.bringBackWrecks();
     // Last, with every event of the update in
     stepStats(state, dt);

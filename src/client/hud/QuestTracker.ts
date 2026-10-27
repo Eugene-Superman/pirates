@@ -24,6 +24,7 @@ import {
   subheading,
   themedPanel,
 } from './theme';
+import { questTitle } from './questText';
 import { Tooltip, type TooltipText } from './Tooltip';
 import { Tile, UI, playTap, show, text, tint } from './ui';
 import { t } from '../i18n/i18n';
@@ -80,11 +81,11 @@ interface QuestRow {
 
 /** What the player is asked before a quest is given up: the tavern and the tracker ask the same */
 export function abandonQuestion(quest: ActiveQuest): Question {
-  const { title, count } = QUESTS[quest.id];
+  const { count } = QUESTS[quest.id];
   return {
     title: t('Abandon the quest?'),
     text: t('"{title}": {kills} of {count} so far. The count is lost, but the tavern will offer the quest again.', {
-      title: t(title),
+      title: questTitle(QUESTS[quest.id]),
       kills: quest.kills,
       count,
     }),
@@ -303,9 +304,9 @@ export class QuestTracker {
 
   /** A row as its quest stands now */
   private fill(row: QuestRow, quest: ActiveQuest) {
-    const { title, count } = QUESTS[quest.id];
+    const { count } = QUESTS[quest.id];
     const done = questDone(quest);
-    show(row.title, t(title));
+    show(row.title, questTitle(QUESTS[quest.id]));
     tint(row.title, done ? UI.good : THEME.text);
     show(row.count, `${quest.kills}/${count}`);
     tint(row.count, done ? UI.good : THEME.dim);

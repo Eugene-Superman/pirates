@@ -88,6 +88,92 @@ const EMITTERS: Readonly<Partial<Record<ShipClassId, { burning: Emitter[]; sinki
       { x: -10.7, y: -1.1, z: 6.1, spread: [1.1, 1.3, 0.2] },
     ],
   },
+  // Matches blender-assets/ships/european/frigate/build.py (scaled by its SCALE, y negated, times 9 / its radius 17):
+  // the waist, the forecastle, the quarterdeck and the burning feet of the courses and the spanker; going down, the
+  // foremast fallen over the bow, the main course, the waist and the quarterdeck
+  frigate: {
+    burning: [
+      { x: 1.7, y: -1.4, z: 4.4, spread: [1.7, 1.1, 0.3] },
+      { x: -3.9, y: 1.7, z: 4.4, spread: [1.1, 1.1, 0.3] },
+      { x: 9.4, y: 1, z: 5.8, spread: [1.1, 0.9, 0.2] },
+      { x: -10.5, y: -1.1, z: 6.2, spread: [1.1, 1.3, 0.2] },
+      { x: -0.7, y: 0, z: 8.6, spread: [1.1, 4.4, 0.4] },
+      { x: 8, y: 0, z: 8.3, spread: [1.1, 4.1, 0.4] },
+      { x: -11.6, y: 0, z: 8, spread: [3.3, 0.8, 0.3] },
+    ],
+    sinking: [
+      { x: 14.9, y: -2.2, z: 6.1, spread: [3.3, 2.8, 0.4] },
+      { x: -0.7, y: 0, z: 8.9, spread: [1.1, 3.9, 0.4] },
+      { x: -3.3, y: -1.4, z: 4.3, spread: [1.9, 1.4, 0.3] },
+      { x: -10.5, y: -1.1, z: 5.9, spread: [1.1, 1.3, 0.2] },
+    ],
+  },
+  // Matches blender-assets/ships/european/royalGalleon/build.py (y negated, times 9 / its radius 19): the waist, the
+  // forecastle, the quarterdeck, the poop and the burning feet of the courses and the mizzen's lateen; going down, the
+  // foremast fallen over the bow, the main course, the waist, the quarterdeck and the poop
+  royalGalleon: {
+    burning: [
+      { x: 1.4, y: -0.7, z: 4.1, spread: [1.6, 1.1, 0.3] },
+      { x: -2.4, y: 0.9, z: 4.1, spread: [1.1, 1.1, 0.3] },
+      { x: 9.7, y: 0.9, z: 5.5, spread: [1.1, 0.9, 0.2] },
+      { x: -7.3, y: -0.9, z: 5.8, spread: [1.1, 1.2, 0.2] },
+      { x: -13, y: 0.7, z: 7.2, spread: [1, 1, 0.2] },
+      { x: 0.4, y: 0, z: 7.8, spread: [1.1, 5.5, 0.4] },
+      { x: 8.5, y: 0, z: 7.5, spread: [1.1, 5, 0.4] },
+      { x: -5.9, y: 0.2, z: 8, spread: [3.8, 0.8, 0.3] },
+    ],
+    sinking: [
+      { x: 11.4, y: -1.2, z: 5.6, spread: [3.3, 2.8, 0.4] },
+      { x: 0.4, y: 0, z: 7.6, spread: [1.1, 4.8, 0.4] },
+      { x: -1.4, y: -0.7, z: 3.8, spread: [2, 1.5, 0.3] },
+      { x: -7.6, y: -0.9, z: 5.5, spread: [1.2, 1.4, 0.2] },
+      { x: -13, y: 0.7, z: 6.9, spread: [1, 1, 0.2] },
+    ],
+  },
+  // Matches blender-assets/ships/european/admiral/build.py (y negated, times 9 / its radius 19): the waist, the
+  // forecastle, the quarterdeck, the poop and the burning feet of the courses and the spanker; going down, the foremast
+  // fallen over the bow, the main course, the waist, the quarterdeck and the poop
+  admiral: {
+    burning: [
+      { x: 1.4, y: -0.7, z: 5.7, spread: [1.6, 1.1, 0.3] },
+      { x: -2.4, y: 0.9, z: 5.7, spread: [1.1, 1.1, 0.3] },
+      { x: 9.9, y: 0.9, z: 6.7, spread: [1.1, 0.9, 0.2] },
+      { x: -6.6, y: -0.9, z: 6.9, spread: [1.1, 1.2, 0.2] },
+      { x: -12.3, y: 0.7, z: 8, spread: [1, 1, 0.2] },
+      { x: 0.2, y: 0, z: 9.1, spread: [1.1, 6.6, 0.4] },
+      { x: 8.1, y: 0, z: 8.7, spread: [1.1, 6, 0.4] },
+      { x: -10.9, y: 0.5, z: 9.9, spread: [3.6, 0.8, 0.3] },
+    ],
+    sinking: [
+      { x: 11.8, y: -1.2, z: 7, spread: [3.3, 2.8, 0.4] },
+      { x: 0.2, y: 0, z: 8.6, spread: [1.1, 5.6, 0.4] },
+      { x: -1.4, y: -0.7, z: 5.2, spread: [2, 1.5, 0.3] },
+      { x: -6.6, y: -0.9, z: 6.4, spread: [1.2, 1.4, 0.2] },
+      { x: -12.3, y: 0.7, z: 7.5, spread: [1, 1, 0.2] },
+    ],
+  },
+  // Matches blender-assets/ships/european/shipOfTheLine/build.py (y negated, times 9 / its radius 22): the Admiral's
+  // places on a ship 15% larger with its decks a little higher
+  shipOfTheLine: {
+    burning: [
+      { x: 1.4, y: -0.7, z: 6, spread: [1.6, 1.1, 0.3] },
+      { x: -2.4, y: 0.9, z: 6, spread: [1.1, 1.1, 0.3] },
+      { x: 9.8, y: 0.9, z: 7.1, spread: [1.1, 0.9, 0.2] },
+      { x: -6.6, y: -0.9, z: 7.3, spread: [1.1, 1.2, 0.2] },
+      { x: -12.2, y: 0.7, z: 8.6, spread: [1, 1, 0.2] },
+      { x: 0.2, y: 0, z: 9.5, spread: [1.1, 6.6, 0.4] },
+      { x: 8, y: 0, z: 9.1, spread: [1.1, 6, 0.4] },
+      { x: -10.8, y: 0.5, z: 10.3, spread: [3.6, 0.8, 0.3] },
+    ],
+    sinking: [
+      { x: 11.7, y: -1.2, z: 7.4, spread: [3.3, 2.8, 0.4] },
+      { x: 0.2, y: 0, z: 9, spread: [1.1, 5.6, 0.4] },
+      { x: -1.4, y: -0.7, z: 5.5, spread: [2, 1.5, 0.3] },
+      { x: -6.6, y: -0.9, z: 6.8, spread: [1.2, 1.4, 0.2] },
+      { x: -12.2, y: 0.7, z: 8.1, spread: [1, 1, 0.2] },
+    ],
+  },
+
   // The bots' ships, from blender-assets/ships/bots/ (y negated, then scaled to the sloop's size): the catch, the
   // little decks and the sail's burning foot of a fishing boat; going down, its side still out of the water
   fishingBoat: {

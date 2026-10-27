@@ -1,5 +1,5 @@
 import { Container, Text, type TextStyleOptions } from 'pixi.js';
-import { WEAPONS, WEAPON_IDS, type GameState, type QuestId, type WeaponId } from '../../game';
+import { WEAPONS, WEAPON_IDS, ZONES, type GameState, type QuestId, type WeaponId } from '../../game';
 import type { SoundSettings } from '../audio/Sounds';
 import type { GpuInfo } from '../render/gpu';
 import { CAMERA_MODES, type CameraMode } from '../scene/cameraControl';
@@ -40,7 +40,7 @@ const WARNING_COLOR = 0xffb347;
 const SOFTWARE_WARNING =
   "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings";
 const HELP =
-  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold, P captain's mastery";
+  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold, P captain's mastery, N world chart";
 
 export interface HudActions extends DamageActions, HoldActions, LoadoutActions, TalentActions {
   /** Uses the ship's ability (its level 5 talent) */
@@ -84,6 +84,8 @@ export interface HudActions extends DamageActions, HoldActions, LoadoutActions, 
   newGame: () => void;
   /** Picks the language of the game's texts: the page reloads in it */
   setLanguage: (lang: Lang) => void;
+  /** Opens or closes the world chart: every sea, its gates and what sails it */
+  toggleWorld: () => void;
 }
 
 /** What the HUD shows of the view (not the game): set by SceneView */
@@ -308,6 +310,19 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
           row.setActive(view.cameraMode);
           zone.setChecked(view.zoneShown);
         });
+      },
+    },
+    {
+      // The sea the player is in, and the world chart: every sea, the gates between them, what sails each
+      id: 'seas',
+      group: 'World',
+      label: 'Seas',
+      kind: 'control',
+      onScreen: true,
+      create: () => {
+        const row = new ButtonRow<never>([{ label: t('World chart (N)'), key: null, onTap: actions.toggleWorld }]);
+        const sea = new Text({ text: ' ', style: LABEL_STYLE });
+        return control(row, sea, ({ state }) => show(sea, t(ZONES[state.world.zone].name)));
       },
     },
     {

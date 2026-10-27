@@ -1,14 +1,14 @@
 # Ships
 
-Every player starts on the **Starter Sloop** (line `starter`). Later ships come in lines: families with their own style
-and role, six tiers each, and the masterworks, bought. The sloop and the European line's tier 1 and 2, the **Coastal
-Bark** (the goal of the starting waters, sold at the shipyard once the Captain's path is done) and the **Corsair** (the
-next goal, sold the same way), are built; the other 58 are planned. `SHIP_LINES` in `src/game/ships/shipLines.ts`
-lists every line and its ships: a planned one has a name, a tier,
-a role, provisional figures and how it is got, which the shipyard shows (its legend and each line's look are in
-`src/client/hud/shipLore.ts`). A player keeps every ship they buy: one sailed, the others laid up in port
-(`src/game/economy/fleet.ts`). Every ship levels on its own from 1 (the sloop to 10, a line's ships to 20) and has
-talents of its own.
+Every player starts on the **Starter Sloop** (line `starter`, tier 0). Later ships come in lines: families with their own style
+and role, six tiers each, and the masterworks, bought. The sloop and the whole European line, the **Coastal Bark**
+(the goal of the starting waters, sold at the shipyard once the Captain's path is done), the **Corsair**, the
+**Frigate**, the **Royal Galleon**, the **Admiral** and the **Imperial Ship of the Line** (the next goals, sold the
+same way), are built; the other 54 are planned. `SHIP_LINES` in `src/game/ships/shipLines.ts` lists every line and
+its ships: a planned one has a name, a tier, a role, provisional figures and how it is got, which the shipyard shows
+(its legend and each line's look are in `src/client/hud/shipLore.ts`). A player keeps every ship they buy: one
+sailed, the others laid up in port (`src/game/economy/fleet.ts`). Every ship levels on its own from 1 (the sloop to
+10, a line's ships to ten a tier, 60 at tier 6) and has talents of its own.
 
 ## Lines
 
@@ -24,8 +24,8 @@ talents of its own.
 
 Tiers 1 → 6, with their ids (built ones in bold):
 
-- **Royal Navies:** **Coastal Bark** (`coastalBark`), **Corsair** (`corsair`), Frigate (`frigate`), Royal Galleon
-  (`royalGalleon`), Admiral (`admiral`), Imperial Ship of the Line (`shipOfTheLine`)
+- **Royal Navies:** **Coastal Bark** (`coastalBark`), **Corsair** (`corsair`), **Frigate** (`frigate`), **Royal
+  Galleon** (`royalGalleon`), **Admiral** (`admiral`), **Imperial Ship of the Line** (`shipOfTheLine`)
 - **Empires of the East:** River Junk (`riverJunk`), Sea Merchant (`seaMerchant`), Dragon Sentinel (`dragonSentinel`),
   Celestial Frigate (`celestialFrigate`), Imperial Junk (`imperialJunk`), Dragon Armada (`dragonArmada`)
 - **Brotherhood of the Black Flag:** Smuggler (`smuggler`), Sea Wolf (`seaWolf`), Black Corsair (`blackCorsair`),
@@ -50,7 +50,8 @@ Swallow (`gildedSwallow`, European) and Jade Lotus (`jadeLotus`, Eastern); Velve
 Silver Fjord (`silverFjord`, northern); Crown Jewel (`crownJewel`) and Moonlit Dragon (`moonlitDragon`); Ruby Corsair
 (`rubyCorsair`) and Valhalla (`valhalla`); Sun King (`sunKing`) and Empress of the Waves (`empressOfWaves`); Midnight
 Sun (`midnightSun`) and Mirage (`mirage`, Forbidden Fleets). Each is bought with doubloons once the player has a ship of
-the same tier of another line at its last level (`tierMastered` in `src/game/economy/shipyard.ts`).
+the same tier of another line at its last level (`tierMastered` in `src/game/economy/shipyard.ts`; the sloop, tier 0,
+opens none).
 
 The planned ships' figures are provisional: the European line's ladder (the Coastal Bark's own at tier 1), each line
 leaning its own way (the comment over `PLANNED` says how). Harpoon guns come in numbers like the cannons', in its
@@ -94,8 +95,10 @@ every frame of its animations from every direction (see the turtle below).
    are run out on the side facing the target, so a cannon slot is a place along the side. How many slots a ship has is
    balance, not the model's ports: the model is a likeness (a tier 5 ship may carry fifty guns, its model far fewer
    ports), and slots beyond its ports go anywhere along the side. `startingGuns` says which
-   slots have a gun when the ship is new; `hold` its places for cargo and `maxLevel` the last level it reaches (10 for
-   the starter sloop, 20 for a line's ships; 0 and 1 for a bot's). Its `name` is English, in `src/client/i18n/uk.ts`
+   slots have a gun when the ship is new, from the first: `UNARMED` for a ship the shipyard sells, which comes with none
+   (a bot's hull has its kind's guns); `hold` its places for cargo. A line's ship takes `...lineTier(tier)` for its
+   `tier`, `maxLevel` (the last level it reaches: ten a tier) and `abilities`; a bot's has its `tier` and `...BOT_HULL`. A ship of the European line keeps to its ladder (the comment over
+   the Coastal Bark): a fight of 20–30 s between two of a tier, and each tier beats two of the tier below. Its `name` is English, in `src/client/i18n/uk.ts`
    and `ru.ts` (a planned ship's is already there). For the shipyard to sell it, an offer in `SHIP_OFFERS`
    (`src/game/economy/shipyard.ts`). A class renamed goes in `RENAMED_CLASSES` (`src/game/save.ts`), so a save keeps it.
 4. **Client.** Add the class to `ART` (the stages it has atlases for, and its looks if it has several) and to

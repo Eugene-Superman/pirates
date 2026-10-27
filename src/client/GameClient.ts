@@ -26,6 +26,7 @@ import {
   useAbility,
   type Game,
   type QuestId,
+  type ZoneId,
 } from '../game';
 import { Sounds, type SoundName } from './audio/Sounds';
 import { Hud } from './hud/Hud';
@@ -64,6 +65,8 @@ export class GameClient {
   private sinceSave = 0;
   /** Set by New game: nothing is kept any more, the page reloads */
   private forgetting = false;
+  /** Set when the ship sails off to another sea: the progress for it is kept, the page reloads in it */
+  private travelling = false;
 
   /** store: what was kept of earlier visits; the game has its progress loaded already */
   constructor(app: Application, game: Game, store: Store, renderer: GpuInfo) {
@@ -136,6 +139,7 @@ export class GameClient {
         useAbility: () => this.cue(useAbility(game.state, ship)),
         newGame: () => this.newGame(),
         setLanguage: (lang) => this.setLanguage(lang),
+        toggleWorld: () => this.hud.toggleWorld(),
       },
       app.screen,
       ship.shipClass,
@@ -163,6 +167,9 @@ export class GameClient {
         },
       },
       { hud: store.slot('hud'), log: store.slot('log'), tracker: store.slot('tracker') },
+      game.state.world.zone,
+      // The world chart's jump to any sea: for the developer, until the seas are reached only through their gates
+      (zone) => this.travel(zone),
     );
     app.stage.addChild(this.view.container, this.hud.container);
     bindPointerInput(app, this.view, ship, this.selection, this.hover, game.state.world.port);
@@ -175,6 +182,7 @@ export class GameClient {
       toggleStats: () => this.hud.toggleStats(),
       toggleHold: () => this.hud.toggleHold(),
       toggleMastery: () => this.hud.toggleMastery(),
+      toggleWorld: () => this.hud.toggleWorld(),
       useAbility: () => this.cue(useAbility(game.state, ship)),
       repair: () => this.cue(orderRepair(game.state, ship)),
     });
@@ -193,6 +201,9 @@ export class GameClient {
     this.app.ticker.add((ticker) => {
       const dt = Math.min(ticker.deltaMS / 1000, MAX_DT);
       this.game.update(dt);
+      // Sailed into a gate: on to the sea beyond it
+      const { departure } = this.game.state.player;
+      if (departure) this.travel(departure);
       this.sinceSave += ticker.deltaMS / 1000;
       if (this.sinceSave >= AUTOSAVE) this.save();
       this.forgetLostSelection();
@@ -228,7 +239,7 @@ export class GameClient {
 
   /** Keeps the progress and the combat log */
   private save() {
-    if (this.forgetting) return;
+    if (this.forgetting || this.travelling) return;
     this.sinceSave = 0;
     this.store.set('save', this.game.save());
     this.hud.keep();
@@ -248,6 +259,19 @@ export class GameClient {
     this.store.flush();
     void this.store.written().then(() => window.location.reload());
     return true;
+  }
+
+  /**
+   * Takes the player to another sea: their progress is kept with their ship coming in there (Game.travel), and the page
+   * reloads, its game made for that sea
+   */
+  private travel(zone: ZoneId) {
+    if (this.travelling || this.forgetting) return;
+    this.store.set('save', this.game.travel(zone));
+    this.hud.keep();
+    this.travelling = true;
+    this.store.flush();
+    void this.store.written().then(() => window.location.reload());
   }
 
   /** Keeps the language picked and the progress, and reloads the page in it: the HUD's texts are made once */

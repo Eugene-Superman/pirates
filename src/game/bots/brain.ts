@@ -3,6 +3,7 @@ import type { Point } from '../lib/geometry';
 import type { NavGrid } from '../navigation/NavGrid';
 import { routeClearance } from '../navigation/pilot';
 import type { Ship } from '../ships/Ship';
+import { nearGate } from '../world/gates';
 import { nearHarbour } from '../world/port';
 import { BOT_KINDS, type BotKindId } from './botKinds';
 
@@ -216,7 +217,10 @@ function steerTo(ship: Ship, x: number, y: number) {
   ship.setTarget(x, y);
 }
 
-/** Leg after leg to open water round its home (never into the harbour), at cruising speed, with a pause in between */
+/**
+ * Leg after leg to open water round its home (never into the harbour or by a gate), at cruising speed, with a pause in
+ * between
+ */
 function wander(state: GameState, nav: NavGrid, ship: Ship, mind: BotMind, random: () => number) {
   const { time } = state;
   ship.throttle = BOT_KINDS[mind.kind].cruise;
@@ -235,7 +239,7 @@ function wander(state: GameState, nav: NavGrid, ship: Ship, mind: BotMind, rando
     mind.home.y + Math.sin(angle) * distance,
     routeClearance(ship),
   );
-  if (!spot || nearHarbour(state.world.port, spot.x, spot.y)) {
+  if (!spot || nearHarbour(state.world.port, spot.x, spot.y) || nearGate(state.world.gates, spot.x, spot.y)) {
     mind.nextLegAt = time + PAUSE[0];
     return;
   }

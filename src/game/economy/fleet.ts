@@ -34,8 +34,8 @@ function changeShip(state: GameState, player: Player, next: Ship) {
 
 /**
  * Buys the ship the player works towards (`goalOffer`) at the shipyard and takes its helm: in port, with every term of
- * the Captain's path met, for its price. It comes new, at level 1, with its class's starting guns and ammo. False if it
- * can't
+ * the Captain's path met, for its price. It comes new, at level 1, with no guns (the player fits theirs from the hold)
+ * and its class's starting ammo. False if it can't
  */
 export function buyShip(state: GameState, player: Player) {
   const offer = goalOffer(state, player);

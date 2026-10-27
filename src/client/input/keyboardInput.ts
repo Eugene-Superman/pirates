@@ -16,6 +16,8 @@ export interface KeyboardActions {
   toggleHold: () => void;
   /** Opens or closes the captain's mastery, the account's tree */
   toggleMastery: () => void;
+  /** Opens or closes the world chart: every sea */
+  toggleWorld: () => void;
   /** Uses the ship's ability */
   useAbility: () => void;
   /** Orders the crew to repair, for gold */
@@ -26,8 +28,8 @@ export interface KeyboardActions {
 // Space fires at the unit picked out; Escape stops firing, or if the ship isn't firing lets go of the unit picked out
 // (unless it closed a window first); Q picks the cannons, E the harpoons; Z and X load the picked weapon's two kinds of
 // ammo at hand (1…0 are left to the skill bar's quick slots, for what the hold will carry); R orders the repair; F uses
-// the ship's ability; L opens the loadout; K the talents; J the combat log; M the sea chart; I the statistics; H the
-// hold; P the captain's mastery
+// the ship's ability; L opens the loadout; K the talents; J the combat log; M the sea chart; N the world chart (every
+// sea); I the statistics; H the hold; P the captain's mastery
 export function bindKeyboardInput(ship: Ship, selection: Selection, actions: KeyboardActions) {
   window.addEventListener('keydown', (e) => {
     if (e.defaultPrevented) return;
@@ -73,6 +75,9 @@ export function bindKeyboardInput(ship: Ship, selection: Selection, actions: Key
         break;
       case 'KeyM':
         actions.toggleMap();
+        break;
+      case 'KeyN':
+        actions.toggleWorld();
         break;
       case 'KeyI':
         actions.toggleStats();

@@ -1,5 +1,6 @@
 import { Container, Graphics, type Text } from 'pixi.js';
 import {
+  BOT_KINDS,
   WEAPONS,
   WRECK_TIME,
   cargoCount,
@@ -254,6 +255,9 @@ export class UnitFrames {
     if (unit.bot) {
       const hostile = isHostile(unit, ship.id);
       tag = unit.bot.foe === ship.id ? t('Attacking you') : hostile ? t('Aggressive') : t('Neutral');
+      // Its tier and its level among the tier's: a ship of a higher tier earns little for it
+      const { tier, level } = BOT_KINDS[unit.bot.kind];
+      tag = `${tag} · ${t('Tier {tier}', { tier })} ${t('Lv {level}', { level })}`;
       tagColor = hostile ? UI.hostile : UI.good;
       alarm = hostile ? UI.hostile : null;
     }

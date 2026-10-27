@@ -7,14 +7,23 @@ import type { OutfitBonus } from './outfit';
 import type { Ship } from './Ship';
 
 /**
- * The highest level any ship reaches: a class's own is its `maxLevel` (the starter sloop's 10, a line's ships' 20).
- * Every ship levels on its own: a new one starts at 1
+ * The highest level any ship reaches: a class's own is its `maxLevel`, ten a tier (ships/shipClasses.ts, lineTier: the
+ * starter sloop's and a tier 1 ship's 10, a tier 6 ship's 60). Every ship levels on its own: a new one starts at 1
  */
-export const MAX_LEVEL = 20;
-// XP from each level to the next, 1→2 first: minutes for the first ones, the starting waters' bots take a sloop to
-// about level 8 (kills are worth less once the ship has outgrown the bots, xpForKill), the rest is for stronger seas
-const XP_STEPS = [
+export const MAX_LEVEL = 60;
+// XP from each level to the next, 1→2 first, to level 20: minutes for the first ones, the starting waters' bots take a
+// sloop to about level 8 (kills are worth less once the ship has outgrown the bots, xpForKill), the rest is for
+// stronger seas. Beyond it, the higher tiers' levels, each step LATE_STEP more than the one before
+const FIRST_STEPS = [
   200, 350, 550, 800, 1100, 1450, 1850, 2300, 2800, 3400, 4000, 4700, 5400, 6200, 7000, 7900, 8800, 9800, 10800,
+];
+const LATE_STEP = 1100;
+const XP_STEPS = [
+  ...FIRST_STEPS,
+  ...Array.from(
+    { length: MAX_LEVEL - 1 - FIRST_STEPS.length },
+    (_, i) => FIRST_STEPS[FIRST_STEPS.length - 1] + LATE_STEP * (i + 1),
+  ),
 ];
 
 /** Total XP a ship has at the start of `level` */
@@ -34,18 +43,32 @@ export function levelOf(xp: number, maxLevel: number) {
   return Math.min(level, maxLevel);
 }
 
+// Share of a bot's XP a ship of the next tier up earns for it: one bought sails on to the next sea. Two tiers or more
+// up, a single point
+const TIER_ABOVE_SHARE = 0.25;
+
 /**
- * XP for sinking a bot whose kind is worth `xp` at `botLevel` (bots/botKinds.ts): all of it to a ship up to three
- * levels above the bot, half up to five, a quarter beyond. A strong ship gets little for the weak ones round the port
+ * XP for sinking a bot whose kind is worth `xp` (bots/botKinds.ts). Every ship counts its levels from 1 again, so a
+ * bot is weighed by the tier of its sea first: one of a lower tier pays a ship a quarter (a tier below) or a point
+ * (further down), one of a higher tier all of it. Of the ship's own tier, by the levels: all of it to a ship up to
+ * three levels above the bot, half up to five, a quarter beyond. A strong ship gets little for the weak ones
  */
-export function xpForKill(xp: number, botLevel: number, shipLevel: number) {
-  const over = shipLevel - botLevel;
+export function xpForKill(xp: number, bot: { tier: number; level: number }, ship: { tier: number; level: number }) {
+  if (bot.tier > ship.tier) return xp;
+  if (bot.tier < ship.tier - 1) return 1;
+  const over = ship.level - bot.level;
   const share = over <= 3 ? 1 : over <= 5 ? 0.5 : 0.25;
-  return Math.max(1, Math.round(xp * share));
+  const below = bot.tier < ship.tier ? TIER_ABOVE_SHARE : 1;
+  return Math.max(1, Math.round(xp * share * below));
 }
 
 /** The levels that offer a choice of two signature talents instead of a talent point */
 export const MILESTONES = [5, 10, 15, 20] as const;
+/**
+ * The level each of a ship's abilities opens at, for a ship that has it (its class's `abilities`): the first is the
+ * level 5 signature talent picked; the second (tier 4 ships and up) and the third (tier 6) are still to be made
+ */
+export const ABILITY_LEVELS = [MILESTONES[0], 25, 45] as const;
 /** Points spent in a branch that open its next row */
 export const ROW_POINTS = 3;
 
@@ -106,8 +129,8 @@ export const PERKS = {
   pointBlank: { within: 0.5, boost: 0.06 },
   /** A cannon hit leaves the target this share of its speed for `time` seconds: Chain shot */
   chainShot: { speed: 0.7, time: 4 },
-  /** Places in the hold, a rank: Quartermaster */
-  hold: 10,
+  /** Share of the class's hold added, a rank: Quartermaster */
+  hold: 0.1,
   /** A kill's bounty, a rank: Bounty hunter */
   bounty: 0.07,
   /** A kill's chance to leave a chest, a rank: Treasure hunter */
@@ -210,7 +233,7 @@ export const TALENTS: Readonly<Record<TalentId, Talent>> = {
   swift: branch('swift', 'seamanship', 0, 3, 'Swift', '+2% speed a rank', { speed: 0.02 }),
   nimble: branch('nimble', 'seamanship', 0, 3, 'Nimble', '+5% turning a rank', { turn: 0.05 }),
   lookout: branch('lookout', 'seamanship', 1, 3, 'Lookout', '+5% sight a rank', { sight: 0.05 }),
-  quartermaster: branch('quartermaster', 'seamanship', 1, 3, 'Quartermaster', `+${PERKS.hold} places in the hold a rank`),
+  quartermaster: branch('quartermaster', 'seamanship', 1, 3, 'Quartermaster', `+${percent(PERKS.hold)} room in the hold a rank`),
   bountyHunter: branch('bountyHunter', 'seamanship', 2, 3, 'Bounty hunter', `+${percent(PERKS.bounty)} gold for every kill a rank`),
   treasureHunter: branch('treasureHunter', 'seamanship', 2, 3, 'Treasure hunter', `Kills leave chests ${percent(PERKS.chest)} more often a rank`),
   hiddenHold: branch('hiddenHold', 'seamanship', 3, 1, 'Hidden hold', `Half your cargo stays aboard when your ship goes down`),

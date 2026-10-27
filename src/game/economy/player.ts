@@ -8,6 +8,7 @@ import type { ActiveQuest } from './quests';
 import type { SavedShip } from '../save';
 import type { PathStepId } from './shipyard';
 import { newStats, type Stats } from '../records/stats';
+import type { ZoneId } from '../world/zones';
 
 /** Gold a new player starts with: a few packs of ammo, or most of a gun of the first tier */
 export const STARTING_GOLD = 100;
@@ -29,6 +30,11 @@ export interface Player {
   readonly fleet: SavedShip[];
   /** What they have done, all their ships together (records/stats.ts) */
   readonly stats: Stats;
+  /**
+   * The sea their ship has sailed off to through a gate (world/gates.ts), their last in this game: the client takes
+   * them there (Game.travel); null while they sail this one. Not saved
+   */
+  departure: ZoneId | null;
 }
 
 /** What the Captain's path counts that a player's gold and ship don't show by themselves */
@@ -49,6 +55,7 @@ export function newPlayer(shipId: number): Player {
     progress: { steps: [], questsDone: 0 },
     fleet: [],
     stats: newStats(),
+    departure: null,
   };
 }
 

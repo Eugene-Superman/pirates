@@ -1,5 +1,5 @@
 import { Container, Graphics, type Rectangle, Text } from 'pixi.js';
-import type { GameState, ShipClass } from '../../game';
+import type { GameState, ShipClass, ZoneId } from '../../game';
 import type { Selection } from '../input/selection';
 import type { Slot } from '../storage/Store';
 import { ButtonRow } from './ButtonRow';
@@ -20,6 +20,7 @@ import { SeaChart } from './SeaChart';
 import { SettingsPanel } from './SettingsPanel';
 import { SkillBar } from './SkillBar';
 import { UnitFrames } from './UnitFrames';
+import { WorldChart } from './WorldChart';
 import { t } from '../i18n/i18n';
 
 export type { MapAxes } from './chart';
@@ -73,8 +74,8 @@ function saveShown(items: readonly HudItem[], ids: ReadonlySet<string>, kept: Sl
  * plate of the unit they picked out; in the top right corner the quest tracker, the quests and the Captain's path; at
  * the bottom the skill bar, the chat on its left (the combat log and the chat's channels, a tab each) and the minimap
  * on its right, the settings and the full screen in its frame's top corners; and the loadout window, the talents, the
- * hold, the captain's mastery (the four of them opened by the buttons on the minimap's frame too), the statistics or
- * the sea chart over everything when open, and over them all a question before a quest is given up
+ * hold, the captain's mastery (the four of them opened by the buttons on the minimap's frame too), the statistics, the
+ * sea chart or the world chart over everything when open, and over them all a question before a quest is given up
  */
 export class Hud {
   readonly container = new Container();
@@ -102,6 +103,8 @@ export class Hud {
   private readonly keptItems: Slot;
   private readonly minimap: Minimap;
   private readonly chart: SeaChart;
+  /** Every sea (N, or the sea chart's button) */
+  private readonly world: WorldChart;
   private readonly tracker: QuestTracker;
   /** Asks before what can't be undone: a quest given up, an item sold back in port */
   private readonly confirm: ConfirmDialog;
@@ -113,7 +116,8 @@ export class Hud {
 
   /**
    * shipClass: the player's ship's, for its share of the talent tree; axes: how the camera turns
-   * the world, for the maps; port: what the port's menus do, and the port's name
+   * the world, for the maps; port: what the port's menus do, and the port's name; zone: the sea the game is in;
+   * travel: takes the player to another sea from the world chart
    */
   constructor(
     actions: HudActions,
@@ -122,6 +126,8 @@ export class Hud {
     axes: MapAxes,
     port: { readonly actions: PortActions; readonly name: string },
     kept: { readonly hud: Slot; readonly log: Slot; readonly tracker: Slot },
+    zone: ZoneId,
+    travel: (zone: ZoneId) => void,
   ) {
     this.keptItems = kept.hud;
     this.chat = new ChatPanel(kept.log);
@@ -131,7 +137,8 @@ export class Hud {
     // The windows hear Escape in the order they are made, each leaving alone one another has taken: so the one on
     // top (the last added below) is made first, and one press closes only it
     this.confirm = new ConfirmDialog(screen);
-    this.chart = new SeaChart(axes, screen, port.name);
+    this.world = new WorldChart(screen, travel);
+    this.chart = new SeaChart(axes, screen, port.name, zone, () => this.toggleWorld());
     this.stats = new StatsPanel(screen);
     this.mastery = new MasteryPanel(screen);
     this.hold = new HoldPanel(actions, screen);
@@ -142,7 +149,7 @@ export class Hud {
       showDrop: (weapon) => this.skills.showDrop(weapon),
     });
     // Made before the keyboard is bound: its Escape (leave port) goes before the one at sea
-    this.port = new PortScreen(port.actions, screen, port.name, this.confirm);
+    this.port = new PortScreen(port.actions, screen, port.name, this.confirm, zone);
     this.settings = new SettingsPanel(
       this.items,
       (id) => this.shownIds.has(id),
@@ -193,6 +200,7 @@ export class Hud {
       this.mastery.container,
       this.stats.container,
       this.chart.container,
+      this.world.container,
       this.confirm.container,
       this.loadout.dragLayer,
     );
@@ -252,6 +260,11 @@ export class Hud {
     this.chart.toggle();
   }
 
+  /** Opens or closes the world chart: every sea */
+  toggleWorld() {
+    this.world.toggle();
+  }
+
   update(state: GameState, frameMs: number, view: ViewStatus, selection: Selection) {
     const { screen } = this;
     const talentX = MARGIN + UnitFrames.WIDTH + TALENT_GAP;
@@ -289,6 +302,7 @@ export class Hud {
     this.hold.update(state.ship);
     this.mastery.update();
     this.chart.update(state);
+    this.world.update(state);
     this.confirm.update();
     const frame = { state, view, frameMs };
     let column = 0;

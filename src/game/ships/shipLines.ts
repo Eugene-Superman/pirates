@@ -1,5 +1,5 @@
 import type { CurrencyId } from '../economy/currencies';
-import { SHIP_CLASSES, type PlayerLineId, type ShipClass, type ShipClassId } from './shipClasses';
+import { SHIP_CLASSES, lineTier, type PlayerLineId, type ShipClass, type ShipClassId } from './shipClasses';
 
 /**
  * Every ship of the lines players sail, built or planned. A built one is a class of SHIP_CLASSES (its own model,
@@ -73,7 +73,7 @@ export type LineShipId =
 /** A ship not built yet: its id once it is, while it isn't a class */
 type PlannedShipId = Exclude<LineShipId, ShipClassId>;
 
-/** A line players sail: its name, what it is for in a fight, and its ships, tier 1 first */
+/** A line players sail: its name, what it is for in a fight, and its ships, the lowest tier first */
 export interface ShipLine {
   readonly id: PlayerLineId;
   readonly name: string;
@@ -92,7 +92,13 @@ export interface ShipFigures {
   readonly harpoons: number;
   readonly hold: number;
   readonly viewRange: number;
+  /** The last level it reaches, and how many abilities it has: by its tier (shipClasses.ts, lineTier) */
+  readonly maxLevel: number;
+  readonly abilities: number;
 }
+
+/** The figures a planned ship is given in PLANNED: the rest come with its tier */
+type PlannedFigures = Omit<ShipFigures, 'maxLevel' | 'abilities'>;
 
 /**
  * Where a ship is got: the starter, the shipyard's ladder (gold and the Captain's path), the Forbidden Fleets' six ways,
@@ -130,7 +136,7 @@ export interface ShipTerms {
 export interface LineShip {
   readonly id: LineShipId;
   readonly line: PlayerLineId;
-  /** 1 to 6 */
+  /** 1 to 6; 0 for the starter sloop */
   readonly tier: number;
   readonly name: string;
   /** What it is for, in a few words */
@@ -203,24 +209,21 @@ export const SHIPYARD_LINES: readonly PlayerLineId[] = [
   'premium',
 ];
 
-// The planned ships' provisional figures: the European line's ladder (the Coastal Bark's own figures at tier 1, then
-// about 1.5 times the hull and the guns a tier, the hold and the sight growing slower, the turn slower), each line
-// leaning its own way. Guns: about as many harpoon guns as cannons in the European line; the East 15% fewer guns, a
-// little more than half of them harpoon guns; the pirates a tenth more, about two cannons to each harpoon gun; the
-// North about two harpoon guns to each cannon; the Forbidden Fleets a twentieth more, each ship its own way (the Sea
-// Devourer three harpoon guns to a cannon, the Cursed Galleon nearly two cannons to a harpoon gun). The rest: the
-// East a sixth less hull for 1.5 knots and a quarter more turn; the pirates a tenth less hull; the North a third
-// more hull for half a knot and some sight; the Forbidden Fleets a tenth more of nearly everything for a smaller
-// hold (they are hard to obtain). A ship leans a little further its own way (the Sea Merchant's hold, the Black
-// Oracle's sight, the Shellback's hull). A masterwork has the figures of its line's ship of its tier, give or take a
-// little: what is paid for is its looks. To be balanced when each is built
+// The planned ships' provisional figures. The European line, all built, is the yardstick (shipClasses.ts says how its
+// ladder grows: each tier beats two of the tier below), and the masterworks built in its manner keep to it. The other
+// lines are still on the ladder it had before, to be balanced against it as each is built:
+// the Coastal Bark's figures of then at tier 1 (800 hull, 12.5 knots, 8 + 8 guns, a hold of 60), about 1.5 times the
+// hull and the guns a tier, the hold and the sight growing slower, the turn slower, each line leaning its own way.
+// Guns: the East 15% fewer guns, a little more than half of them harpoon guns; the pirates a tenth more, about two
+// cannons to each harpoon gun; the North about two harpoon guns to each cannon; the Forbidden Fleets a twentieth more,
+// each ship its own way (the Sea Devourer three harpoon guns to a cannon, the Cursed Galleon nearly two cannons to a
+// harpoon gun). The rest: the East a sixth less hull for 1.5 knots and a quarter more turn; the pirates a tenth less
+// hull; the North a third more hull for half a knot and some sight; the Forbidden Fleets a tenth more of nearly
+// everything for a smaller hold (they are hard to obtain). A ship leans a little further its own way (the Sea
+// Merchant's hold, the Black Oracle's sight, the Shellback's hull). A masterwork has the figures of its line's ship of
+// its tier, give or take a little: what is paid for is its looks
 // prettier-ignore
-const PLANNED: Readonly<Record<PlannedShipId, { readonly name: string; readonly tier: number } & ShipFigures>> = {
-  // The Royal Navies (the Coastal Bark, tier 1, and the Corsair, tier 2, are built)
-  frigate:          { name: 'Frigate',                   tier: 3, hp: 1900, maxSpeed: 140, turnSpeed: 1.35, cannons: 20, harpoons: 16, hold: 100, viewRange: 490 },
-  royalGalleon:     { name: 'Royal Galleon',             tier: 4, hp: 3150, maxSpeed: 125, turnSpeed: 1.20, cannons: 30, harpoons: 25, hold: 150, viewRange: 490 },
-  admiral:          { name: 'Admiral',                   tier: 5, hp: 4300, maxSpeed: 135, turnSpeed: 1.10, cannons: 36, harpoons: 36, hold: 160, viewRange: 520 },
-  shipOfTheLine:    { name: 'Imperial Ship of the Line', tier: 6, hp: 6000, maxSpeed: 135, turnSpeed: 1.00, cannons: 50, harpoons: 50, hold: 200, viewRange: 550 },
+const PLANNED: Readonly<Record<PlannedShipId, { readonly name: string; readonly tier: number } & PlannedFigures>> = {
   // The Empires of the East
   riverJunk:        { name: 'River Junk',                tier: 1, hp:  700, maxSpeed: 140, turnSpeed: 1.95, cannons:  6, harpoons:  7, hold:  55, viewRange: 450 },
   seaMerchant:      { name: 'Sea Merchant',              tier: 2, hp: 1100, maxSpeed: 145, turnSpeed: 1.80, cannons: 10, harpoons:  7, hold:  95, viewRange: 480 },
@@ -268,15 +271,15 @@ const PLANNED: Readonly<Record<PlannedShipId, { readonly name: string; readonly 
   leviathan:        { name: 'Leviathan',                 tier: 6, hp: 7600, maxSpeed: 140, turnSpeed: 1.10, cannons: 26, harpoons: 79, hold: 160, viewRange: 590 },
   starfall:         { name: 'Starfall',                  tier: 6, hp: 6250, maxSpeed: 155, turnSpeed: 1.10, cannons: 58, harpoons: 47, hold: 160, viewRange: 630 },
   // The masterworks, two to a tier, each built in a line's manner and with its figures
-  gildedSwallow:    { name: 'Gilded Swallow',            tier: 1, hp:  750, maxSpeed: 130, turnSpeed: 1.65, cannons:  8, harpoons:  8, hold:  60, viewRange: 420 },
+  gildedSwallow:    { name: 'Gilded Swallow',            tier: 1, hp:  750, maxSpeed: 105, turnSpeed: 1.65, cannons:  8, harpoons:  8, hold:  15, viewRange: 420 },
   jadeLotus:        { name: 'Jade Lotus',                tier: 1, hp:  700, maxSpeed: 140, turnSpeed: 1.95, cannons:  6, harpoons:  7, hold:  55, viewRange: 450 },
   velvetRose:       { name: 'Velvet Rose',               tier: 2, hp: 1150, maxSpeed: 135, turnSpeed: 1.60, cannons: 18, harpoons:  8, hold:  90, viewRange: 450 },
   silverFjord:      { name: 'Silver Fjord',              tier: 2, hp: 1700, maxSpeed: 125, turnSpeed: 1.40, cannons:  6, harpoons: 16, hold:  80, viewRange: 420 },
-  crownJewel:       { name: 'Crown Jewel',               tier: 3, hp: 2000, maxSpeed: 135, turnSpeed: 1.35, cannons: 18, harpoons: 18, hold: 110, viewRange: 480 },
+  crownJewel:       { name: 'Crown Jewel',               tier: 3, hp: 3450, maxSpeed: 115, turnSpeed: 1.35, cannons: 19, harpoons: 15, hold:  34, viewRange: 480 },
   moonlitDragon:    { name: 'Moonlit Dragon',            tier: 3, hp: 1700, maxSpeed: 150, turnSpeed: 1.70, cannons: 14, harpoons: 17, hold:  90, viewRange: 520 },
   rubyCorsair:      { name: 'Ruby Corsair',              tier: 4, hp: 2700, maxSpeed: 135, turnSpeed: 1.25, cannons: 40, harpoons: 17, hold: 145, viewRange: 490 },
   valhalla:         { name: 'Valhalla',                  tier: 4, hp: 4100, maxSpeed: 125, turnSpeed: 1.15, cannons: 14, harpoons: 35, hold: 130, viewRange: 460 },
-  sunKing:          { name: 'Sun King',                  tier: 5, hp: 4300, maxSpeed: 135, turnSpeed: 1.10, cannons: 36, harpoons: 36, hold: 160, viewRange: 520 },
+  sunKing:          { name: 'Sun King',                  tier: 5, hp: 12500, maxSpeed: 132, turnSpeed: 1.10, cannons: 42, harpoons: 25, hold:  54, viewRange: 520 },
   empressOfWaves:   { name: 'Empress of the Waves',      tier: 5, hp: 3650, maxSpeed: 150, turnSpeed: 1.40, cannons: 28, harpoons: 34, hold: 145, viewRange: 550 },
   midnightSun:      { name: 'Midnight Sun',              tier: 6, hp: 7800, maxSpeed: 130, turnSpeed: 0.95, cannons: 28, harpoons: 66, hold: 200, viewRange: 520 },
   mirage:           { name: 'Mirage',                    tier: 6, hp: 6600, maxSpeed: 145, turnSpeed: 1.10, cannons: 52, harpoons: 52, hold: 160, viewRange: 590 },
@@ -398,8 +401,9 @@ function isBuilt(id: LineShipId): id is LineShipId & ShipClassId {
 
 /** A class's figures, as the shipyard shows them */
 export function classFigures(shipClass: ShipClass): ShipFigures {
-  const { hp, maxSpeed, turnSpeed, slots, hold, viewRange } = shipClass;
-  return { hp, maxSpeed, turnSpeed, cannons: slots.cannon.length, harpoons: slots.harpoon.length, hold, viewRange };
+  const { hp, maxSpeed, turnSpeed, slots, hold, viewRange, maxLevel, abilities } = shipClass;
+  const guns = { cannons: slots.cannon.length, harpoons: slots.harpoon.length };
+  return { hp, maxSpeed, turnSpeed, ...guns, hold, viewRange, maxLevel, abilities };
 }
 
 /** The starter's sloop is given; the rest of the ladders are the shipyard's, their prices set once they are built */
@@ -418,7 +422,9 @@ export function lineShip(id: LineShipId): LineShip {
     const built = SHIP_CLASSES[id];
     return { id, line: line.id, tier: built.tier, name: built.name, role, built, figures: classFigures(built), obtain };
   }
-  const { name, tier, ...figures } = PLANNED[id];
+  const { name, tier, ...given } = PLANNED[id];
+  const { maxLevel, abilities } = lineTier(tier);
+  const figures = { ...given, maxLevel, abilities };
   return { id, line: line.id, tier, name, role, built: null, figures, obtain };
 }
 

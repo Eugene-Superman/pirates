@@ -87,6 +87,42 @@ const LOOKS: Readonly<Partial<Record<ShipClassId, ShipLook>>> = {
     deckLoad: 'crates',
     foremast: { x: 9, height: 23, sailWidth: 16 },
   },
+  // The seas' new ships, drawn only from these looks until they are modelled: a pirate brig with a gold stripe and
+  // brown sails; a warship, a sea's elite, under white sails and a red flag; a pirate flagship, a sea's boss, under
+  // blood-red sails
+  pirateBrig: {
+    outline: [[19, 0], [14, 5.1], [4, 6.6], [-8, 6.4], [-15.5, 4.9], [-18, 2.8], [-18, -2.8], [-15.5, -4.9], [-8, -6.4], [4, -6.6], [14, -5.1]],
+    deckZ: 3.8,
+    colors: { hull: 0x2d2420, deck: 0x6a4d33, stripe: 0xd4a23a, mast: 0x2e2018, sail: 0x5a4636, trim: 0x8a7a66, flag: 0x111111, flagMark: 0xf2f2f2 },
+    mastX: -2,
+    mastHeight: 25,
+    sail: 'square',
+    sailWidth: 17,
+    deckLoad: null,
+    foremast: { x: 8, height: 20, sailWidth: 14 },
+  },
+  warship: {
+    outline: [[27, 0], [20, 6.6], [7, 8.6], [-10, 8.4], [-21, 6.8], [-25, 3.8], [-25, -3.8], [-21, -6.8], [-10, -8.4], [7, -8.6], [20, -6.6]],
+    deckZ: 5,
+    colors: { hull: 0x3b2f2a, deck: 0x7a5a3a, stripe: 0xe8dcc0, mast: 0x3a2a1c, sail: 0xece4d0, trim: 0xa89a80, flag: 0x8a1c14, flagMark: 0x111111 },
+    mastX: -2,
+    mastHeight: 32,
+    sail: 'square',
+    sailWidth: 21,
+    deckLoad: null,
+    foremast: { x: 11, height: 26, sailWidth: 17 },
+  },
+  flagship: {
+    outline: [[31, 0], [23, 7.6], [8, 10], [-12, 9.8], [-24, 8], [-29, 4.4], [-29, -4.4], [-24, -8], [-12, -9.8], [8, -10], [23, -7.6]],
+    deckZ: 5.8,
+    colors: { hull: 0x1c1414, deck: 0x5a3e2a, stripe: 0xc9a227, mast: 0x241810, sail: 0x6a1616, trim: 0x2a0a0a, flag: 0x111111, flagMark: 0xf2d24b },
+    mastX: -4,
+    mastHeight: 36,
+    sail: 'square',
+    sailWidth: 23,
+    deckLoad: 'crates',
+    foremast: { x: 12, height: 29, sailWidth: 19 },
+  },
 };
 
 const KEEL_SHARE = 0.75; // the hull narrows to this share of the deck at the waterline

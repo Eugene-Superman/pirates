@@ -1,0 +1,1624 @@
+{
+ "frames": {
+  "ship_00": {
+   "frame": {
+    "x": 1663,
+    "y": 1343,
+    "w": 332,
+    "h": 318
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 233,
+    "y": 26,
+    "w": 332,
+    "h": 318
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_01": {
+   "frame": {
+    "x": 680,
+    "y": 1666,
+    "w": 350,
+    "h": 317
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 229,
+    "y": 27,
+    "w": 350,
+    "h": 317
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_02": {
+   "frame": {
+    "x": 1332,
+    "y": 1666,
+    "w": 366,
+    "h": 315
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 227,
+    "y": 27,
+    "w": 366,
+    "h": 315
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_03": {
+   "frame": {
+    "x": 387,
+    "y": 1986,
+    "w": 377,
+    "h": 314
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 225,
+    "y": 27,
+    "w": 377,
+    "h": 314
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_04": {
+   "frame": {
+    "x": 1517,
+    "y": 1986,
+    "w": 389,
+    "h": 312
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 222,
+    "y": 26,
+    "w": 389,
+    "h": 312
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_05": {
+   "frame": {
+    "x": 0,
+    "y": 2303,
+    "w": 400,
+    "h": 312
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 218,
+    "y": 26,
+    "w": 400,
+    "h": 312
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_06": {
+   "frame": {
+    "x": 1154,
+    "y": 2303,
+    "w": 411,
+    "h": 309
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 215,
+    "y": 26,
+    "w": 411,
+    "h": 309
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_07": {
+   "frame": {
+    "x": 1567,
+    "y": 2303,
+    "w": 414,
+    "h": 308
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 212,
+    "y": 25,
+    "w": 414,
+    "h": 308
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_08": {
+   "frame": {
+    "x": 0,
+    "y": 2927,
+    "w": 417,
+    "h": 306
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 210,
+    "y": 25,
+    "w": 417,
+    "h": 306
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_09": {
+   "frame": {
+    "x": 0,
+    "y": 2617,
+    "w": 415,
+    "h": 308
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 210,
+    "y": 24,
+    "w": 415,
+    "h": 308
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_10": {
+   "frame": {
+    "x": 419,
+    "y": 2927,
+    "w": 416,
+    "h": 306
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 210,
+    "y": 23,
+    "w": 416,
+    "h": 306
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_11": {
+   "frame": {
+    "x": 417,
+    "y": 2617,
+    "w": 405,
+    "h": 308
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 212,
+    "y": 21,
+    "w": 405,
+    "h": 308
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_12": {
+   "frame": {
+    "x": 402,
+    "y": 2303,
+    "w": 399,
+    "h": 311
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 215,
+    "y": 19,
+    "w": 399,
+    "h": 311
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_13": {
+   "frame": {
+    "x": 0,
+    "y": 1986,
+    "w": 385,
+    "h": 315
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 219,
+    "y": 16,
+    "w": 385,
+    "h": 315
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_14": {
+   "frame": {
+    "x": 827,
+    "y": 1343,
+    "w": 367,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 225,
+    "y": 14,
+    "w": 367,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_15": {
+   "frame": {
+    "x": 1357,
+    "y": 685,
+    "w": 348,
+    "h": 324
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 232,
+    "y": 12,
+    "w": 348,
+    "h": 324
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_16": {
+   "frame": {
+    "x": 658,
+    "y": 685,
+    "w": 327,
+    "h": 327
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 237,
+    "y": 10,
+    "w": 327,
+    "h": 327
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_17": {
+   "frame": {
+    "x": 347,
+    "y": 685,
+    "w": 309,
+    "h": 330
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 240,
+    "y": 9,
+    "w": 309,
+    "h": 330
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_18": {
+   "frame": {
+    "x": 1537,
+    "y": 346,
+    "w": 291,
+    "h": 333
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 241,
+    "y": 7,
+    "w": 291,
+    "h": 333
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_19": {
+   "frame": {
+    "x": 938,
+    "y": 346,
+    "w": 271,
+    "h": 334
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 243,
+    "y": 6,
+    "w": 271,
+    "h": 334
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_20": {
+   "frame": {
+    "x": 687,
+    "y": 346,
+    "w": 249,
+    "h": 335
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 245,
+    "y": 5,
+    "w": 249,
+    "h": 335
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_21": {
+   "frame": {
+    "x": 0,
+    "y": 346,
+    "w": 232,
+    "h": 337
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 247,
+    "y": 4,
+    "w": 232,
+    "h": 337
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_22": {
+   "frame": {
+    "x": 234,
+    "y": 346,
+    "w": 226,
+    "h": 337
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 249,
+    "y": 3,
+    "w": 226,
+    "h": 337
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_23": {
+   "frame": {
+    "x": 462,
+    "y": 346,
+    "w": 223,
+    "h": 336
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 251,
+    "y": 3,
+    "w": 223,
+    "h": 336
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_24": {
+   "frame": {
+    "x": 1426,
+    "y": 0,
+    "w": 223,
+    "h": 339
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 252,
+    "y": 3,
+    "w": 223,
+    "h": 339
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_25": {
+   "frame": {
+    "x": 925,
+    "y": 0,
+    "w": 224,
+    "h": 341
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 252,
+    "y": 3,
+    "w": 224,
+    "h": 341
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_26": {
+   "frame": {
+    "x": 454,
+    "y": 0,
+    "w": 224,
+    "h": 342
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 252,
+    "y": 4,
+    "w": 224,
+    "h": 342
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_27": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 344
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 252,
+    "y": 4,
+    "w": 224,
+    "h": 344
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_28": {
+   "frame": {
+    "x": 226,
+    "y": 0,
+    "w": 226,
+    "h": 344
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 251,
+    "y": 4,
+    "w": 226,
+    "h": 344
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_29": {
+   "frame": {
+    "x": 680,
+    "y": 0,
+    "w": 243,
+    "h": 342
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 237,
+    "y": 6,
+    "w": 243,
+    "h": 342
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_30": {
+   "frame": {
+    "x": 1151,
+    "y": 0,
+    "w": 273,
+    "h": 341
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 218,
+    "y": 7,
+    "w": 273,
+    "h": 341
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_31": {
+   "frame": {
+    "x": 1651,
+    "y": 0,
+    "w": 301,
+    "h": 338
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 200,
+    "y": 8,
+    "w": 301,
+    "h": 338
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_32": {
+   "frame": {
+    "x": 1211,
+    "y": 346,
+    "w": 324,
+    "h": 334
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 184,
+    "y": 10,
+    "w": 324,
+    "h": 334
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_33": {
+   "frame": {
+    "x": 0,
+    "y": 685,
+    "w": 345,
+    "h": 331
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 169,
+    "y": 11,
+    "w": 345,
+    "h": 331
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_34": {
+   "frame": {
+    "x": 987,
+    "y": 685,
+    "w": 368,
+    "h": 327
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 156,
+    "y": 13,
+    "w": 368,
+    "h": 327
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_35": {
+   "frame": {
+    "x": 0,
+    "y": 1018,
+    "w": 391,
+    "h": 323
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 145,
+    "y": 15,
+    "w": 391,
+    "h": 323
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_36": {
+   "frame": {
+    "x": 0,
+    "y": 1666,
+    "w": 408,
+    "h": 318
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 135,
+    "y": 17,
+    "w": 408,
+    "h": 318
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_37": {
+   "frame": {
+    "x": 1093,
+    "y": 1986,
+    "w": 422,
+    "h": 313
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 128,
+    "y": 20,
+    "w": 422,
+    "h": 313
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_38": {
+   "frame": {
+    "x": 1198,
+    "y": 2617,
+    "w": 433,
+    "h": 307
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 122,
+    "y": 22,
+    "w": 433,
+    "h": 307
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_39": {
+   "frame": {
+    "x": 842,
+    "y": 3235,
+    "w": 438,
+    "h": 302
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 120,
+    "y": 25,
+    "w": 438,
+    "h": 302
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_40": {
+   "frame": {
+    "x": 0,
+    "y": 3541,
+    "w": 443,
+    "h": 301
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 118,
+    "y": 25,
+    "w": 443,
+    "h": 301
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_41": {
+   "frame": {
+    "x": 445,
+    "y": 3541,
+    "w": 441,
+    "h": 301
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 120,
+    "y": 25,
+    "w": 441,
+    "h": 301
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_42": {
+   "frame": {
+    "x": 1282,
+    "y": 3235,
+    "w": 438,
+    "h": 302
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 123,
+    "y": 26,
+    "w": 438,
+    "h": 302
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_43": {
+   "frame": {
+    "x": 409,
+    "y": 3235,
+    "w": 431,
+    "h": 303
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 128,
+    "y": 26,
+    "w": 431,
+    "h": 303
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_44": {
+   "frame": {
+    "x": 1230,
+    "y": 2927,
+    "w": 420,
+    "h": 305
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 136,
+    "y": 26,
+    "w": 420,
+    "h": 305
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_45": {
+   "frame": {
+    "x": 0,
+    "y": 3235,
+    "w": 407,
+    "h": 304
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 145,
+    "y": 27,
+    "w": 407,
+    "h": 304
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_46": {
+   "frame": {
+    "x": 837,
+    "y": 2927,
+    "w": 391,
+    "h": 306
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 156,
+    "y": 27,
+    "w": 391,
+    "h": 306
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_47": {
+   "frame": {
+    "x": 824,
+    "y": 2617,
+    "w": 372,
+    "h": 308
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 169,
+    "y": 27,
+    "w": 372,
+    "h": 308
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_48": {
+   "frame": {
+    "x": 803,
+    "y": 2303,
+    "w": 349,
+    "h": 311
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 184,
+    "y": 25,
+    "w": 349,
+    "h": 311
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_49": {
+   "frame": {
+    "x": 766,
+    "y": 1986,
+    "w": 325,
+    "h": 314
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 200,
+    "y": 24,
+    "w": 325,
+    "h": 314
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_50": {
+   "frame": {
+    "x": 1032,
+    "y": 1666,
+    "w": 298,
+    "h": 316
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 218,
+    "y": 23,
+    "w": 298,
+    "h": 316
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_51": {
+   "frame": {
+    "x": 410,
+    "y": 1666,
+    "w": 268,
+    "h": 318
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 237,
+    "y": 22,
+    "w": 268,
+    "h": 318
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_52": {
+   "frame": {
+    "x": 1196,
+    "y": 1343,
+    "w": 249,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 245,
+    "y": 20,
+    "w": 249,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_53": {
+   "frame": {
+    "x": 1364,
+    "y": 1018,
+    "w": 233,
+    "h": 321
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 250,
+    "y": 19,
+    "w": 233,
+    "h": 321
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_54": {
+   "frame": {
+    "x": 911,
+    "y": 1018,
+    "w": 222,
+    "h": 322
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 253,
+    "y": 19,
+    "w": 222,
+    "h": 322
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_55": {
+   "frame": {
+    "x": 1599,
+    "y": 1018,
+    "w": 217,
+    "h": 321
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 257,
+    "y": 19,
+    "w": 217,
+    "h": 321
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_56": {
+   "frame": {
+    "x": 1447,
+    "y": 1343,
+    "w": 214,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 261,
+    "y": 19,
+    "w": 214,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_57": {
+   "frame": {
+    "x": 1818,
+    "y": 1018,
+    "w": 215,
+    "h": 321
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 260,
+    "y": 19,
+    "w": 215,
+    "h": 321
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_58": {
+   "frame": {
+    "x": 0,
+    "y": 1343,
+    "w": 219,
+    "h": 321
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 257,
+    "y": 19,
+    "w": 219,
+    "h": 321
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_59": {
+   "frame": {
+    "x": 1135,
+    "y": 1018,
+    "w": 227,
+    "h": 322
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 254,
+    "y": 20,
+    "w": 227,
+    "h": 322
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_60": {
+   "frame": {
+    "x": 393,
+    "y": 1018,
+    "w": 246,
+    "h": 323
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 249,
+    "y": 20,
+    "w": 246,
+    "h": 323
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_61": {
+   "frame": {
+    "x": 641,
+    "y": 1018,
+    "w": 268,
+    "h": 323
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 245,
+    "y": 21,
+    "w": 268,
+    "h": 323
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_62": {
+   "frame": {
+    "x": 221,
+    "y": 1343,
+    "w": 288,
+    "h": 321
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 242,
+    "y": 23,
+    "w": 288,
+    "h": 321
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  },
+  "ship_63": {
+   "frame": {
+    "x": 511,
+    "y": 1343,
+    "w": 314,
+    "h": 321
+   },
+   "rotated": false,
+   "trimmed": true,
+   "spriteSourceSize": {
+    "x": 236,
+    "y": 24,
+    "w": 314,
+    "h": 321
+   },
+   "sourceSize": {
+    "w": 686,
+    "h": 448
+   },
+   "anchor": {
+    "x": 0.49969,
+    "y": 0.6124
+   }
+  }
+ },
+ "animations": {
+  "ship": [
+   "ship_00",
+   "ship_01",
+   "ship_02",
+   "ship_03",
+   "ship_04",
+   "ship_05",
+   "ship_06",
+   "ship_07",
+   "ship_08",
+   "ship_09",
+   "ship_10",
+   "ship_11",
+   "ship_12",
+   "ship_13",
+   "ship_14",
+   "ship_15",
+   "ship_16",
+   "ship_17",
+   "ship_18",
+   "ship_19",
+   "ship_20",
+   "ship_21",
+   "ship_22",
+   "ship_23",
+   "ship_24",
+   "ship_25",
+   "ship_26",
+   "ship_27",
+   "ship_28",
+   "ship_29",
+   "ship_30",
+   "ship_31",
+   "ship_32",
+   "ship_33",
+   "ship_34",
+   "ship_35",
+   "ship_36",
+   "ship_37",
+   "ship_38",
+   "ship_39",
+   "ship_40",
+   "ship_41",
+   "ship_42",
+   "ship_43",
+   "ship_44",
+   "ship_45",
+   "ship_46",
+   "ship_47",
+   "ship_48",
+   "ship_49",
+   "ship_50",
+   "ship_51",
+   "ship_52",
+   "ship_53",
+   "ship_54",
+   "ship_55",
+   "ship_56",
+   "ship_57",
+   "ship_58",
+   "ship_59",
+   "ship_60",
+   "ship_61",
+   "ship_62",
+   "ship_63"
+  ]
+ },
+ "meta": {
+  "app": "render_sprites.py",
+  "image": "minor.webp",
+  "format": "RGBA8888",
+  "size": {
+   "w": 2048,
+   "h": 3844
+  },
+  "scale": "1",
+  "ship": {
+   "directions": 64,
+   "pxPerUnit": 2.8,
+   "pitch": 30.0,
+   "yaw": 45.0
+  }
+ }
+}

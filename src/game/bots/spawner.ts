@@ -5,9 +5,10 @@ import type { NavGrid } from '../navigation/NavGrid';
 import { hullReach } from '../physics/hull';
 import { Ship } from '../ships/Ship';
 import { SHIP_CLASSES } from '../ships/shipClasses';
+import { nearGate } from '../world/gates';
 import { nearHarbour } from '../world/port';
 import { MAP_SQUARES, START, WORLD_HEIGHT, WORLD_WIDTH } from '../world/World';
-import { BOT_KINDS, BOT_KIND_IDS, type BotKindId } from './botKinds';
+import { BOT_KINDS, zoneKinds, type BotKindId } from './botKinds';
 import { newBotMind } from './brain';
 
 // World units round the start where no aggressive bot comes into the game: a new player's harbour. With the bots'
@@ -35,9 +36,9 @@ export interface Respawn {
   readonly near: Point | null;
 }
 
-/** The bots of every kind, there when the game starts: anywhere on the sea, but not on top of a player */
+/** The bots of every kind of the sea, there when the game starts: anywhere on it, but not on top of a player */
 export function populate(state: GameState, nav: NavGrid, random: () => number) {
-  for (const kind of BOT_KIND_IDS) {
+  for (const { id: kind } of zoneKinds(state.world.zone)) {
     if (BOT_KINDS[kind].boss) {
       if (!spawnBoss(state, nav, random, kind, false))
         state.respawns.push({ kind, at: state.time + RETRY_TIME, near: null });
@@ -145,6 +146,9 @@ function addBot(
   ship.rotation = random() * Math.PI * 2 - Math.PI;
   ship.throttle = kind.cruise;
   if (kind.ammo) ship.loadAmmo(kind.ammo);
+  // As tough and as hard-hitting as its sea asks
+  if (kind.hp !== null) ship.setHull(kind.hp);
+  ship.power = kind.power;
   // An escort circles a fight on its own side of the leader
   const circle =
     leader === null
@@ -174,6 +178,7 @@ function spawn(
   for (let attempt = 0; attempt < SPAWN_TRIES; attempt++) {
     const { x, y } = near ? around(near, random) : anywhere(random);
     if (nav.clearanceAt(x, y) < need || nearHarbour(state.world.port, x, y)) continue;
+    if (nearGate(state.world.gates, x, y)) continue;
     if (kind.behaviour === 'aggressive' && Math.hypot(x - START.x, y - START.y) < SAFE_RADIUS) continue;
     const crowded = state.ships.some((other) => {
       const distance = Math.hypot(other.x - x, other.y - y);

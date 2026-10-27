@@ -1,4 +1,4 @@
-import { BOT_KINDS } from '../bots/botKinds';
+import { BOT_KINDS, type BotKindId } from '../bots/botKinds';
 import { findUnit } from '../combat/units';
 import type { GameState } from '../GameState';
 import { hullReach } from '../physics/hull';
@@ -13,6 +13,7 @@ export const CHEST_TIME = 15;
 export const LOST_CARGO_TIME = 300;
 /** World units beyond a ship's hull from which a chest is hauled aboard as it sails by */
 const CHEST_PICKUP = 12;
+const BARON: BotKindId = 'baron'; // the starting waters' boss: the Bark asks for it (economy/shipyard.ts)
 
 /**
  * Loot floating where a ship sank: a bot's chest of gold and the goods its wreck left, or a player's own cargo lost
@@ -61,10 +62,12 @@ export function stepLoot(state: GameState, random: () => number) {
     if (player && killer) {
       const bounty = Math.round(kind.bounty * (1 + PERKS.bounty * killer.rank('bountyHunter')));
       earn(state, player, { amount: bounty, reason: 'bounty', kind: event.kind, quest: null, at: event.at });
-      countKill(player, event.kind);
-      gainXp(state, killer, xpForKill(kind.xp, kind.level, killer.level), 'kill', event.at);
+      countKill(player, event.kind, state.world.zone);
+      const ship = { tier: killer.shipClass.tier, level: killer.level };
+      gainXp(state, killer, xpForKill(kind.xp, kind, ship), 'kill', event.at);
       markStep(state, player, 'sink');
-      if (kind.boss) markStep(state, player, 'baron');
+      // The Captain's path asks for the starting waters' boss
+      if (kind.id === BARON) markStep(state, player, 'baron');
     }
     let gold = 0;
     if (kind.chest) {
