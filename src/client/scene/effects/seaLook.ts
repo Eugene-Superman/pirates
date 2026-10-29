@@ -82,6 +82,8 @@ export interface SurfaceLook {
   readonly glass: GlassLook;
   /** Where the story sends the player: a gold light in the water */
   readonly mark: MarkLook;
+  /** Round a boss that fights the player: a red light in the water, pulsing faster */
+  readonly boss: MarkLook;
   /** The Seam's storm at the map's edges, and a gate's whirlpool */
   readonly seam: SeamLook;
   readonly vortex: VortexLook;
@@ -114,9 +116,9 @@ export interface GlassLook {
 }
 
 /**
- * The story's mark (storyMark3d.ts) in the water: a pool of gold light, breathing, and rings of it spreading out of its
- * middle one after another, all bent by the waves over it, gold glints on the ripples; its pillar of light is drawn
- * over the sea (StoryLight). Distances in the mark's radii
+ * A light in the water, the story's mark's (storyMark3d.ts) or a boss's: a pool of it, breathing, and rings of it
+ * spreading out of its middle one after another, all bent by the waves over it, glints on the ripples; its pillar of
+ * light is drawn over the sea (Beacon). Distances in its radii
  */
 export interface MarkLook {
   readonly color: number;
@@ -264,6 +266,19 @@ export const SEA_LOOK: SurfaceLook = {
     ringReach: 1.1,
     ringPeriod: 3.4,
     breath: 2.2,
+    glints: 1.6,
+    glintSharpness: 260,
+  },
+  boss: {
+    color: 0xff3b2e,
+    under: 0.6,
+    over: 0.3,
+    bend: 0.14,
+    pool: 4,
+    ringWidth: 0.07,
+    ringReach: 1.1,
+    ringPeriod: 2.2,
+    breath: 3.4,
     glints: 1.6,
     glintSharpness: 260,
   },

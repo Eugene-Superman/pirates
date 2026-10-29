@@ -103,7 +103,6 @@ export const RU: Readonly<Record<string, string>> = {
   'Goal: the {ship}': 'Цель: {ship}',
   'Take a talent (K)': 'Возьмите талант (K)',
   'Repair your hull at sea (R)': 'Почините корпус в море (R)',
-  'Turn in tavern quests': 'Сдайте задания таверны',
   'Reach level': 'Достигните уровня',
   'Sink the Smuggler Baron': 'Потопите Барона контрабандистов',
   'Save gold': 'Накопите золото',

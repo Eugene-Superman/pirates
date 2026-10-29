@@ -83,18 +83,19 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    set are in the top-right corner, and where they send you is gold on the minimap and the sea chart. The goal of the
    starting waters is the next ship, a tier 1 ship of any line (only the European line's, the Royal Herald, is built
    yet): the Captain's path in the top-right corner, under your quests, lists what the shipyard asks (the story
-   followed to the Seam's seal, the Smuggler Baron sunk; quests turned in, from tier 2; a level; the price). The Baron's brig sails in the north-east with two smugglers; his mortar
+   followed to the Seam's seal, the Smuggler Baron sunk; a level; the price; from tier 2 only your ship at its last level
+   and the price). The Baron's brig sails in the north-east with two smugglers; his mortar
    marks red circles on the water where its shells will land — sail out of them. With every term met, the shipyard
    sells the Royal Herald: it starts at level 1 (up to 10) with talents of its own, and your sloop stays in port with
    everything on it. Then the path leads on to the Salamander, the line's tier 2: a three-master with three tiers of
-   guns under sails the orange of flame, for the Royal Herald at level 10, twelve quests and 9,000 gold; to the
-   Peregrine, its tier 3, a bigger, faster ship under orange and lilac sails, for the Salamander at level 20, twenty
-   quests and 24,000 gold; to the Crowned Lion, its tier 4, a wide crimson four-master under silver sails and gilt
-   crowns, for the Peregrine at level 30, thirty quests and 60,000 gold; to the Black Eagle, its tier 5, a black and
-   gold three-decker under towering black sails, for the Crowned Lion at level 40, forty-five quests and 150,000 gold;
+   guns under sails the orange of flame, for the Royal Herald at level 10 and 9,000 gold; to the
+   Peregrine, its tier 3, a bigger, faster ship under orange and lilac sails, for the Salamander at level 20 and
+   24,000 gold; to the Crowned Lion, its tier 4, a wide crimson four-master under silver sails and gilt
+   crowns, for the Peregrine at level 30 and 60,000 gold; to the Black Eagle, its tier 5, a black and
+   gold three-decker under towering black sails, for the Crowned Lion at level 40 and 150,000 gold;
    and to the Sovereign of the Seas, its tier 6 and last, a golden three-decker under the tallest sails afloat with a
-   gilt shark's fins and tail, for the Black Eagle at level 50,
-   sixty-five quests and 375,000 gold. The shipyard's My ships lists your ships: take the helm of any of them there. A
+   gilt shark's fins and tail, for the Black Eagle at level 50 and
+   375,000 gold. The shipyard's My ships lists your ships: take the helm of any of them there. A
    tab for each line shows its ships (the Forbidden Fleets four a tier, each with how it will be won and in what
    currency), and Buy the masterworks, for doubloons; all but the European line are planned, with provisional figures
    and their legends.

@@ -158,7 +158,7 @@ src/
                        count, as many as the gold pays for; the prices),
                        shipyard.ts (the ships for sale and their terms, by tier, the same for every line (TIER_TERMS):
                        the goal (shipGoal: after the starter sloop a tier 1 ship of any line, LADDER_LINES, then the
-                       next of the line sailed), the Captain's path (the story, quests, a level, the price);
+                       next of the line sailed), the Captain's path (the story, a level, the price);
                        tierMastered, a masterwork's term), fleet.ts (a player's ships: buying the one picked of the
                        goal's, taking the helm of one laid up in port; neither of a ship below the sea's tier: fitsSea),
                        currencies.ts (gold, doubloons, spent on forgetting the mastery or a ship's talents, and the currencies to come
@@ -385,7 +385,7 @@ src/
                        and flagship only so, for now), monster3d.ts (the seas' crab, shark and kraken, vector-drawn,
                        until they are modelled), gate3d.ts (a gate to another sea on the water, till the sea's
                        maps load: then it is the sea's whirlpool), storyMark3d.ts (where the story sends the player: a
-                       buoy with its lamp, its light StoryLight's; what it asks them to sink, a gold ring and a painted gold arrow over it; a painted
+                       buoy with its lamp, its light Beacon.ts's; what it asks them to sink, a gold ring and a painted gold arrow over it; a painted
                        gold arrow round the ship, turned towards the one off the screen, or the prey hidden in the fog;
                        drawn till the arrows load), serpent3d.ts and turtle3d.ts (sea monsters:
                        their water, the serpent's body bending as it swims, and their bodies until their atlases load),
@@ -420,11 +420,14 @@ src/
                        seaSurface.ts (the sea's surface, one shader: the waves, light in the water and on the floor
                        of the shallows, the sky, glitter, whitecaps, and the Moon's light from below, its glass
                        glowing up from the seabed here and there; where the story sends the player, a pool of gold
-                       light in the water, rings of it spreading, bent by the waves; towards the map's edges the
+                       light in the water, rings of it spreading, bent by the waves, and a red one round a boss that
+                       fights them and on every spot its shells are to land on; towards the map's edges the
                        Seam's storm, rougher and darker, whitewater at its wall's foot; at a gate to another sea a
                        whirlpool, arms of foam winding in to a dark funnel, its eye violet, red while shut to the
-                       ship's tier), seaLook.ts (how it looks: one set of numbers), StoryLight.ts (over that pool, a
-                       pillar of soft gold light, gold motes rising in it, coming in and going softly; its textures
+                       ship's tier), seaLook.ts (how it looks: one set of numbers), Beacon.ts (over that pool, a
+                       pillar of soft gold light, gold motes rising in it, coming in and going softly; the same in red
+                       round a boss while it fights the player, following it, under the ships, its pillar rising
+                       behind the masts, and over every spot its shells are to land on, ShellBeacons; its textures
                        made in a canvas), SeamWalls.ts (the Seams, docs/story.md's walls of storm, at the map's edges:
                        a wall of water along each, the sea's ripples running up its face, streams of foam, a white
                        crest blowing off into spray; those the camera looks towards under everything on the water,

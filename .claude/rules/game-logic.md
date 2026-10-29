@@ -252,7 +252,7 @@ paths:
 ## Economy (`economy/`), the port (`world/port.ts`) and saves (`save.ts`)
 
 - `state.player` (`player.ts`) is what belongs to the player rather than to their ship: `gold`, the `hold` of guns and
-  `outfits` not fitted, the `items` bought for doubloons and the skill bar's `quickSlots` (see Items), the quests taken, the Captain's path (`progress`), the story (`story`, story/story.ts), the ships laid up in port (`fleet`),
+  `outfits` not fitted, the `items` bought for doubloons and the skill bar's `quickSlots` (see Items), the quests taken and how many were turned in (`progress`, which opens the tavern's later quests), the story (`story`, story/story.ts), the ships laid up in port (`fleet`),
   their `stats` and the captain's `portrait` (`account/portrait.ts`: a number below `PORTRAITS`, picked with
   `choosePortrait`, the client's painted busts in the same order; others will see it online). One player for now; online there will be one per player's ship (`playerOf`, `shipOf`). Gold comes
   in only through `earn` (a `gold` event for the client) and goes out only through `spend` (`records/stats.ts`: the
@@ -279,8 +279,8 @@ paths:
   their price (`sellGun`, `sellAmmo`, `SELL_BACK`: gold earned as `'arsenal'`), so buying and selling never pays. A
   gun is fitted from the hold anywhere (`fitFromHold`).
 - `shipyard.ts`: the ships for sale and their terms, by tier and the same for every line players climb (`LADDER_LINES`:
-  the European, Eastern, pirate and northern; `TIER_TERMS`: a price, the level of the ship sailed, tavern quests
-  counted from the start, how far along the story). The goal (`shipGoal`) is by the ship sailed: after the starter
+  the European, Eastern, pirate and northern; `TIER_TERMS`: a price, the level of the ship sailed (from tier 2 the one
+  before it at its last level, and nothing more: no quests), how far along the story). The goal (`shipGoal`) is by the ship sailed: after the starter
   sloop, a tier 1 ship of any of those lines (the story told up to the Seam's seal: the Baron sunk), after one of them
   the next of its line; its ships (`goalShips`) are the built ones not owned yet, so a planned line's waits. The
   Captain's path (`captainsPath`) is its terms as steps, each counted from the player, their ship and the story.

@@ -9,6 +9,9 @@ const SEA_SPRITES = `${import.meta.env.BASE_URL}sprites/sea`;
 // Sun glitter shows where the water reflects this direction: just above the mirror image of the camera, so it sparkles
 // on slopes tilted a little towards the viewer
 const GLINT_LIFT = 0.6;
+// The spots a boss's shells are to land on that the water lights at once (Beacon.ts): it fires four or five a barrage,
+// one barrage at a time
+export const SHELL_LIGHTS = 6;
 
 // Every pixel of the screen is a spot on the water: the vertices carry theirs, and the layers' texture coordinates
 // are computed from it, so the waves stay fixed to the water whatever the camera does. Two layers' coordinates share
@@ -114,7 +117,13 @@ uniform vec4 uMark;        // the story's mark's light: how far the waves bend i
 uniform vec4 uMarkLight;   // its brightness in the water and over the reflected sky, its glints' and their sharpness
 uniform vec3 uMarkColor;
 uniform vec3 uMarkNow;     // how much of it shows (0: none), how far its rings have spread (0..1), its breath (radians)
-uniform vec4 uSeam;        // the sea's map: its width and height; how far in from its edge the Seam's storm reaches, and
+uniform vec3 uBossOrigin;  // a boss's light round it while it fights the player: its middle (x, y), 1 / its radius;
+uniform vec4 uBoss;        // the rest of it as the mark's
+uniform vec4 uBossLight;
+uniform vec3 uBossColor;
+uniform vec3 uBossNow;
+uniform vec4 uShells[${SHELL_LIGHTS}]; // the same on the spots its shells are to land on: middle, 1 / radius, how much shows
+uniform vec4 uSeam;       // the sea's map: its width and height; how far in from its edge the Seam's storm reaches, and
                            // how wide the whitewater at the wall's foot is (world units)
 uniform vec4 uSeamWater;   // the storm: how much steeper its waves, how much of its colour, its whitewater's foam,
                            // 1 / its foam's tile
@@ -162,22 +171,23 @@ float glassLight(out float core) {
   return light;
 }
 
-// Where the story sends the player: a pool of gold light in the water and rings of it spreading out of its middle one
-// after another, all bent by the waves over it, as light seen through moving water is. pool: the pool alone, for the
-// glints on the ripples over it
-float markLight(vec2 slope, out float pool) {
+// Where the story sends the player, or round a boss that fights them: a pool of light in the water and rings of it
+// spreading out of its middle one after another, all bent by the waves over it, as light seen through moving water is.
+// at: here, in its radii; shape and now: its uMark and uMarkNow; pool: the pool alone, for the glints on the ripples
+// over it
+float waterLight(vec2 at, vec4 shape, vec3 now, vec2 slope, out float pool) {
   pool = 0.0;
-  if (uMarkNow.x <= 0.0) return 0.0;
-  float r = length(vGlow.zw + slope * uMark.x);
-  pool = exp(-r * r * uMark.y) * (0.8 + 0.2 * sin(uMarkNow.z));
+  if (now.x <= 0.0) return 0.0;
+  float r = length(at + slope * shape.x);
+  pool = exp(-r * r * shape.y) * (0.8 + 0.2 * sin(now.z));
   float rings = 0.0;
   for (int i = 0; i < 3; i++) {
-    float k = fract(uMarkNow.y + float(i) / 3.0);
-    float w = (r - k * uMark.w) / uMark.z;
+    float k = fract(now.y + float(i) / 3.0);
+    float w = (r - k * shape.w) / shape.z;
     rings += exp(-w * w) * (1.0 - k) * (1.0 - k) * smoothstep(0.0, 0.25, k);
   }
-  float light = (pool + rings * 0.7) * uMarkNow.x;
-  pool *= uMarkNow.x;
+  float light = (pool + rings * 0.7) * now.x;
+  pool *= now.x;
   return light;
 }
 
@@ -277,10 +287,20 @@ void main() {
   float glass = glassLight(core) * mix(uGlass.w, 1.0, depth);
   float bent = 0.5 + 1.2 * caustic;
   color += (uGlassHalo * glass * bent + uGlassColor * core * 0.7 * mix(uGlass.w, 1.0, depth)) * uGlass.z;
-  // The story's mark's, the caustics playing in it: the water turned gold, not lightened, which would whiten its blue
+  // The story's mark's, and a boss's, the caustics playing in them: the water turned gold or red, not lightened, which
+  // would whiten its blue
   float pool;
-  float mark = markLight(slope, pool);
+  float mark = waterLight(vGlow.zw, uMark, uMarkNow, slope, pool);
   color = mix(color, uMarkColor * (0.75 + 0.9 * caustic), clamp(mark * uMarkLight.x, 0.0, 1.0));
+  float bossPool;
+  float boss = waterLight((vPlace - uBossOrigin.xy) * uBossOrigin.z, uBoss, uBossNow, slope, bossPool);
+  for (int i = 0; i < ${SHELL_LIGHTS}; i++) {
+    vec4 shell = uShells[i];
+    float shellPool;
+    boss += waterLight((vPlace - shell.xy) * shell.z, uBoss, vec3(shell.w, uBossNow.yz), slope, shellPool);
+    bossPool += shellPool;
+  }
+  color = mix(color, uBossColor * (0.75 + 0.9 * caustic), clamp(boss * uBossLight.x, 0.0, 1.0));
 
   // The sky, reflected more where the water turns away from the camera (Fresnel)
   float facing = max(dot(n, uView), 0.0);
@@ -293,8 +313,9 @@ void main() {
   color += pow(toSun, uLight.w) * uLight.z * (1.0 + gust) * (1.0 - shade);
   color += pow(toSun, uSheen.y) * uSheen.x * (1.0 - gust) * (1.0 - shade);
   color *= 1.0 - 0.5 * uClouds.y * shade;
-  // The mark's light again over the sky, which would hide the most of it, and its glitter gold on the ripples over it
+  // Their light again over the sky, which would hide the most of it, and its glitter on the ripples over it
   color += uMarkColor * (mark * uMarkLight.y + pow(toSun, uMarkLight.w) * pool * uMarkLight.z);
+  color += uBossColor * (boss * uBossLight.y + pow(toSun, uBossLight.w) * bossPool * uBossLight.z);
 
   // Sparks of moonlight over the glass, here and there, twinkling: on top of the reflected sky, as glitter is
   vec2 fine = vGlow.xy * uGlassSpark.z;
@@ -380,6 +401,12 @@ function seaUniforms() {
     uMarkLight: vec4(),
     uMarkColor: vec3(),
     uMarkNow: vec3(),
+    uBossOrigin: vec3(),
+    uBoss: vec4(),
+    uBossLight: vec4(),
+    uBossColor: vec3(),
+    uBossNow: vec3(),
+    uShells: { value: new Float32Array(4 * SHELL_LIGHTS), type: 'vec4<f32>' as const, size: SHELL_LIGHTS },
     uSeam: vec4(),
     uSeamWater: vec4(),
     uSeamColor: vec3(),
@@ -411,7 +438,7 @@ export interface WaterGate {
   readonly open: boolean;
 }
 
-/** A light in the water: the story's mark's (StoryLight.ts), world units; `shown` 0..1 as it fades */
+/** A light in the water: the story's mark's or a boss's (Beacon.ts), world units; `shown` 0..1 as it fades */
 export interface WaterLight {
   readonly x: number;
   readonly y: number;
@@ -428,10 +455,10 @@ const FOAM_LAYER: PatchLayer = { tile: SEA_LOOK.foamTile, turn: SEA_LOOK.chop.tu
  * deeper and shallower patches, light playing on the floor of the shallows, cloud shadows drifting over it, reflected
  * sky, sun glitter and sheen, whitecaps in the gusts, and the Moon's light from below: moon glass glowing up from the
  * seabed here and there, breathing, with sparks of moonlight over it (made up in the shader, no map); and where the
- * story sends the player, a pool of gold light in the water with rings of it spreading, bent by the waves; towards the
- * map's edges the Seam's storm, whitewater at the foot of its wall (SeamWalls.ts); and at a gate to another sea a
- * whirlpool, arms of foam winding in to a dark funnel, its eye lit. How it looks is a set of numbers (SEA_LOOK,
- * seaLook.ts).
+ * story sends the player, a pool of gold light in the water with rings of it spreading, bent by the waves, and a red
+ * one round a boss that fights them; towards the map's edges the Seam's storm, whitewater at the foot of its wall
+ * (SeamWalls.ts); and at a gate to another sea a whirlpool, arms of foam winding in to a dark funnel, its eye lit. How
+ * it looks is a set of numbers (SEA_LOOK, seaLook.ts).
  * Hidden until its maps have loaded: the flat sea color shows till then. WebGL only (Pixi's default renderer)
  */
 export function createSeaSurface(): SeaSurface {
@@ -534,10 +561,13 @@ function applyLook(sea: SeaSurface) {
   u.uGlassColor.set(rgb(glass.color));
   u.uGlassHalo.set(rgb(glass.halo));
   u.uGlassSpark.set([glass.sparks, glass.sparkShare, glass.sparkCells, 0]);
-  const { mark } = look;
+  const { mark, boss } = look;
   u.uMark.set([mark.bend, mark.pool, mark.ringWidth, mark.ringReach]);
   u.uMarkLight.set([mark.under, mark.over, mark.glints, mark.glintSharpness]);
   u.uMarkColor.set(rgb(mark.color));
+  u.uBoss.set([boss.bend, boss.pool, boss.ringWidth, boss.ringReach]);
+  u.uBossLight.set([boss.under, boss.over, boss.glints, boss.glintSharpness]);
+  u.uBossColor.set(rgb(boss.color));
   const { seam, vortex } = look;
   u.uSeam.set([WORLD_WIDTH, WORLD_HEIGHT, seam.reach, seam.foot]);
   u.uSeamWater.set([seam.rough, seam.dark, seam.foam, 1 / seam.foamTile]);
@@ -548,8 +578,9 @@ function applyLook(sea: SeaSurface) {
 }
 
 /**
- * screenWidth/Height: pixels; the camera must already be set for this frame. light: the story's mark's, if any; gate:
- * the gate nearest the camera, if any
+ * screenWidth/Height: pixels; the camera must already be set for this frame. light: the story's mark's, if any;
+ * bossLight: round a boss that fights the player, if any; shellLights: on the spots its shells are to land on, null
+ * where none shows (SHELL_LIGHTS at most); gate: the gate nearest the camera, if any
  */
 export function updateSeaSurface(
   sea: SeaSurface,
@@ -558,6 +589,8 @@ export function updateSeaSurface(
   screenWidth: number,
   screenHeight: number,
   light: WaterLight | null,
+  bossLight: WaterLight | null,
+  shellLights: readonly (WaterLight | null)[],
   gate: WaterGate | null,
 ) {
   if (!sea.mesh.visible) return;
@@ -592,6 +625,14 @@ export function updateSeaSurface(
   const { mark } = SEA_LOOK;
   if (light) u.uMarkOrigin.set([light.x, light.y, 1 / light.radius]);
   u.uMarkNow.set([light?.shown ?? 0, (time / mark.ringPeriod) % 1, (time * mark.breath) % turn]);
+  const { boss } = SEA_LOOK;
+  if (bossLight) u.uBossOrigin.set([bossLight.x, bossLight.y, 1 / bossLight.radius]);
+  u.uBossNow.set([bossLight?.shown ?? 0, (time / boss.ringPeriod) % 1, (time * boss.breath) % turn]);
+  for (let i = 0; i < SHELL_LIGHTS; i++) {
+    const shell = shellLights[i];
+    if (shell) u.uShells.set([shell.x, shell.y, 1 / shell.radius, shell.shown], i * 4);
+    else u.uShells[i * 4 + 3] = 0;
+  }
   const { seam, vortex } = SEA_LOOK;
   const churn = (time * seam.churn) % seam.foamTile;
   u.uSeamChurn.set([churn, churn * 0.6]);

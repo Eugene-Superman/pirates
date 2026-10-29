@@ -102,7 +102,7 @@ every frame of its animations from every direction (see the turtle below).
    `tier`, `maxLevel` (the last level it reaches: ten a tier) and `abilities`; a bot's has its `tier` and `...BOT_HULL`. A ship of the European line keeps to its ladder (the comment over
    the Royal Herald, `coastalBark`): a fight of 20–30 s between two of a tier, and each tier beats two of the tier below. Its `name` is English, in `src/client/i18n/uk.ts`
    and `ru.ts` (a planned ship's is already there). The shipyard sells it once it is built: a ship of a
-   line in `LADDER_LINES` (`src/game/economy/shipyard.ts`) by its tier's `TIER_TERMS` (a price, a level, quests, the
+   line in `LADDER_LINES` (`src/game/economy/shipyard.ts`) by its tier's `TIER_TERMS` (a price, a level, the
    story), the same for every line, to a player sailing its line's ship of the tier below (after the starter sloop, a
    tier 1 ship of any of them). The Forbidden Fleets' ships and the masterworks are got their own ways (`OBTAIN`,
    `src/game/ships/shipLines.ts`), which the shipyard only shows for now. A class renamed goes in `RENAMED_CLASSES` (`src/game/save.ts`), so a save keeps it.

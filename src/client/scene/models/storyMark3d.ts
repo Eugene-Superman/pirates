@@ -29,7 +29,7 @@ const ARROW_IDS = { pointer: 'upGold', chevron: 'downGold' } as const satisfies 
 
 /**
  * Where the story sends the player (story/story.ts): a buoy there with its lamp lit (not in the harbour, which has its
- * quay). Drawn with the sea; its light, in the water and a pillar over it, is effects/StoryLight.ts's
+ * quay). Drawn with the sea; its light, in the water and a pillar over it, is effects/Beacon.ts's
  */
 export function drawStoryMark(p: Painter3D, mark: StoryMark, time: number) {
   if (mark.id === 'port') return;

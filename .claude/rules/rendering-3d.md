@@ -113,7 +113,7 @@ paths:
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
   The exceptions are things projected elsewhere: the sprites of ships, monsters and chests with their water masks,
   the port's pictures (`PortSprites`), the islands' paintings (`IslandSprites`), the fog puffs (`FogClouds`) and the sky's clouds and their shadows
-  (`SkyClouds`), all made for this camera; the story's pillar of light and its motes (`StoryLight`, soft textures
+  (`SkyClouds`), all made for this camera; the pillars of light and their motes (`Beacon`: the story's gold, a boss's and its shells' red; soft textures
   made in a canvas, placed at projected points); the shader
   meshes (`seaSurface.ts`, `fogOfWar.ts`, `Wake.ts`, the water round a wreck in `Sinking.ts`, the Seams' walls in
   `SeamWalls.ts`), whose vertices are
@@ -149,7 +149,7 @@ There is no z-buffer, so order is everything. In `SceneView.update`:
    vector-drawn island's "ground" (shallows, sand, cliff shadows) → the gates, till the sea's maps load (then each is
    a whirlpool in the sea's shader) and the story's mark
    (`storyMark3d.ts`: where the story sends the player, its buoy; its light in the water is the sea's shader's, the
-   pillar over it `StoryLight`'s, over the fog) → range rings (the
+   pillar over it a `Beacon`'s, over the fog) → range rings (the
    picked weapon's shortest and longest reach, dashed, running round) → units' water (a serpent's body under the surface,
    a turtle's, a monster's; a gold ring round what the story asks the player to sink, `storyMark3d.ts`) → bubbles over
    bots' wrecks → chests' foam rings → powder kegs' foam and the ring of their blast (`keg3d.ts`) → repair rings → the
@@ -170,9 +170,11 @@ draw it separately after sorting.
 
 A sprite can't go inside a `Graphics`, so the scene is layers in `container`, bottom to top:
 sea surface mesh → the Seams' walls the camera looks towards (`SeamWalls.back`: behind the sea) → wake mesh → wreck
-water mesh → `layers` → the Seams' walls between the camera and the sea (`SeamWalls.front`, a curtain seen through,
+water mesh → the red `Beacon` round a boss that fights the player (under the ships, so its pillar rises behind
+the masts instead of washing the hull out) → the red `ShellBeacons` over the spots its shells are to land on (as many
+as the sea's shader lights, `SHELL_LIGHTS`) → `layers` → the Seams' walls between the camera and the sea (`SeamWalls.front`, a curtain seen through,
 clearer round the player's ship) → the sky clouds' shadows → fog of war mesh (haze and
-mist) → fog puffs → `markerLayer` (the target marker where the ship can't see) → `StoryLight` (the pillar of light
+mist) → fog puffs → `markerLayer` (the target marker where the ship can't see) → the story's `Beacon` (the pillar of light
 over where the story sends the player, and its motes, over the port's pictures and the fog: seen from afar) → the sky's
 clouds → `overlay` (the
 navigation debug drawings) → `hpBars` (the units' hit point bars, with a red border on a bot hostile to the player) →
@@ -267,8 +269,10 @@ its `intact` atlas has loaded (the vector model stands in for a bot, a monster o
   `glass`, the Moon's light from below (docs/story.md: its shards glow on the seabed): made up in the shader with no
   map, a shard in some cells of a grid, each its own size and breath, its light bent by the caustics, sparks over it.
   A cell's shard is picked by its whole place in the world (`uGlassCell`), so it stays put as the camera moves. And its
-  `mark`, where the story sends the player (`StoryLight.water`): a pool of gold light, rings of it spreading, bent by
-  the waves, the water turned gold rather than lightened (light added onto its blue whitens it). Its `seam`, the storm
+  `mark`, where the story sends the player (`Beacon.water`): a pool of gold light, rings of it spreading, bent by
+  the waves, the water turned gold rather than lightened (light added onto its blue whitens it); and its `boss`, the
+  same in red round a boss while it fights the player, pulsing faster, and on every spot its shells are to land on
+  (`ShellBeacons.water`, an array of `SHELL_LIGHTS` uniforms, `uShells`). Its `seam`, the storm
   at the map's edges, where the Seams' walls stand (`SeamWalls.ts`, the sea's ripples running up their faces): a gust
   everywhere and steeper waves, darker water, whitewater at the walls' foot. Its `vortex`, the gate nearest the
   camera (one at a time: they stand at the map's far sides) as a whirlpool: the waves' slope turned round it and

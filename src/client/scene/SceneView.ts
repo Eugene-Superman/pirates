@@ -10,6 +10,8 @@ import {
   storyMark,
   storyTargets,
   storyWatch,
+  zoneBoss,
+  type BotKindId,
   type GameState,
   type GatePlace,
   type Ship,
@@ -22,6 +24,7 @@ import { Camera3D, type CameraConfig } from '../render/Camera3D';
 import { Painter3D } from '../render/Painter3D';
 import { CameraControl } from './cameraControl';
 import { BarrageMarks } from './effects/BarrageMarks';
+import { Beacon, ShellBeacons, bossSpot, markSpot } from './effects/Beacon';
 import { DamageNumbers } from './effects/DamageNumbers';
 import { FogClouds } from './effects/FogClouds';
 import { FOG_LAYERS, createFogOfWar, type FogLayer, type FogOfWar, updateFogOfWar } from './effects/fogOfWar';
@@ -33,7 +36,6 @@ import { ShipFire } from './effects/ShipFire';
 import { ShotEffects } from './effects/ShotEffects';
 import { SkyClouds } from './effects/SkyClouds';
 import { Sinking } from './effects/Sinking';
-import { StoryLight } from './effects/StoryLight';
 import { NAV_DEBUG, drawHulls, drawRoute, type NavDebug } from './effects/navDebug';
 import { drawSelection, drawTargetLock } from './effects/targetLock';
 import { drawTargetMarker } from './effects/targetMarker';
@@ -137,7 +139,16 @@ export class SceneView {
   /** Over the fog, under the sky's clouds: the target marker where the ship can't see, so the fog doesn't dim it */
   private readonly markerLayer = new Graphics();
   /** Over the fog too: the pillar of light over where the story sends the player, its light in the water */
-  private readonly storyLight = new StoryLight();
+  private readonly storyLight = new Beacon('story');
+  /**
+   * Under the ships: the red light round a boss that fights the player, in the water, its pillar rising behind its
+   * masts (over them it would wash the hull out)
+   */
+  private readonly bossLight = new Beacon('boss');
+  /** Under the ships too: the same red over every spot a boss's shells are to land on */
+  private readonly shellLights = new ShellBeacons();
+  /** This sea's boss's kind, if it has one */
+  private readonly bossKind: BotKindId | null;
   /** Over the whole scene: the debug drawings */
   private readonly overlay = new Graphics();
   /** Fire, smoke and shot effects above the player's ship, under whatever is nearer than it */
@@ -216,6 +227,7 @@ export class SceneView {
     this.bots = new BotSprites(this.camera);
     this.chestSprites = new ChestSprites(this.camera);
     this.islandSprites = new IslandSprites(state.world.islands);
+    this.bossKind = zoneBoss(state.world.zone)?.id ?? null;
 
     this.camera.focusX = state.ship.x;
     this.camera.focusY = state.ship.y;
@@ -227,6 +239,8 @@ export class SceneView {
       this.seams.back,
       this.wake.mesh,
       this.sinking.water,
+      this.bossLight.container,
+      this.shellLights.container,
       this.layers,
       this.seams.front,
       this.sky.shadows,
@@ -286,10 +300,24 @@ export class SceneView {
     this.scene.clear();
     this.markerLayer.clear();
 
-    // Everything lying on the water; where the story sends the player now, if anywhere, its light in it
+    // Everything lying on the water; where the story sends the player now, if anywhere, a boss that fights them and
+    // where its shells will land, their lights in it
     const mark = storyMark(this.state, this.state.player);
-    this.storyLight.update(dt, mark, camera, time, width, height);
-    updateSeaSurface(this.seaSurface, camera, time, width, height, this.storyLight.water, this.waterGate());
+    this.storyLight.update(dt, mark && markSpot(mark), camera, time, width, height);
+    const boss = this.fightingBoss();
+    this.bossLight.update(dt, boss && bossSpot(boss), camera, time, width, height);
+    this.shellLights.update(dt, this.state.shells, camera, time, width, height);
+    updateSeaSurface(
+      this.seaSurface,
+      camera,
+      time,
+      width,
+      height,
+      this.storyLight.water,
+      this.bossLight.water,
+      this.shellLights.water,
+      this.waterGate(),
+    );
     this.seams.update(camera, ship, time, this.seaSurface.textures.ripples);
     if (this.fogLayers.mist) updateFogOfWar(this.fog, camera, ship, time, width, height);
     else this.fog.mesh.visible = false;
@@ -699,5 +727,11 @@ export class SceneView {
     if (!nearest) return null;
     const open = seaOpenTo(nearest.to, this.state.ship.shipClass.tier);
     return { x: nearest.x, y: nearest.y, radius: nearest.radius, open };
+  }
+
+  /** This sea's boss while it fights the player's ship: from the moment it goes for it till it gives up or sinks */
+  private fightingBoss(): Ship | null {
+    const { ship, ships } = this.state;
+    return ships.find((other) => other.bot?.kind === this.bossKind && other.bot.foe === ship.id) ?? null;
   }
 }

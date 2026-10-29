@@ -7,9 +7,9 @@ import { shipOf, type Player } from './player';
 
 /**
  * The Captain's path: what the shipyard asks of a player for the next ship. The starting waters' story first (it
- * teaches the game), then the shipwright's terms: quests turned in, a level, the price
+ * teaches the game), then the shipwright's terms: a level, the price
  */
-export type PathStepId = 'story' | 'quests' | 'level' | 'gold';
+export type PathStepId = 'story' | 'level' | 'gold';
 
 /**
  * The lines whose ships the shipyard sells for gold, tier by tier: the ladders a player climbs after the starter
@@ -18,14 +18,13 @@ export type PathStepId = 'story' | 'quests' | 'level' | 'gold';
 export const LADDER_LINES: readonly PlayerLineId[] = ['european', 'eastern', 'pirate', 'northern'];
 
 /**
- * What the shipyard asks for a ship of a tier, of whichever line: its price, the level of the ship sailed now, tavern
- * quests turned in (counted from the start), and how far along the story
+ * What the shipyard asks for a ship of a tier, of whichever line: its price, the level of the ship sailed now, and how
+ * far along the story
  */
 export interface TierTerms {
   readonly tier: number;
   readonly price: number;
   readonly level: number;
-  readonly quests: number;
   /** The step of the story the player must have got to; null: none asked */
   readonly story: StoryStepId | null;
 }
@@ -33,15 +32,16 @@ export interface TierTerms {
 // The ladder, the same for every line (the European one is the yardstick the others are balanced against). Tier 1 is
 // the starting waters' goal: a couple of hours of play, the starter sloop at its last level (10) and its story told up
 // to the Seam's seal (the Baron sunk); the gold is some 80 kills with their cargo, less the repairs. Each next tier asks
-// for the one before it at its last level (the level is the ship's sailed now, the quests are counted from the start),
-// and its gold: three times at tier 2, near three times again at tier 3, two and a half times at each tier after it
+// for the one before it at its last level (the level is the ship's sailed now) and its gold, nothing more: the tavern's
+// quests are for the XP and gold on the way, never asked for. Its gold is three times at tier 2, near three times again
+// at tier 3, two and a half times at each tier after it
 const TIER_TERMS: readonly TierTerms[] = [
-  { tier: 1, price: 3000, level: 10, quests: 0, story: 'seal' },
-  { tier: 2, price: 9000, level: 10, quests: 12, story: null },
-  { tier: 3, price: 24000, level: 20, quests: 20, story: null },
-  { tier: 4, price: 60000, level: 30, quests: 30, story: null },
-  { tier: 5, price: 150000, level: 40, quests: 45, story: null },
-  { tier: 6, price: 375000, level: 50, quests: 65, story: null },
+  { tier: 1, price: 3000, level: 10, story: 'seal' },
+  { tier: 2, price: 9000, level: 10, story: null },
+  { tier: 3, price: 24000, level: 20, story: null },
+  { tier: 4, price: 60000, level: 30, story: null },
+  { tier: 5, price: 150000, level: 40, story: null },
+  { tier: 6, price: 375000, level: 50, story: null },
 ];
 
 /** The next ship a player works towards: a tier, of a line or of any (the first after the starter sloop), and its terms */
@@ -57,7 +57,7 @@ export interface PathStep {
   readonly id: PathStepId;
   readonly text: string;
   readonly done: boolean;
-  /** Where a counted step stands: quests, levels, gold */
+  /** Where a counted step stands: levels, gold */
   readonly have: number | null;
   readonly need: number | null;
 }
@@ -133,14 +133,9 @@ export function captainsPath(state: GameState, player: Player): PathStep[] {
   if (!goal) return [];
   const { terms } = goal;
   const level = shipOf(state, player)?.level ?? 1;
-  const { questsDone } = player.progress;
   const steps: PathStep[] = [];
   if (terms.story) {
     steps.push(step('story', 'Follow the story of the starting waters', storyReached(player, terms.story)));
-  }
-  if (terms.quests > 0) {
-    const done = questsDone >= terms.quests;
-    steps.push(step('quests', 'Turn in tavern quests', done, Math.min(questsDone, terms.quests), terms.quests));
   }
   steps.push(
     step('level', 'Reach level', level >= terms.level, Math.min(level, terms.level), terms.level),
