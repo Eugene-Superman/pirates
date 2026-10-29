@@ -5,17 +5,17 @@ import {
   GUNS,
   SHIP_CLASSES,
   WEAPONS,
-  captainsPath,
   findUnit,
+  STORY,
   type Cargo,
-  type AmmoId,
   type DieResult,
   type GameEvent,
   type GameState,
   type Strike,
+  type StoryStepId,
   type UnitKind,
   QUESTS,
-  TALENTS,
+  talentOf,
   ZONES,
 } from '../../game';
 import { t } from '../i18n/i18n';
@@ -28,20 +28,6 @@ import { questTitle } from './questText';
 export type LogKind = 'dealt' | 'taken' | 'kill' | 'death' | 'repair' | 'gold' | 'level' | 'note';
 const LOG_KINDS = new Set<unknown>(['dealt', 'taken', 'kill', 'death', 'repair', 'gold', 'level', 'note']);
 const TONES = new Set<unknown>(['crit', 'miss', 'plain']);
-const NUMBER_STATS = [
-  'dealt',
-  'volleys',
-  'dice',
-  'crits',
-  'misses',
-  'best',
-  'taken',
-  'hitsTaken',
-  'repaired',
-  'repairGold',
-  'deaths',
-  'gold',
-] as const;
 
 /** The log's tabs: everything, the player's blows, the blows they took, the rest (kills, losses, repairs, gold) */
 export const LOG_FILTERS = ['all', 'dealt', 'taken', 'other'] as const;
@@ -59,28 +45,6 @@ export interface LogEntry {
   readonly tone: 'crit' | 'miss' | 'plain';
 }
 
-/** Totals since the first game kept in this browser */
-export interface LogStats {
-  dealt: number;
-  volleys: number;
-  dice: number;
-  crits: number;
-  misses: number;
-  best: number;
-  taken: number;
-  hitsTaken: number;
-  repaired: number;
-  /** Gold paid the crew for repairs at sea */
-  repairGold: number;
-  deaths: number;
-  /** Gold earned: bounties, chests, quests */
-  gold: number;
-  /** Units sunk, by name */
-  readonly sunk: Map<string, number>;
-  /** Shots fired, by ammo */
-  readonly ammo: Map<AmmoId, number>;
-}
-
 const MAX_ENTRIES = 500; // the oldest go first
 const DICE_PER_LINE = 3;
 const DICE_LISTED = 9; // a volley of more dice is summed up gun by gun instead
@@ -89,6 +53,11 @@ const REPAIR_JOIN = 1.5; // seconds: repair steps closer than this are one entry
 /** A unit's name, in the player's language */
 export function unitName(kind: UnitKind) {
   return t(SHIP_CLASSES[kind].name);
+}
+
+/** A step of the story's title, English, by its id */
+function storyTitle(id: StoryStepId) {
+  return STORY.find((step) => step.id === id)?.title ?? '';
 }
 
 function clock(time: number) {
@@ -147,14 +116,21 @@ export function goodsText(goods: Cargo) {
   }).join(', ');
 }
 
-/** "2 cannons, Cannonball I (+1)", "… (+2, Steady hands)", "a bite", "a mortar shell" */
+/** "2 cannons, Cannonball I (+1)", "… (+2, Steady hands)", "a bite", "a mortar shell", "a rocket, as 20 cannons" */
 function means(strike: Strike) {
   const n = strike.dice.length;
   if (strike.source === 'bite') return t('a bite');
   if (strike.source === 'shell') return t('a mortar shell');
+  if (strike.source === 'rocket') return t('a rocket, as {n} cannon|a rocket, as {n} cannons', { n });
+  if (strike.source === 'keg') return t('a powder keg, as {n} cannon|a powder keg, as {n} cannons', { n });
+  if (strike.source === 'bombard') return t('a mortar shell, as {n} cannon|a mortar shell, as {n} cannons', { n });
   const guns =
     strike.source === 'cannon' ? t('{n} cannon|{n} cannons', { n }) : t('{n} harpoon gun|{n} harpoon guns', { n });
-  const steady = strike.talents.includes('steadyHands') ? `, ${t(TALENTS.steadyHands.name)}` : '';
+  const steady = strike.diceTalents
+    .map((id) => talentOf(id))
+    .filter((talent) => talent.kind === 'branch' && (talent.effects.dieBonus ?? 0) > 0)
+    .map((talent) => `, ${t(talent.name)}`)
+    .join('');
   return strike.ammo ? `${guns}, ${t(AMMO[strike.ammo].name)} (+${strike.bonus}${steady})` : guns;
 }
 
@@ -171,11 +147,17 @@ function sumLine(event: DamageEvent, hull: string) {
     parts.push(`× ${Math.round(strike.share * 100)}% (${t("{weapon} aren't made for it", { weapon })})`);
   }
   if (strike.boost !== 1) {
-    const boosts = new Set<string>(['broadside', 'pointBlank', 'ambush', 'relentless', 'lastStand']);
-    const by = strike.talents.filter((id) => boosts.has(id)).map((id) => t(TALENTS[id].name));
+    const by = strike.talents.map((id) => t(talentOf(id).name));
+    if (strike.captain !== 1) by.push(t("Captain's mastery"));
     parts.push(`× ${Number(strike.boost.toFixed(2))} (${by.join(', ')})`);
   }
-  if (event.guardedBy) parts.push(`× ${Math.round(event.guard * 100)}% (${t(TALENTS[event.guardedBy].name)})`);
+  if (event.captainGuard !== 1) {
+    parts.push(`× ${Math.round(event.captainGuard * 100)}% (${t("Captain's mastery")})`);
+  }
+  if (event.guard !== 1) {
+    const by = event.guardedBy.map((id) => t(talentOf(id).name)).join(', ');
+    parts.push(`× ${Math.round(event.guard * 100)}% (${by})`);
+  }
   const scaled = parts.length > 0 ? ` ${parts.join(' ')} = ${amount}` : '';
   return `${t('Sum {sum}', { sum })}${scaled}  ·  ${hull}`;
 }
@@ -184,27 +166,11 @@ type DamageEvent = Extract<GameEvent, { type: 'damage' }>;
 
 /**
  * The player's combat log: every blow they dealt or took with all its dice, the units they sank, their own ship going
- * down and their repairs, as lines of text, plus totals. Client state, made from the game's events: the game itself
- * keeps no history
+ * down and their repairs, as lines of text. Client state, made from the game's events: the game itself keeps no
+ * history (the player's records are the game's: the statistics window)
  */
 export class CombatLog {
   readonly entries: LogEntry[] = [];
-  readonly stats: LogStats = {
-    dealt: 0,
-    volleys: 0,
-    dice: 0,
-    crits: 0,
-    misses: 0,
-    best: 0,
-    taken: 0,
-    hitsTaken: 0,
-    repaired: 0,
-    repairGold: 0,
-    deaths: 0,
-    gold: 0,
-    sunk: new Map(),
-    ammo: new Map(),
-  };
   /** Changes with every new or updated entry, so the view rebuilds its lines only then */
   version = 0;
   private repair: { entry: LogEntry; amount: number; paid: number; steps: number; last: number } | null = null;
@@ -216,26 +182,16 @@ export class CombatLog {
 
   private read(event: GameEvent, state: GameState) {
     const me = state.ship.id;
-    const { stats } = this;
     switch (event.type) {
-      case 'shot':
-        if (event.shooterId === me)
-          stats.ammo.set(event.ammo, (stats.ammo.get(event.ammo) ?? 0) + event.muzzles.length);
-        break;
       case 'damage': {
         const { strike, amount } = event;
         const target = findUnit(state, event.targetId);
         const hull = `${unitName(event.targetKind)} ${target ? `${target.hp}/${target.maxHp}` : t('sunk')}`;
-        const tone = amount === 0 ? 'miss' : event.crits > 0 ? 'crit' : 'plain';
+        // The dice's own crits are in the details; the line stands out only for a critical volley, as on the screen
+        const tone = amount === 0 ? 'miss' : event.critical ? 'crit' : 'plain';
         const details = [...diceLines(strike), sumLine(event, hull)];
         if (event.attackerId === me) {
-          stats.dealt += amount;
-          stats.volleys++;
-          stats.dice += event.guns;
-          stats.crits += event.crits;
-          stats.misses += event.misses;
-          stats.best = Math.max(stats.best, amount);
-          const result = amount === 0 ? t('miss') : `${amount}${event.crits > 0 ? ` ${t('crit!')}` : ''}`;
+          const result = amount === 0 ? t('miss') : `${amount}${event.critical ? ` ${t('crit!')}` : ''}`;
           this.add(
             'dealt',
             state.time,
@@ -244,8 +200,6 @@ export class CombatLog {
             tone,
           );
         } else if (event.targetId === me) {
-          stats.taken += amount;
-          stats.hitsTaken++;
           const who = unitName(strike.attackerKind);
           const what =
             strike.source === 'bite'
@@ -253,20 +207,16 @@ export class CombatLog {
               : strike.source === 'shell'
                 ? t("{who}'s mortar → you", { who })
                 : t('{who} → you', { who });
-          const result = amount === 0 ? t('miss') : `−${amount}${event.crits > 0 ? ` ${t('crit!')}` : ''}`;
+          const result = amount === 0 ? t('miss') : `−${amount}${event.critical ? ` ${t('crit!')}` : ''}`;
           this.add('taken', state.time, `${what}: ${result}  ·  ${means(strike)}`, details, tone);
         }
         break;
       }
       case 'destroyed': {
         if (event.targetId === me) {
-          stats.deaths++;
           const who = unitName(event.attackerKind);
           this.add('death', state.time, t('Your ship went down: {who} sank it', { who }), [], 'plain');
         } else if (event.attackerId === me) {
-          // Kept by the English name: the totals outlast a change of language
-          const kept = SHIP_CLASSES[event.kind].name;
-          stats.sunk.set(kept, (stats.sunk.get(kept) ?? 0) + 1);
           const name = unitName(event.kind);
           const said = { name: name.toLowerCase(), Name: name };
           const line =
@@ -286,18 +236,19 @@ export class CombatLog {
         break;
       case 'gold': {
         if (event.shipId !== me) break;
-        stats.gold += event.amount;
         const name = event.kind ? unitName(event.kind) : '';
         const why =
           event.reason === 'bounty' && event.kind
             ? t('Bounty for the {name}', { name: name.toLowerCase(), Name: name })
             : event.reason === 'quest' && event.quest
               ? t('Quest "{title}" turned in', { title: questTitle(QUESTS[event.quest]) })
-              : event.reason === 'market'
-                ? t('Goods sold at the market')
-                : event.reason === 'arsenal'
-                  ? t('Sold to the arsenal')
-                  : t('A chest hauled aboard');
+              : event.reason === 'quest' && event.story
+                ? t('Story: "{title}" done', { title: t(storyTitle(event.story)) })
+                : event.reason === 'market'
+                  ? t('Goods sold at the market')
+                  : event.reason === 'arsenal'
+                    ? t('Sold to the arsenal')
+                    : t('A chest hauled aboard');
         this.add('gold', state.time, t('{why}: +{n} gold', { why, n: event.amount }), [], 'plain');
         break;
       }
@@ -307,13 +258,14 @@ export class CombatLog {
         break;
       case 'talent': {
         if (event.shipId !== me) break;
-        const name = t(TALENTS[event.talent].name);
-        // An ability's text without its cooldown: "Broadside: the next volley does ×2 damage"
-        const does = TALENTS[event.talent].text.replace(/^Ability \(F\): /, '').replace(/\. Every \d+ s$/, '');
+        const talent = talentOf(event.talent);
+        const name = t(talent.name);
+        // An ability's text without its key and cooldown: "Broadside: the next volley does ×2 damage"
+        const does = talent.text.replace(/^Ability \([A-Z]\): /, '').replace(/\. Every \d+ s$/, '');
         const what =
           event.amount > 0
             ? t('{talent}: +{n} hull at once', { talent: name, n: event.amount })
-            : `${name}: ${t(does)}`;
+            : `${name}: ${t(does, talent.figures)}`;
         this.add('level', state.time, what, [], 'plain');
         break;
       }
@@ -352,11 +304,16 @@ export class CombatLog {
           this.add('taken', state.time, t('The Baron fires his mortar: get out of the marked circles!'), [], 'plain');
         }
         break;
-      case 'pathStep': {
-        if (event.shipId !== me) break;
-        const step = captainsPath(state, state.player).find((s) => s.id === event.step);
-        if (step)
-          this.add('level', state.time, t("Captain's path: {step} — done", { step: t(step.text) }), [], 'plain');
+      // An objective of the story met; a step done says so with its reward (the gold's line), or here without one
+      case 'story': {
+        const step = STORY.find((s) => s.id === event.step);
+        if (event.shipId !== me || !step) break;
+        const objective = event.objective === null ? null : step.objectives[event.objective];
+        if (objective)
+          this.add('level', state.time, t('Story: {what} — done', { what: t(objective.text) }), [], 'plain');
+        else if (step.reward.gold === 0) {
+          this.add('level', state.time, t('Story: "{title}" done', { title: t(step.title) }), [], 'plain');
+        }
         break;
       }
       default:
@@ -365,8 +322,6 @@ export class CombatLog {
 
   /** Repair steps a moment apart are one entry, its numbers growing as the repair goes on */
   private repaired(amount: number, paid: number, state: GameState) {
-    this.stats.repaired += amount;
-    this.stats.repairGold += paid;
     const { ship, time } = state;
     let repair = this.repair;
     if (!repair || time - repair.last > REPAIR_JOIN || this.entries.at(-1) !== repair.entry) {
@@ -392,15 +347,11 @@ export class CombatLog {
 
   /** The log as plain data, to keep between visits */
   toData() {
-    const numbers = Object.fromEntries(NUMBER_STATS.map((key) => [key, this.stats[key]]));
-    return {
-      entries: this.entries.map((e) => ({ ...e, details: [...e.details] })),
-      stats: { ...numbers, sunk: [...this.stats.sunk], ammo: [...this.stats.ammo] },
-    };
+    return { entries: this.entries.map((e) => ({ ...e, details: [...e.details] })) };
   }
 
   /**
-   * Puts a kept log back (what is valid of it), with a note where it ends: the next entries are this visit's. Their
+   * Puts a kept log back (what is valid of it; the totals an older one kept are left out), with a note where it ends: the next entries are this visit's. Their
    * times are each visit's own game time. A visit that left nothing in the log left only its note: one note between
    * two visits is enough, so a note right after another (or first) is dropped, and none is added after one
    */
@@ -418,15 +369,6 @@ export class CombatLog {
       if (last && !isVisitNote(last)) {
         this.push({ kind: 'note', time: 0, summary: t('— a new visit —'), details: [], tone: 'plain' });
       }
-    }
-    if (isRecord(data.stats)) {
-      const { stats } = data;
-      for (const key of NUMBER_STATS) {
-        const value = stats[key];
-        if (typeof value === 'number' && Number.isFinite(value)) this.stats[key] = value;
-      }
-      for (const [name, n] of pairs(stats.sunk)) this.stats.sunk.set(name, n);
-      for (const [id, n] of pairs(stats.ammo)) if (isAmmo(id)) this.stats.ammo.set(id, n);
     }
     this.version++;
   }
@@ -455,10 +397,6 @@ function isTone(value: unknown): value is LogEntry['tone'] {
   return TONES.has(value);
 }
 
-function isAmmo(value: string): value is AmmoId {
-  return value in AMMO;
-}
-
 /** A kept entry, if it is one */
 function readEntry(item: unknown): LogEntry | null {
   if (!isRecord(item)) return null;
@@ -468,45 +406,9 @@ function readEntry(item: unknown): LogEntry | null {
   return { kind, time, summary, details: lines, tone };
 }
 
-/** Kept [name, count] pairs of a total, the valid ones */
-function pairs(value: unknown): [string, number][] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (pair): pair is [string, number] =>
-      Array.isArray(pair) && typeof pair[0] === 'string' && typeof pair[1] === 'number' && Number.isFinite(pair[1]),
-  );
-}
-
 /** Whether an entry shows under a tab */
 export function inFilter(entry: LogEntry, filter: LogFilter) {
   if (filter === 'all') return true;
   if (filter === 'other') return entry.kind !== 'dealt' && entry.kind !== 'taken';
   return entry.kind === filter;
-}
-
-/** The totals, a few lines of them */
-export function statsLines(stats: LogStats): string[] {
-  const missRate = stats.dice > 0 ? Math.round((stats.misses / stats.dice) * 100) : 0;
-  const sunk = [...stats.sunk].map(([name, n]) => `${t(name)} ×${n}`).join(', ') || t('nothing yet');
-  const ammo = [...stats.ammo].map(([id, n]) => `${t(AMMO[id].name)} ×${n}`).join(', ') || t('none');
-  return [
-    t('Dealt {dealt} in {volleys}  ·  best {best}  ·  {crits}  ·  {miss}% of {dice} missed', {
-      dealt: stats.dealt,
-      volleys: t('{n} volley|{n} volleys', { n: stats.volleys }),
-      best: stats.best,
-      crits: t('{n} crit|{n} crits', { n: stats.crits }),
-      miss: missRate,
-      dice: t('{n} die|{n} dice', { n: stats.dice }),
-    }),
-    t('Taken {taken} in {hits}  ·  repaired {repaired} for {gold}  ·  went down {deaths}×  ·  gold earned {earned}', {
-      taken: stats.taken,
-      hits: t('{n} hit|{n} hits', { n: stats.hitsTaken }),
-      repaired: stats.repaired,
-      gold: t('{n} gold', { n: stats.repairGold }),
-      deaths: stats.deaths,
-      earned: stats.gold,
-    }),
-    t('Sunk: {list}', { list: sunk }),
-    t('Shots fired: {list}', { list: ammo }),
-  ];
 }

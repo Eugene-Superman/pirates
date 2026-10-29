@@ -1,9 +1,10 @@
 import { AMMO, GUNS, type AmmoId, type GunId } from '../combat/arsenal';
 import type { GameState } from '../GameState';
+import { ITEMS, isItem, type ItemId } from '../items/items';
 import { OUTFITS, type OutfitId, type OutfitSlot } from '../ships/outfit';
 import type { Ship } from '../ships/Ship';
 import { GOOD_IDS, cargoValue, type GoodId } from './cargo';
-import { earn, markStep, shipOf, type Player } from './player';
+import { earn, shipOf, type Player } from './player';
 import { spend } from '../records/stats';
 
 // The port's shop and shipwright. Prices by tier: a gun of the next tier costs a few times the last, as its damage
@@ -12,13 +13,14 @@ const GUN_PRICES = [0, 80, 250, 600, 1400, 3000, 6000]; // gold, by the gun's ti
 const AMMO_PACK_PRICES = [0, 10, 30, 70, 150, 300, 600]; // gold for AMMO_PACK shots, by the ammo's tier
 /** Shots in one pack of ammo: what the arsenal's cards buy and sell at a click; any count from 1 is bought too */
 export const AMMO_PACK = 20;
-/** The most shots of an ammo bought or sold at once */
-export const MAX_AMMO_DEAL = 1000;
 // The shipwright's rate: hull points mended for one gold, all at once. Four times the crew's at sea (ships/repair.ts)
 const SHIPWRIGHT_HP_PER_GOLD = 2.5;
 // Gold, by the piece of outfit's tier: a little dearer than a gun of the tier, as it serves every fight
 const OUTFIT_PRICES = [0, 120, 400, 1000];
-const RESPEC_PRICE = 20; // gold for every talent point and signature forgotten: cheap, so a player tries other builds
+// Doubloons for every level of the ship whose talents are forgotten, all of them at once. Not gold, which a player
+// farms: they would take whatever the next fight wants and forget it after (as the captain's mastery,
+// account/mastery.ts)
+const RESPEC_PRICE = 1;
 // Share of its price the arsenal pays for a gun or ammo sold back: a quarter, so a gun bought and sold again is a loss,
 // and selling what the player has outgrown helps a little towards the next, never more than the hunting does
 const SELL_BACK = 0.25;
@@ -50,14 +52,24 @@ export function ammoSalePrice(ammo: AmmoId, count: number = AMMO_PACK) {
   return Math.floor((ammoPackPrice(ammo) * SELL_BACK * count) / AMMO_PACK);
 }
 
-/** Whether a count of shots can be dealt in at once: a whole number from 1 to MAX_AMMO_DEAL */
+/** Whether a count of shots can be dealt in at once: a whole number from 1, as many as the gold or the hold has */
 function dealable(count: number) {
-  return Number.isInteger(count) && count >= 1 && count <= MAX_AMMO_DEAL;
+  return Number.isSafeInteger(count) && count >= 1;
 }
 
-/** What mending the whole hull costs at the shipwright's; 0 when it is whole */
+/** What mending the whole hull costs at the shipwright's, less with the captain's Thrifty crew; 0 when it is whole */
 export function repairPrice(ship: Ship) {
-  return Math.ceil((ship.maxHp - ship.hp) / SHIPWRIGHT_HP_PER_GOLD);
+  return Math.ceil(((ship.maxHp - ship.hp) / SHIPWRIGHT_HP_PER_GOLD) * (1 - ship.bonus.repairCost));
+}
+
+/** What the market pays this ship for goods, as a share of their price: more with the captain's mastery */
+export function marketShare(ship: Ship) {
+  return 1 + ship.bonus.market + ship.bonus.gold;
+}
+
+/** What goods in the ship's hold fetch at the market (some kinds, or all) */
+export function marketValue(ship: Ship, kinds: readonly GoodId[] = GOOD_IDS) {
+  return Math.round(cargoValue(ship.cargo, kinds) * marketShare(ship));
 }
 
 /** The player's ship, if it is in port: everything in the shop is bought there */
@@ -79,11 +91,30 @@ export function buyGun(state: GameState, player: Player, gun: GunId) {
   return true;
 }
 
-/** Buys `count` shots of an ammo into the ship's hold (a pack's by default), up to MAX_AMMO_DEAL at once */
+/** Buys `count` shots of an ammo into the ship's hold (a pack's by default), as many as the gold pays for */
 export function buyAmmo(state: GameState, player: Player, ammo: AmmoId, count: number = AMMO_PACK) {
   const ship = dockedShip(state, player);
   if (!ship || !dealable(count) || !pay(player, ammoPrice(ammo, count))) return false;
   ship.addAmmo(ammo, count);
+  return true;
+}
+
+/** What `count` of an item cost at the market, in doubloons */
+export function itemPrice(id: ItemId, count = 1) {
+  return ITEMS[id].price * count;
+}
+
+/**
+ * Buys `count` of an item at the market into the player's hold, for doubloons only (items/items.ts): as many as they
+ * like, the hold has room for every one. False if not in port or short of doubloons
+ */
+export function buyItem(state: GameState, player: Player, id: ItemId, count = 1) {
+  // Online the id is a player's: checked before it is priced
+  if (!isItem(id) || !dockedShip(state, player) || !dealable(count)) return false;
+  const price = itemPrice(id, count);
+  if (player.doubloons < price) return false;
+  player.doubloons -= price;
+  player.items[id] = (player.items[id] ?? 0) + count;
   return true;
 }
 
@@ -162,26 +193,27 @@ export function sellCargo(state: GameState, player: Player, good?: GoodId) {
   const ship = dockedShip(state, player);
   if (!ship) return false;
   const kinds = good ? [good] : GOOD_IDS;
-  const amount = cargoValue(ship.cargo, kinds);
+  const amount = marketValue(ship, kinds);
   if (amount === 0) return false;
   for (const id of kinds) delete ship.cargo[id];
   earn(state, player, { amount, reason: 'market', kind: null, quest: null, at: shipTop(ship) });
-  markStep(state, player, 'sell');
   return true;
 }
 
-/** What forgetting the ship's talents costs at the shipwright's; 0 with none picked */
+/** What forgetting the ship's talents costs at the shipwright's, in doubloons: by its level; 0 with none picked */
 export function respecPrice(ship: Ship) {
-  let picks = 0;
-  for (const rank of ship.talentRanks().values()) picks += rank;
-  return picks * RESPEC_PRICE;
+  return ship.talentRanks().size > 0 ? ship.level * RESPEC_PRICE : 0;
 }
 
-/** The shipwright retrains the crew: every talent forgotten, to pick again. Only in port; false with none or short */
+/**
+ * The shipwright retrains the crew: every talent forgotten at once, to pick again, for doubloons. Only in port; false
+ * with none or short
+ */
 export function resetTalents(state: GameState, player: Player) {
   const ship = dockedShip(state, player);
   const price = ship ? respecPrice(ship) : 0;
-  if (!ship || price === 0 || !pay(player, price)) return false;
+  if (!ship || price === 0 || player.doubloons < price) return false;
+  player.doubloons -= price;
   ship.forgetTalents();
   return true;
 }

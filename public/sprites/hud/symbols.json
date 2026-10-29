@@ -1,0 +1,18 @@
+{
+ "file": "symbols.webp",
+ "tile": 96,
+ "icons": {
+  "gold": [
+   0,
+   0
+  ],
+  "xp": [
+   1,
+   0
+  ],
+  "doubloon": [
+   2,
+   0
+  ]
+ }
+}

@@ -2,6 +2,7 @@ import { AMMO, GUNS, averageDamage, type AmmoId } from '../combat/arsenal';
 import type { CargoDrop } from '../economy/cargo';
 import type { Point } from '../lib/geometry';
 import { SHIP_CLASSES, lineTier, type ShipClass, type ShipClassId } from '../ships/shipClasses';
+import { MAP_SQUARES } from '../world/map';
 import { START_ZONE, ZONES, ZONE_IDS, type OuterZoneId, type ZoneId } from '../world/zones';
 
 /** The starting waters' own kinds of bots */
@@ -68,13 +69,14 @@ export interface Boss {
   readonly escorts: { readonly kind: BotKindId; readonly count: number };
 }
 
-// The starting waters' bots, balanced against the starter sloop with its starting guns (two cannons I, two harpoon
-// guns I): each fight costs it a share of its hull that the repair skill brings back in half a minute or so.
+// The starting waters' bots, balanced against the starter sloop with the guns a new player has (four cannons I, four
+// harpoon guns I): each fight costs it a share of its hull that the repair skill brings back in half a minute or so.
 // pirate-balance.xlsx, Plan bots, has the first numbers; their experience is two and a half times the table's, so the
 // sloop reaches its last level in about two hours. The loot is kept lean: about 7 gold a fishing boat, 15 a turtle,
 // 22–29 the rest (bounty + chests on average); chests of gold only from ships, a monster leaves only what its body is
 // worth. Goods drop now and then, a piece or two, and sell for about a tenth as much again at the market
-// (economy/cargo.ts), once carried home
+// (economy/cargo.ts), once carried home. Moon glass now and then from each (the story: they all deal in it, or ate it),
+// every time from the story's own prey (economy/loot.ts), crates of it from the Baron
 const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
   // Nets and fish, no guns: it runs from whoever attacks it
   fisher: {
@@ -93,7 +95,10 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     level: 1,
     xp: 25,
     chest: { chance: 0.15, gold: [3, 6] },
-    cargo: [{ good: 'fish', count: [1, 2], chance: 0.35 }],
+    cargo: [
+      { good: 'fish', count: [1, 2], chance: 0.35 },
+      { good: 'moonGlass', count: [1, 1], chance: 0.08 },
+    ],
     boss: null,
   },
   // A swivel gun that reaches less far than the player's cannons: keep your distance and it can't answer
@@ -116,6 +121,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     cargo: [
       { good: 'cloth', count: [1, 2], chance: 0.4 },
       { good: 'spices', count: [1, 1], chance: 0.15 },
+      { good: 'moonGlass', count: [1, 1], chance: 0.1 },
     ],
     boss: null,
   },
@@ -138,6 +144,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     cargo: [
       { good: 'rum', count: [1, 1], chance: 0.35 },
       { good: 'contraband', count: [1, 1], chance: 0.15 },
+      { good: 'moonGlass', count: [1, 1], chance: 0.12 },
     ],
     boss: null,
   },
@@ -158,7 +165,10 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     level: 2,
     xp: 50,
     chest: null,
-    cargo: [{ good: 'turtleShell', count: [1, 1], chance: 0.3 }],
+    cargo: [
+      { good: 'turtleShell', count: [1, 1], chance: 0.3 },
+      { good: 'moonGlass', count: [1, 1], chance: 0.1 },
+    ],
     boss: null,
   },
   serpent: {
@@ -177,7 +187,10 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     level: 4,
     xp: 90,
     chest: null,
-    cargo: [{ good: 'serpentScale', count: [1, 1], chance: 0.3 }],
+    cargo: [
+      { good: 'serpentScale', count: [1, 1], chance: 0.3 },
+      { good: 'moonGlass', count: [1, 1], chance: 0.1 },
+    ],
     boss: null,
   },
   // The boss of the starting waters (ships/shipClasses.ts, baronBrig): its lair is far from the port, and it sails
@@ -200,6 +213,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     chest: { chance: 1, gold: [60, 120] },
     cargo: [
       { good: 'contraband', count: [2, 3], chance: 1 },
+      { good: 'moonGlass', count: [2, 3], chance: 1 },
       { good: 'baronsStrongbox', count: [1, 1], chance: 1 },
     ],
     boss: { lair: { x: 6500, y: 1500 }, escorts: { kind: 'smuggler', count: 2 } },
@@ -366,6 +380,11 @@ export const BOT_KINDS: Readonly<Record<string, BotKind>> = Object.fromEntries(
 /** The kinds of bots that sail a sea */
 export function zoneKinds(zone: ZoneId): readonly BotKind[] {
   return ZONE_KINDS.get(zone) ?? [];
+}
+
+/** How many of a kind sail its sea at once: `perSquare` to every square of the map; a boss, one at its lair */
+export function botsInSea(kind: BotKind) {
+  return kind.boss ? 1 : Math.round(kind.perSquare * MAP_SQUARES * MAP_SQUARES);
 }
 
 /** The boss of a sea, if it has one */

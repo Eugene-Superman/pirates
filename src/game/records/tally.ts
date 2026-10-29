@@ -2,7 +2,7 @@ import type { GameState } from '../GameState';
 import { cargoCount } from '../economy/cargo';
 import { playerOf } from '../economy/player';
 import { findUnit } from '../combat/units';
-import { TALENTS } from '../ships/talents';
+import { talentOf } from '../ships/talents';
 import type { Stats } from './stats';
 
 /**
@@ -63,7 +63,7 @@ export function stepStats(state: GameState, dt: number) {
         record(state, event.shipId, (s) => (s.repaired += event.amount));
         break;
       case 'talent': {
-        const talent = TALENTS[event.talent];
+        const talent = talentOf(event.talent);
         if (talent.kind === 'signature' && talent.active) record(state, event.shipId, (s) => s.abilities++);
         break;
       }

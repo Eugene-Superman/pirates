@@ -1,7 +1,8 @@
 /**
  * What things are paid in: gold, and the currencies of the systems to come, each paid out by its own (sea monsters,
- * bosses, treasure maps, the arena, events, guild battles) and doubloons, bought. Only gold is earned and spent so far;
- * the shipyard already prices ships in the rest (ships/shipLines.ts)
+ * bosses, treasure maps, the arena, events, guild battles) and doubloons, bought. Only gold is earned so far, and
+ * doubloons spent on forgetting the captain's mastery (account/mastery.ts) and a ship's talents (economy/shop.ts); the
+ * shipyard already prices ships in the rest (ships/shipLines.ts)
  */
 export type CurrencyId = 'gold' | 'pearls' | 'seals' | 'relics' | 'glory' | 'tokens' | 'honour' | 'doubloons';
 

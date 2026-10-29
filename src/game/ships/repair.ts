@@ -1,8 +1,7 @@
-import { markStep, playerOf } from '../economy/player';
+import { playerOf } from '../economy/player';
 import { spend } from '../records/stats';
 import type { GameState } from '../GameState';
 import type { Ship } from './Ship';
-import { PERKS } from './talents';
 
 /** Share of the hull's points the crew mends per second: 2 %, a sloop's whole hull in under a minute */
 const REPAIR_RATE = 0.02;
@@ -18,15 +17,19 @@ export const COMBAT_TIME = 5;
  */
 export const REPAIR_HP_PER_GOLD = 10;
 
-/** Hull points one repair step mends on this ship: more with Carpenters */
+/** Hull points one repair step mends on this ship: more with Carpenters and the captain's mastery */
 export function repairStep(ship: Ship) {
-  const carpenters = 1 + PERKS.repair * ship.rank('carpenters');
+  const carpenters = 1 + ship.bonus.repairRate;
   return Math.max(1, Math.round(ship.maxHp * REPAIR_RATE * REPAIR_TICK * carpenters));
 }
 
-/** The gold owed after the next step, coins and the fraction of one carried over (Ship.repairDue) */
+/**
+ * The gold owed after the next step, coins and the fraction of one carried over (Ship.repairDue): less with the
+ * captain's Thrifty crew
+ */
 function dueAfterStep(ship: Ship) {
-  return ship.repairDue + Math.min(repairStep(ship), ship.maxHp - ship.hp) / REPAIR_HP_PER_GOLD;
+  const mended = Math.min(repairStep(ship), ship.maxHp - ship.hp);
+  return ship.repairDue + (mended / REPAIR_HP_PER_GOLD) * (1 - ship.bonus.repairCost);
 }
 
 /**
@@ -78,7 +81,6 @@ export function stepRepairs(state: GameState, dt: number) {
       paid = Math.floor(due);
       spend(player, paid);
       ship.repairDue = due - paid;
-      markStep(state, player, 'repair');
     }
     const before = ship.hp;
     ship.heal(repairStep(ship));

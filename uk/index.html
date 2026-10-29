@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="uk" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moonwreck — морські бої у вашому браузері</title>
+    <meta
+      name="description"
+      content="Пливіть мальованим морем, бийтеся з кораблями й морськими чудовиськами гарматами та гарпунами, піднімайте їхнє золото на борт і пройдіть шлях від шлюпа до лінійного корабля просто в браузері."
+    />
+    <link rel="canonical" href="%VITE_SITE_URL%/uk/" />
+    <link rel="alternate" hreflang="en" href="%VITE_SITE_URL%/" />
+    <link rel="alternate" hreflang="uk" href="%VITE_SITE_URL%/uk/" />
+    <link rel="alternate" hreflang="ru" href="%VITE_SITE_URL%/ru/" />
+    <link rel="alternate" hreflang="x-default" href="%VITE_SITE_URL%/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#050b1a" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Moonwreck" />
+    <meta property="og:locale" content="uk_UA" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:locale:alternate" content="ru_RU" />
+    <meta property="og:url" content="%VITE_SITE_URL%/uk/" />
+    <meta property="og:title" content="Moonwreck — морські бої у вашому браузері" />
+    <meta
+      property="og:description"
+      content="Бийтеся з кораблями й морськими чудовиськами гарматами та гарпунами, піднімайте їхнє золото на борт і пройдіть шлях від шлюпа до лінійного корабля."
+    />
+    <meta property="og:image" content="%VITE_SITE_URL%/landing/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Портове місто під замком на пагорбі, кораблі на якорі за його кам’яними стінами"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image:alt"
+      content="Портове місто під замком на пагорбі, кораблі на якорі за його кам’яними стінами"
+    />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "%VITE_SITE_URL%/uk/#website",
+            "name": "Moonwreck",
+            "url": "%VITE_SITE_URL%/uk/",
+            "inLanguage": "uk"
+          },
+          {
+            "@type": "VideoGame",
+            "@id": "%VITE_SITE_URL%/#game",
+            "name": "Moonwreck",
+            "url": "%VITE_SITE_URL%/uk/",
+            "description": "Морська пригода в браузері: пливіть мальованим морем, бийтеся з кораблями й морськими чудовиськами гарматами та гарпунами, піднімайте їхнє золото на борт і пройдіть шлях від шлюпа до лінійного корабля крізь п’ятнадцять морів.",
+            "image": "%VITE_SITE_URL%/landing/og-image.jpg",
+            "genre": ["Морський екшн", "Рольова гра"],
+            "gamePlatform": "Браузер",
+            "applicationCategory": "Game",
+            "operatingSystem": "Any",
+            "playMode": "SinglePlayer",
+            "inLanguage": ["en", "uk", "ru"]
+          }
+        ]
+      }
+    </script>
+
+    <link rel="stylesheet" href="/src/landing/landing.css" />
+    <script type="module" src="/src/landing/landing.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Перейти до головного</a>
+
+    <header class="masthead">
+      <a class="brand" href="./">
+        <img src="/landing/emblem.webp" width="48" height="48" alt="" />
+        <span>Moonwreck</span>
+      </a>
+      <nav class="sections-nav" aria-label="Розділи">
+        <ul>
+          <li><a href="#features">Життя в морі</a></li>
+          <li><a href="#port">Порт</a></li>
+          <li><a href="#ships">Кораблі</a></li>
+          <li><a class="nav-cta" href="#sign-in">Увійти</a></li>
+        </ul>
+      </nav>
+      <nav class="lang-nav" aria-label="Мова">
+        <ul>
+          <li><a href="../" hreflang="en" lang="en">English</a></li>
+          <li><a href="./" hreflang="uk" lang="uk" aria-current="page">Українська</a></li>
+          <li><a href="../ru/" hreflang="ru" lang="ru">Русский</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero" aria-labelledby="intro-title">
+        <div class="hero-art">
+          <img
+            src="/sprites/port/harbour.webp"
+            srcset="/landing/harbour-800.webp 800w, /sprites/port/harbour.webp 1586w"
+            sizes="100vw"
+            width="1586"
+            height="992"
+            fetchpriority="high"
+            alt="Порт: портове місто під замком на пагорбі, кораблі на якорі за його вигнутими кам’яними стінами"
+          />
+        </div>
+
+        <div class="hero-panels">
+          <div class="panel intro">
+            <h1 id="intro-title">Moonwreck</h1>
+            <p class="tagline">Морські бої на мальованому морі просто у вашому браузері.</p>
+            <p>
+              Клацніть по морю, і ваш корабель попливе туди, оминаючи острови. Бийтеся з купцями, контрабандистами й
+              морськими зміями гарматами та гарпунами, піднімайте їхні скрині на борт, продавайте товари в порту й
+              пройдіть шлях від маленького шлюпа до золотого лінійного корабля.
+            </p>
+            <ul class="facts">
+              <li><strong>15</strong> морів</li>
+              <li><strong>6</strong> рангів кораблів</li>
+              <li><strong>60</strong> рівнів кожного корабля</li>
+            </ul>
+          </div>
+
+          <section class="panel sign-in" id="sign-in" aria-labelledby="sign-in-title">
+            <h2 id="sign-in-title">Відчалити</h2>
+            <p class="hint" id="sign-in-hint">
+              Увійдіть з електронною поштою й паролем. Облікові записи з’являться з онлайн-грою, а доки їх немає, на
+              борт пустить будь-яка пошта й будь-який пароль.
+            </p>
+            <noscript>
+              <p class="notice">Гра працює на JavaScript: увімкніть його в браузері, щоб відчалити.</p>
+            </noscript>
+            <form id="sign-in-form" action="../play/?lang=uk" method="post">
+              <div class="field">
+                <label for="email">Електронна пошта</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autocomplete="username"
+                  spellcheck="false"
+                  required
+                  aria-describedby="email-error"
+                />
+                <p class="field-error" id="email-error"></p>
+              </div>
+              <div class="field">
+                <label for="password">Пароль</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                  aria-describedby="password-error"
+                />
+                <p class="field-error" id="password-error"></p>
+              </div>
+              <div class="check" id="show-password-row" hidden>
+                <input id="show-password" type="checkbox" aria-controls="password" />
+                <label for="show-password">Показати пароль</label>
+              </div>
+              <button class="button" type="submit">Увійти</button>
+              <p class="form-status" id="sign-in-status" role="status"></p>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <section class="section" id="features" aria-labelledby="features-title">
+        <h2 id="features-title">Життя в морі</h2>
+        <ul class="cards">
+          <li class="card">
+            <h3>Пливіть, куди вкажете</h3>
+            <p>
+              Клацніть по воді, і корабель сам прокладе курс повз острови й інші кораблі. Затисніть і ведіть, щоб
+              кермувати на ходу.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Гармати й гарпуни</h3>
+            <p>
+              Двадцять гармат і чотирнадцять видів боєприпасів, у кожного своя дальність і перезарядка. Виберіть ціль,
+              відкрийте вогонь і читайте кожен удар, з усіма кидками кубиків, у журналі бою.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Кораблі й морські чудовиська</h3>
+            <p>
+              Рибалки й купці вас не чіпають, а от контрабандисти, пірати й морські змії — так. Велетенські черепахи,
+              акули, краби й кракени водяться в дальніх морях.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Здобич і торгівля</h3>
+            <p>
+              Кожна перемога приносить золото й досвід і лишає на воді скрині та ящики з товарами. Підніміть їх на борт,
+              доки не потонули, але стережіться: підете на дно — і ваш вантаж лишиться там, де ви потонули.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Боси</h3>
+            <p>
+              Барон контрабандистів зі своїм ескортом тримає куток стартових вод, і снаряди його мортири падають на
+              позначені місця на морі. У кожному морі далі — свій бос.
+            </p>
+          </li>
+          <li class="card">
+            <h3>П’ятнадцять морів</h3>
+            <p>
+              За стартовими водами лежать ще чотирнадцять морів, у кожного своя мапа, свої боти й свій бос. Пропливайте
+              крізь ворота на їхніх краях, щойно ваш корабель стане досить міцним.
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section" id="port" aria-labelledby="port-title">
+        <h2 id="port-title">Порт, куди хочеться повертатися</h2>
+        <p class="section-lead">Посеред моря лежить портове місто. Зайдіть у гавань, і всі його будівлі — за клік.</p>
+        <ul class="cards buildings">
+          <li class="card building">
+            <span class="sprite medallion medallion-tavern">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Таверна</h3>
+              <p>Завдання на нагороду для кожного моря: потопіть, що просять, і вертайтеся по винагороду.</p>
+            </div>
+          </li>
+          <li class="card building">
+            <span class="sprite medallion medallion-market">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Ринок</h3>
+              <p>Продайте підняті на борт товари й звільніть трюм для нових.</p>
+            </div>
+          </li>
+          <li class="card building">
+            <span class="sprite medallion medallion-workshop">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Майстерня</h3>
+              <p>Вітрила, обшивка, стерно й спорядження дозорного для корабля, а корпус — полагоджений одразу.</p>
+            </div>
+          </li>
+          <li class="card building">
+            <span class="sprite medallion medallion-shipyard">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Верф</h3>
+              <p>Купіть наступний корабель або станьте за стерно будь-якого корабля свого флоту, що стоїть у порту.</p>
+            </div>
+          </li>
+          <li class="card building">
+            <span class="sprite medallion medallion-arsenal">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Арсенал</h3>
+              <p>Гармати й боєприпаси для кожного гнізда, і чверть ціни назад за те, що вам більше не потрібно.</p>
+            </div>
+          </li>
+        </ul>
+        <p class="section-note">Штаб гільдії й аукціонний дім відкриються з онлайн-грою.</p>
+      </section>
+
+      <section class="section" id="ships" aria-labelledby="ships-title">
+        <h2 id="ships-title">Від шлюпа до лінійного корабля</h2>
+        <p class="section-lead">
+          Кожен корабель має власні рівні, по десять на ранг і шістдесят на 6 ранзі, і власне дерево талантів з
+          особливим талантом кожні п’ять рівнів: ракета чи бочка пороху з 25 рівня, бомбардування чи Королівський
+          штандарт з 50. Над усіма вашими кораблями росте майстерність капітана: пасивні вміння у семи спеціалізаціях
+          для кожного корабля, яким ви пливете.
+        </p>
+        <ol class="ships">
+          <li class="ship">
+            <span class="sprite ship-picture ship-sloop">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Стартовий шлюп</h3>
+            <p class="ship-tier">Ваш перший корабель</p>
+            <p>Малий і легкий: корабель, щоб навчитися морю.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-herald">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Королівський герольд</h3>
+            <p class="ship-tier">1 ранг</p>
+            <p>Герольд корони, міцний на всі руки.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-salamander">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Саламандра</h3>
+            <p class="ship-tier">2 ранг</p>
+            <p>Королівський рейдер під вітрилами кольору полум’я.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-peregrine">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Сапсан</h3>
+            <p class="ship-tier">3 ранг</p>
+            <p>Сокіл флоту: швидкий і пильний.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-lion">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Коронований лев</h3>
+            <p class="ship-tier">4 ранг</p>
+            <p>Скарби й гармати під королівською короною.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-eagle">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Чорний орел</h3>
+            <p class="ship-tier">5 ранг</p>
+            <p>Чорний флагман королівських ескадр.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-sovereign">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Володар морів</h3>
+            <p class="ship-tier">6 ранг</p>
+            <p>Золотий трипалубник, що править морем.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="section call" aria-labelledby="call-title">
+        <h2 id="call-title">Ваш корабель чекає</h2>
+        <p>Шлюп чекає біля причалу, море спокійне, а Барон контрабандистів — ні.</p>
+        <a class="button" href="#sign-in">Увійти й відчалити</a>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Працює в будь-якому сучасному браузері з WebGL: Chrome, Firefox, Safari чи Edge.</p>
+      <p>© 2026 Moonwreck</p>
+    </footer>
+  </body>
+</html>

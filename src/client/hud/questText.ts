@@ -1,4 +1,4 @@
-import { SHIP_CLASSES, ZONES, type Quest } from '../../game';
+import { SHIP_CLASSES, ZONES, goalShips, type GameState, type Quest, type ShipGoal } from '../../game';
 import { t } from '../i18n/i18n';
 
 /** A name to start a sentence with */
@@ -24,4 +24,15 @@ export function questTitle(quest: Quest) {
 /** What the tavern keeper says of a quest, as the player reads it */
 export function questText(quest: Quest) {
   return t(quest.text, names(quest));
+}
+
+/**
+ * The ship the player works towards, in the tracker's header: the next of their line by its name, or the first after
+ * the starter sloop, of any line, by its tier
+ */
+export function goalTitle(state: GameState, goal: ShipGoal) {
+  const [ship] = goalShips(state, state.player, goal);
+  return goal.line && ship
+    ? t('Goal: the {ship}', { ship: t(SHIP_CLASSES[ship].name) })
+    : t('Goal: a tier {tier} ship', { tier: goal.tier });
 }

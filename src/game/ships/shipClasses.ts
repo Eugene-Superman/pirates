@@ -76,8 +76,9 @@ export interface ShipClass {
    */
   readonly slots: Readonly<Record<WeaponId, readonly Mount[]>>;
   /**
-   * Guns fitted when the ship is new, slot by slot from the first (null, or a slot past the list: empty). Only the
-   * starter sloop and the bots' hulls have any: a ship bought at the shipyard comes with none (UNARMED)
+   * Guns fitted when the ship is new, slot by slot from the first (null, or a slot past the list: empty). Only the bots'
+   * hulls have any: a player's ship comes with none (UNARMED), the starter sloop's guns in a new player's hold for them
+   * to fit (economy/player.ts, STARTING_HOLD)
    */
   readonly startingGuns: Readonly<Record<WeaponId, readonly (GunId | null)[]>>;
   /** A sea monster's jaws; null for a ship */
@@ -90,7 +91,7 @@ export interface ShipClass {
   readonly maxLevel: number;
   /**
    * How many abilities it has, each used with a key once its level opens it (ships/talents.ts, ABILITY_LEVELS); 0 for
-   * a bot's. Only the first is made yet
+   * a bot's. The third is still to be made
    */
   readonly abilities: number;
 }
@@ -100,13 +101,14 @@ const LEVELS_A_TIER = 10;
 
 /**
  * What a ship of the lines players sail has by its tier, whatever its line: the last level it reaches (ten a tier,
- * the starter sloop's as tier 1's) and its abilities (one up to tier 3, two at tiers 4 and 5, three at tier 6)
+ * the starter sloop's as tier 1's) and its abilities (one up to tier 2, two at tiers 3 and 4, three from tier 5: the
+ * levels they open at, ships/talents.ts ABILITY_LEVELS, are within its last)
  */
 export function lineTier(tier: number) {
-  return { tier, maxLevel: Math.max(1, tier) * LEVELS_A_TIER, abilities: tier >= 6 ? 3 : tier >= 4 ? 2 : 1 };
+  return { tier, maxLevel: Math.max(1, tier) * LEVELS_A_TIER, abilities: tier >= 5 ? 3 : tier >= 3 ? 2 : 1 };
 }
 
-// A ship bought at the shipyard comes with every slot empty: the player fits guns from the hold (economy/player.ts)
+// A player's ship comes with every slot empty: the player fits guns from the hold (economy/player.ts)
 const UNARMED = { cannon: [], harpoon: [] } as const;
 const NO_GUNS = { slots: { cannon: [], harpoon: [] }, startingGuns: UNARMED } as const;
 // A bot's hull: it doesn't level and has no abilities
@@ -147,10 +149,8 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
         { x: -11, y: 0, z: 6.4 },
       ],
     },
-    startingGuns: {
-      cannon: ['cannon1', 'cannon1', null, null],
-      harpoon: ['harpoonGun1', 'harpoonGun1', null, null],
-    },
+    // A new player's are in the hold, the story's first step to fit them (story/story.ts)
+    startingGuns: UNARMED,
     bite: null,
     barrage: null,
     hold: 10,
@@ -171,7 +171,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     id: 'coastalBark',
     line: 'european',
     ...lineTier(1),
-    name: 'Coastal Bark',
+    name: 'Royal Herald',
     hp: 800,
     nature: 'object',
     height: 10,
@@ -216,7 +216,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     hold: 15,
   },
 
-  // Tier 2: a three-master with three tiers of guns, 13 cannons and 10 harpoon guns, about twice the Coastal Bark's hull,
+  // Tier 2: a three-master with three tiers of guns, 13 cannons and 10 harpoon guns, about twice the Royal Herald's hull,
   // a bigger hold, a knot quicker and slower to turn. Its model is blender-assets/ships/european/corsair/build.py: the
   // hull and the slots' places are measured on it. It shows some fifty ports; the game's thirteen cannons are the main
   // battery's eight a side and the lower battery's five amidships
@@ -224,7 +224,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     id: 'corsair',
     line: 'european',
     ...lineTier(2),
-    name: 'Corsair',
+    name: 'Salamander',
     hp: 1700,
     nature: 'object',
     height: 13,
@@ -277,15 +277,15 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     hold: 20,
   },
 
-  // Tier 3: the Corsair drawn out for speed, a few percent bigger, three raked masts under sharp orange and lilac
-  // sails, two batteries. 20 cannons and 14 harpoon guns, about twice the Corsair's hull, a bigger hold, a knot quicker
+  // Tier 3: the Salamander drawn out for speed, a few percent bigger, three raked masts under sharp orange and lilac
+  // sails, two batteries. 20 cannons and 14 harpoon guns, about twice the Salamander's hull, a bigger hold, a knot quicker
   // and a little slower to turn. Its model is blender-assets/ships/european/frigate/build.py, made SCALE (1.04) times
   // bigger once built: the hull and the slots' places are measured on it, scaled
   frigate: {
     id: 'frigate',
     line: 'european',
     ...lineTier(3),
-    name: 'Frigate',
+    name: 'Peregrine',
     hp: 3300,
     nature: 'object',
     height: 13.5,
@@ -349,15 +349,15 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     hold: 32,
   },
 
-  // Tier 4: the king's treasure ship, a galleon about a tenth longer than the Frigate and much wider, with a high
+  // Tier 4: the king's treasure ship, a galleon about a tenth longer than the Peregrine and much wider, with a high
   // stepped stern, four masts under silver sails and gilt crowns. 31 cannons and 19 harpoon guns, about twice the
-  // Frigate's hull, a bigger hold, a knot quicker under its four masts and heavier on the helm. Its model is
+  // Peregrine's hull, a bigger hold, a knot quicker under its four masts and heavier on the helm. Its model is
   // blender-assets/ships/european/royalGalleon/build.py
   royalGalleon: {
     id: 'royalGalleon',
     line: 'european',
     ...lineTier(4),
-    name: 'Royal Galleon',
+    name: 'Crowned Lion',
     hp: 6200,
     nature: 'object',
     height: 15,
@@ -439,13 +439,13 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
   },
 
   // The European line's tier 5: a black and gold first-rate flagship, three gun decks, towering black sails and a gilt
-  // eagle at the head. The Royal Galleon's size on the water, but far more hull and guns, a little faster under that
+  // eagle at the head. The Crowned Lion's size on the water, but far more hull and guns, a little faster under that
   // rig, slower to turn and with the widest sight. Its model is blender-assets/ships/european/admiral/build.py
   admiral: {
     id: 'admiral',
     line: 'european',
     ...lineTier(5),
-    name: 'Admiral',
+    name: 'Black Eagle',
     hp: 12500,
     nature: 'object',
     height: 17,
@@ -543,14 +543,14 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
   },
 
   // The European line's tier 6, its last: a golden three-decker with emerald strakes, the tallest rig afloat in cloth
-  // of gold and a gilt shark's tail at the stern. 15% over the Admiral every way, with twice its hull and half as many
+  // of gold and a gilt shark's tail at the stern. 15% over the Black Eagle every way, with twice its hull and half as many
   // guns again, a little faster under that rig, the slowest to turn and with the widest sight. Its model is
   // blender-assets/ships/european/shipOfTheLine/build.py
   shipOfTheLine: {
     id: 'shipOfTheLine',
     line: 'european',
     ...lineTier(6),
-    name: 'Imperial Ship of the Line',
+    name: 'Sovereign of the Seas',
     hp: 24000,
     nature: 'object',
     height: 20,

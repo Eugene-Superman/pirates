@@ -1,0 +1,200 @@
+{
+ "file": "cursors.webp",
+ "tile": 64,
+ "icons": {
+  "arrow": [
+   0,
+   0
+  ],
+  "arrowLit": [
+   1,
+   0
+  ],
+  "arrowGold": [
+   2,
+   0
+  ],
+  "forbidden": [
+   3,
+   0
+  ],
+  "info": [
+   4,
+   0
+  ],
+  "help": [
+   5,
+   0
+  ],
+  "sabres": [
+   0,
+   1
+  ],
+  "sight": [
+   1,
+   1
+  ],
+  "harpoon": [
+   2,
+   1
+  ],
+  "forbiddenRed": [
+   3,
+   1
+  ],
+  "keg": [
+   4,
+   1
+  ],
+  "vortex": [
+   5,
+   1
+  ],
+  "wave": [
+   0,
+   2
+  ],
+  "compass": [
+   1,
+   2
+  ],
+  "wheel": [
+   2,
+   2
+  ],
+  "coinHand": [
+   3,
+   2
+  ],
+  "chest": [
+   4,
+   2
+  ],
+  "magnifier": [
+   5,
+   2
+  ],
+  "hammer": [
+   0,
+   3
+  ],
+  "plus": [
+   1,
+   3
+  ],
+  "exchange": [
+   2,
+   3
+  ],
+  "seal": [
+   3,
+   3
+  ],
+  "anchor": [
+   4,
+   3
+  ],
+  "hourglass": [
+   5,
+   3
+  ]
+ },
+ "spots": {
+  "arrow": [
+   1.3,
+   0.4
+  ],
+  "arrowLit": [
+   0.7,
+   0.7
+  ],
+  "arrowGold": [
+   1.3,
+   0.4
+  ],
+  "forbidden": [
+   1.3,
+   0.7
+  ],
+  "info": [
+   1.0,
+   0.7
+  ],
+  "help": [
+   0.7,
+   0.4
+  ],
+  "sabres": [
+   1.3,
+   0.4
+  ],
+  "sight": [
+   31.6,
+   31.5
+  ],
+  "harpoon": [
+   1.0,
+   0.4
+  ],
+  "forbiddenRed": [
+   1.3,
+   0.4
+  ],
+  "keg": [
+   31.4,
+   32.1
+  ],
+  "vortex": [
+   31.5,
+   32.2
+  ],
+  "wave": [
+   1.0,
+   0.7
+  ],
+  "compass": [
+   1.0,
+   0.4
+  ],
+  "wheel": [
+   1.3,
+   0.4
+  ],
+  "coinHand": [
+   1.3,
+   0.4
+  ],
+  "chest": [
+   1.3,
+   0.4
+  ],
+  "magnifier": [
+   1.0,
+   0.4
+  ],
+  "hammer": [
+   1.3,
+   0.4
+  ],
+  "plus": [
+   1.0,
+   1.0
+  ],
+  "exchange": [
+   1.0,
+   1.0
+  ],
+  "seal": [
+   1.3,
+   1.0
+  ],
+  "anchor": [
+   1.3,
+   0.7
+  ],
+  "hourglass": [
+   1.3,
+   1.0
+  ]
+ }
+}

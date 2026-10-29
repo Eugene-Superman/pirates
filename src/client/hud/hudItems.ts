@@ -1,8 +1,7 @@
 import { Container, Text, type TextStyleOptions } from 'pixi.js';
-import { WEAPONS, WEAPON_IDS, ZONES, type GameState, type QuestId, type WeaponId } from '../../game';
+import { WEAPONS, WEAPON_IDS, ZONES, storyStep, type GameState, type QuestId, type WeaponId } from '../../game';
 import type { SoundSettings } from '../audio/Sounds';
 import type { GpuInfo } from '../render/gpu';
-import { CAMERA_MODES, type CameraMode } from '../scene/cameraControl';
 import { FOG_LAYERS, type FogLayer } from '../scene/effects/fogOfWar';
 import { NAV_DEBUG, type NavDebug } from '../scene/effects/navDebug';
 import { ButtonRow } from './ButtonRow';
@@ -11,6 +10,7 @@ import { DamagePanel, type DamageActions } from './DamagePanel';
 import { FpsMeter } from './FpsMeter';
 import type { HoldActions } from './HoldPanel';
 import type { LoadoutActions } from './LoadoutPanel';
+import type { MasteryActions } from './MasteryPanel';
 import type { TalentActions } from './TalentPanel';
 import { show } from './ui';
 import { LANGS, lang, t, type Lang } from '../i18n/i18n';
@@ -24,15 +24,11 @@ export const TEXT_STYLE = {
 export const LABEL_STYLE = { ...TEXT_STYLE, fontSize: 14 };
 // Camera zoom levels, as multiples of the default zoom
 const ZOOM_LEVELS: readonly number[] = [1, 1.5, 2, 3];
-const CAMERA_LABELS: Readonly<Record<CameraMode, string>> = {
-  follow: 'Follow',
-  deadZone: 'Dead zone',
-  recenter: 'Recenter',
-};
 const FOG_LABELS: Readonly<Record<FogLayer, string>> = { mist: 'Mist', clouds: 'Clouds' };
 const DEBUG_LABELS: Readonly<Record<NavDebug, string>> = { route: 'Route', hulls: 'Hulls and coasts' };
 const HELP_WIDTH = 360; // pixels: the help wraps, so the column leaves room for the frames at the top
 const DEBUG_GOLD: readonly number[] = [1000, 5000, 10000]; // gold each debug button gives
+const DEBUG_DOUBLOONS: readonly number[] = [10, 100, 1000]; // doubloons each debug button gives
 const KNOT = 10; // world units per second: the HUD shows speed in knots, a tenth of the game's units
 const VIEW_STEP = 50; // world units, for the view range buttons
 const VALUE_GAP = 10; // pixels between a row's buttons and what comes after them
@@ -40,11 +36,11 @@ const WARNING_COLOR = 0xffb347;
 const SOFTWARE_WARNING =
   "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings";
 const HELP =
-  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F ability, K talents, I statistics, H hold, P captain's mastery, N world chart";
+  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F/G/T abilities, K talents, I statistics, H hold, P captain's mastery, N world chart";
 
-export interface HudActions extends DamageActions, HoldActions, LoadoutActions, TalentActions {
-  /** Uses the ship's ability (its level 5 talent) */
-  useAbility: () => void;
+export interface HudActions extends DamageActions, HoldActions, LoadoutActions, MasteryActions, TalentActions {
+  /** Uses the ship's ability in a slot: 0 its level 5 talent (F), 1 its level 25 one (G), 2 its level 50 one (T) */
+  useAbility: (slot: number) => void;
   /** Stops firing at the target */
   ceaseFire: () => void;
   /** Fires at the unit the player picked out, or stops if the ship already does */
@@ -53,14 +49,13 @@ export interface HudActions extends DamageActions, HoldActions, LoadoutActions, 
   repair: () => void;
   /** Gives a quest up, from the quest tracker (the player has said yes) */
   dropQuest: (id: QuestId) => void;
+  /** Puts up the captain's portrait of that number */
+  choosePortrait: (portrait: number) => void;
   /** Camera zoom as a multiple of the default one */
   setZoom: (level: number) => void;
-  setCameraMode: (mode: CameraMode) => void;
   setWeapon: (weapon: WeaponId) => void;
   /** Shows or hides the range rings of the weapon picked */
   toggleRanges: () => void;
-  /** Shows or hides the outline of the camera's zone */
-  toggleZone: () => void;
   /** Shows or hides a part of the fog of war; the ship sees as far either way */
   toggleFog: (layer: FogLayer) => void;
   /** Shows or hides the clouds drifting over the sea */
@@ -78,25 +73,35 @@ export interface HudActions extends DamageActions, HoldActions, LoadoutActions, 
   changeViewRange: (delta: number) => void;
   /** Gold for testing the shop */
   addGold: (amount: number) => void;
+  /** Doubloons for testing what they buy, until they can be bought */
+  addDoubloons: (amount: number) => void;
   /** Levels up or down for testing the talents and the shipyard, within the ship's first and last */
   changeLevel: (delta: number) => void;
+  /** The story's step done at once, for testing a later one */
+  skipStory: () => void;
+  /** A conversation of the story heard out (or skipped), by its key */
+  tellStory: (key: string) => void;
+  /** The prologue seen (or skipped) */
+  seePrologue: () => void;
   /** Forgets everything kept in this browser and starts again */
   newGame: () => void;
+  /** Leaves the game for the landing, the progress kept (the minimap's last button) */
+  logOut: () => void;
   /** Picks the language of the game's texts: the page reloads in it */
   setLanguage: (lang: Lang) => void;
+  /** Opens the layout editor: the parts of the main screen dragged where the player likes them, then saved */
+  editLayout: () => void;
   /** Opens or closes the world chart: every sea, its gates and what sails it */
   toggleWorld: () => void;
+  /** Opens or closes the bestiary: every kind of bot of every sea */
+  toggleBestiary: () => void;
 }
 
 /** What the HUD shows of the view (not the game): set by SceneView */
 export interface ViewStatus {
   zoom: number;
-  cameraMode: CameraMode;
   /** Whether the range rings are shown */
   ranges: boolean;
-  zoneShown: boolean;
-  /** The camera's zone on the screen, pixels; null when the camera mode has none */
-  zoneBox: { x: number; y: number; width: number; height: number } | null;
   fog: Readonly<Record<FogLayer, boolean>>;
   /** Whether clouds drift over the sea */
   sky: boolean;
@@ -119,7 +124,17 @@ export interface HudWidget {
   update(frame: HudFrame): void;
 }
 
-export const HUD_GROUPS = ['Language', 'Info', 'Sound', 'Camera', 'World', 'Combat', 'Ship tuning', 'Debug'] as const;
+export const HUD_GROUPS = [
+  'Language',
+  'Interface',
+  'Info',
+  'Sound',
+  'Camera',
+  'World',
+  'Combat',
+  'Ship tuning',
+  'Debug',
+] as const;
 export type HudGroup = (typeof HUD_GROUPS)[number];
 
 /**
@@ -209,6 +224,21 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       },
     },
     {
+      id: 'layout',
+      group: 'Interface',
+      label: 'Layout',
+      kind: 'control',
+      onScreen: false,
+      create: () => {
+        const text = new Text({
+          text: t('drag the panels on the screen where you like, then save'),
+          style: LABEL_STYLE,
+        });
+        const row = new ButtonRow([{ label: t('Edit'), key: null, onTap: actions.editLayout }]);
+        return control(row, text, () => {});
+      },
+    },
+    {
       id: 'help',
       group: 'Info',
       label: 'Help',
@@ -292,35 +322,17 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       },
     },
     {
-      id: 'camera',
-      group: 'Camera',
-      label: 'Camera',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const row = new ButtonRow(
-          CAMERA_MODES.map((mode) => ({
-            label: t(CAMERA_LABELS[mode]),
-            key: mode,
-            onTap: () => actions.setCameraMode(mode),
-          })),
-        );
-        const zone = new Checkbox(t('Show zone'), actions.toggleZone);
-        return control(row, zone.container, ({ view }) => {
-          row.setActive(view.cameraMode);
-          zone.setChecked(view.zoneShown);
-        });
-      },
-    },
-    {
-      // The sea the player is in, and the world chart: every sea, the gates between them, what sails each
+      // The sea the player is in, the world chart (every sea, the gates between them, what sails each) and the bestiary
       id: 'seas',
       group: 'World',
       label: 'Seas',
       kind: 'control',
       onScreen: true,
       create: () => {
-        const row = new ButtonRow<never>([{ label: t('World chart (N)'), key: null, onTap: actions.toggleWorld }]);
+        const row = new ButtonRow<never>([
+          { label: t('World chart (N)'), key: null, onTap: actions.toggleWorld },
+          { label: t('Bestiary (B)'), key: null, onTap: actions.toggleBestiary },
+        ]);
         const sea = new Text({ text: ' ', style: LABEL_STYLE });
         return control(row, sea, ({ state }) => show(sea, t(ZONES[state.world.zone].name)));
       },
@@ -441,6 +453,26 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       },
     },
     {
+      id: 'doubloons',
+      group: 'Debug',
+      label: 'Doubloons',
+      kind: 'control',
+      onScreen: false,
+      create: () => {
+        const text = new Text({ text: ' ', style: LABEL_STYLE });
+        const row = new ButtonRow(
+          DEBUG_DOUBLOONS.map((amount) => ({
+            label: `+${amount}`,
+            key: null,
+            onTap: () => actions.addDoubloons(amount),
+          })),
+        );
+        return control(row, text, ({ state }) =>
+          show(text, t('{n}, for testing the mastery', { n: state.player.doubloons })),
+        );
+      },
+    },
+    {
       id: 'level',
       group: 'Debug',
       label: 'Level',
@@ -455,6 +487,21 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
         return control(row, text, ({ state: { ship } }) =>
           show(text, t('{level} of {max}', { level: ship.level, max: ship.shipClass.maxLevel })),
         );
+      },
+    },
+    {
+      id: 'story',
+      group: 'Debug',
+      label: 'Story',
+      kind: 'control',
+      onScreen: false,
+      create: () => {
+        const text = new Text({ text: ' ', style: LABEL_STYLE });
+        const row = new ButtonRow([{ label: t('Skip step'), key: null, onTap: actions.skipStory }]);
+        return control(row, text, ({ state }) => {
+          const step = storyStep(state.player);
+          show(text, step ? t(step.title) : t('told to its end'));
+        });
       },
     },
     {

@@ -1,0 +1,210 @@
+{
+ "file": "map_markers.webp",
+ "tile": 96,
+ "icons": {
+  "storyNew": [
+   0,
+   0
+  ],
+  "hostile": [
+   0,
+   1
+  ],
+  "guildShip": [
+   0,
+   2
+  ],
+  "bossGalleon": [
+   0,
+   3
+  ],
+  "bossSerpent": [
+   0,
+   4
+  ],
+  "storyGoal": [
+   1,
+   0
+  ],
+  "hostileShip": [
+   1,
+   1
+  ],
+  "guildShield": [
+   1,
+   2
+  ],
+  "bossSloop": [
+   1,
+   3
+  ],
+  "bossTentacle": [
+   1,
+   4
+  ],
+  "storyPrey": [
+   2,
+   0
+  ],
+  "hostilePlayer": [
+   2,
+   1
+  ],
+  "group": [
+   2,
+   2
+  ],
+  "bossBrig": [
+   2,
+   3
+  ],
+  "bossKraken": [
+   2,
+   4
+  ],
+  "storyHome": [
+   3,
+   0
+  ],
+  "target": [
+   3,
+   1
+  ],
+  "guild": [
+   3,
+   2
+  ],
+  "bossHelm": [
+   3,
+   3
+  ],
+  "bossMaw": [
+   3,
+   4
+  ],
+  "storyMoon": [
+   4,
+   0
+  ],
+  "hostileBeast": [
+   4,
+   1
+  ],
+  "guildStar": [
+   4,
+   2
+  ],
+  "bossWarship": [
+   4,
+   3
+  ],
+  "bossHorned": [
+   4,
+   4
+  ],
+  "questNew": [
+   5,
+   0
+  ],
+  "neutralShip": [
+   5,
+   1
+  ],
+  "compass": [
+   5,
+   2
+  ],
+  "bossManOfWar": [
+   5,
+   3
+  ],
+  "bossCoil": [
+   5,
+   4
+  ],
+  "questGoal": [
+   6,
+   0
+  ],
+  "friend": [
+   6,
+   1
+  ],
+  "helm": [
+   6,
+   2
+  ],
+  "bossBlackFlag": [
+   6,
+   3
+  ],
+  "bossShark": [
+   6,
+   4
+  ],
+  "questPrey": [
+   7,
+   0
+  ],
+  "friendPlayer": [
+   7,
+   1
+  ],
+  "guildPort": [
+   7,
+   2
+  ],
+  "bossAnchor": [
+   7,
+   3
+  ],
+  "bossCrab": [
+   7,
+   4
+  ],
+  "questHome": [
+   8,
+   0
+  ],
+  "port": [
+   8,
+   1
+  ],
+  "guildPlayer": [
+   8,
+   2
+  ],
+  "bossFrigate": [
+   8,
+   3
+  ],
+  "bossEye": [
+   8,
+   4
+  ],
+  "questMoon": [
+   9,
+   0
+  ],
+  "neutral": [
+   9,
+   1
+  ],
+  "guildMoon": [
+   9,
+   2
+  ],
+  "bossFlagship": [
+   9,
+   3
+  ],
+  "bossHydra": [
+   9,
+   4
+  ],
+  "gate": [
+   0,
+   5
+  ]
+ }
+}

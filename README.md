@@ -1,4 +1,4 @@
-# Pirate Game
+# Moonwreck
 
 Frontend of a browser naval game in the style of _Pirate Storm: Death or Glory_.
 Click on the sea and your ship sails there, steering around islands.
@@ -35,7 +35,8 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    npm run dev
    ```
 
-   The game opens in your browser automatically at <http://localhost:5173>.
+   The landing opens in your browser automatically at <http://localhost:5173>: sign in with any email and password
+   (there are no accounts until the online game) and the game starts, or go straight to <http://localhost:5173/play/>.
    Code changes reload the page on save.
 
 4. Seas: the starting waters are the first of fifteen, one to three a tier of ship. Each has gates at its west and east
@@ -46,11 +47,14 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    steer continuously. Bots sail the sea: fishing boats, merchants and turtles leave you alone, smugglers and sea
    serpents attack when you come near. Click one to pick it out (its hull shows at the top), double-click it or press
    Space to fire the selected weapon at it, Escape to stop. Kills and quests give experience: every ship has its own
-   level, from 1, up to ten a tier: the starter sloop's and a tier 1 ship's go up to 10, a tier 6 ship's to 60. Each level from 2 gives a talent point for three branches (Gunnery, Seamanship, Hull and crew),
-   ranked, a branch's next row opening with points spent in it; levels 5, 10, 15 and 20 (those a ship reaches) offer
-   one of two signature talents instead (the level 5 one is an ability, F; ships of tier 4 and up will have a second at
-   level 25, tier 6 a third at 45). A ship bought at the shipyard comes with no guns: fit yours from the hold. K opens the tree; a button by your ship's frame lights up when
-   something waits to be picked; the shipwright forgets them all for a little gold. R repairs the hull out of combat,
+   level, from 1, up to ten a tier: the starter sloop's and a tier 1 ship's go up to 10, a tier 6 ship's to 60. Each level from 2 gives a talent point for the ship's own tree
+   (the starter sloop's one branch, a tier 1 to 3 ship's three, four from tier 4, longer and more tangled up a line),
+   ranked, a branch's next row opening with points spent in it; every fifth level, 5 to 60, offers one of two signature
+   talents instead. Three of them are abilities: the level 5 one (F: Full sail or Broadside), the level 25 one from
+   tier 3 (G: a rocket or a powder keg) and the level 50 one from tier 5 (T: a bombardment or a Royal standard). A ship
+   bought at the shipyard comes with no guns: fit yours from the hold. K opens the tree; a "!" on the talents' button
+   round the minimap and a gold level badge on your ship's frame show when something waits to be picked; the shipwright
+   in port forgets them all for doubloons. R repairs the hull out of combat,
    for a little gold (1 for every 10 hull; the shipwright in port does it at once, for more); L opens the loadout
    (the ship's gun slots, its ammo at hand and what waits in the hold: click or drag a gun into a slot, drag ammo onto
    a place at hand or onto the bar at the bottom); the chat in the bottom-left corner has a tab for the combat log (every blow
@@ -74,18 +78,22 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
    ammo's picks how many to buy or sell, from 1 to 1000. The guild hall and the auction house open with the online game.
    Escape goes back from a building to the harbour; Set sail (or Escape again) leaves port.
 
-   The goal of the starting waters is the next ship, the Coastal Bark (the European line's tier 1): the Captain's path
-   in the top-right corner, under your quests, lists what the shipyard asks (a first kill, a talent, a repair at sea, a sale; quests turned in, a
-   level, the Smuggler Baron sunk, the price). The Baron's brig sails in the north-east with two smugglers; his mortar
+   A new player first sees the prologue (the Moon fell into the sea), picks their captain's face and is led by the
+   story through the starting waters: the bosun and the port's people talk at the bottom of the screen, the steps they
+   set are in the top-right corner, and where they send you is gold on the minimap and the sea chart. The goal of the
+   starting waters is the next ship, a tier 1 ship of any line (only the European line's, the Royal Herald, is built
+   yet): the Captain's path in the top-right corner, under your quests, lists what the shipyard asks (the story
+   followed to the Seam's seal, the Smuggler Baron sunk; quests turned in, from tier 2; a level; the price). The Baron's brig sails in the north-east with two smugglers; his mortar
    marks red circles on the water where its shells will land — sail out of them. With every term met, the shipyard
-   sells the Coastal Bark: it starts at level 1 (up to 10) with talents of its own, and your sloop stays in port with
-   everything on it. Then the path leads on to the Corsair, the line's tier 2: a three-master with three tiers of guns,
-   for the Coastal Bark at level 10, twelve quests and 9,000 gold; to the Frigate, its tier 3, a bigger, faster ship
-   under orange and lilac sails, for the Corsair at level 20, twenty quests and 24,000 gold; to the Royal Galleon, its
-   tier 4, a wide four-master under silver sails and gilt crowns, for the Frigate at level 30, thirty quests and 60,000
-   gold; to the Admiral, its tier 5, a black and gold three-decker under towering black sails, for the Royal Galleon
-   at level 40, forty-five quests and 150,000 gold; and to the Imperial Ship of the Line, its tier 6 and last, a
-   golden three-decker under the tallest sails afloat with a gilt shark's tail, for the Admiral at level 50,
+   sells the Royal Herald: it starts at level 1 (up to 10) with talents of its own, and your sloop stays in port with
+   everything on it. Then the path leads on to the Salamander, the line's tier 2: a three-master with three tiers of
+   guns under sails the orange of flame, for the Royal Herald at level 10, twelve quests and 9,000 gold; to the
+   Peregrine, its tier 3, a bigger, faster ship under orange and lilac sails, for the Salamander at level 20, twenty
+   quests and 24,000 gold; to the Crowned Lion, its tier 4, a wide crimson four-master under silver sails and gilt
+   crowns, for the Peregrine at level 30, thirty quests and 60,000 gold; to the Black Eagle, its tier 5, a black and
+   gold three-decker under towering black sails, for the Crowned Lion at level 40, forty-five quests and 150,000 gold;
+   and to the Sovereign of the Seas, its tier 6 and last, a golden three-decker under the tallest sails afloat with a
+   gilt shark's fins and tail, for the Black Eagle at level 50,
    sixty-five quests and 375,000 gold. The shipyard's My ships lists your ships: take the helm of any of them there. A
    tab for each line shows its ships (the Forbidden Fleets four a tier, each with how it will be won and in what
    currency), and Buy the masterworks, for doubloons; all but the European line are planned, with provisional figures
@@ -93,10 +101,10 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
 
    Your ship's hull, level, gold, doubloons and hold are in the top-left corner, speed and FPS under it; the quests
    you have taken (✕ gives one up, once you say yes) and the Captain's path are in the top-right corner, each folded
-   by a click on its header. The four buttons on top of the minimap's frame open the hold, the loadout, the talents
-   and the captain's mastery (P: the account's own tree of passives for every ship you sail, round the captain; a
-   look ahead until the online game brings its points). The two small medallions in the minimap frame's top corners
-   are the settings and the full screen. The settings open every other control (the language, camera, fog,
+   by a click on its header. The ten buttons round the top of the minimap's frame are, left to right, the settings,
+   the full screen, the feats, the hold, the loadout, the talents, the captain's mastery (P: the account's own tree of
+   passives for every ship you sail, round the captain), the bestiary, the world chart and logging out (back to the
+   landing, your progress kept). The settings open every other control (the language, camera, fog,
    clouds, range rings, damage and speed tuning, gold for testing, navigation debug) and picks which of them also stay
    on the screen. The game speaks English (the default), Ukrainian or Russian; a new language reloads the page.
 
@@ -122,8 +130,13 @@ Built with TypeScript, [Pixi.js v8](https://pixijs.com/) and [Vite](https://vite
 npm run build
 ```
 
-The result is static files in `dist/` (`index.html` + `assets/`). They can be hosted on any static
-hosting or CDN — there is no backend yet.
+The result is static files in `dist/`: the landing (`index.html`, in Ukrainian and Russian `uk/index.html` and `ru/index.html`), the
+game (`play/index.html`), `assets/`, and the
+`robots.txt` and `sitemap.xml` for search engines. They can be hosted on any static hosting or CDN — there is no
+backend yet.
+
+Before deploying, put the site's real address in `.env` (`VITE_SITE_URL`, no trailing slash): the landing's canonical
+link, link previews, structured data, `robots.txt` and `sitemap.xml` all name it.
 
 ## Development
 

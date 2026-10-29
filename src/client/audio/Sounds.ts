@@ -51,6 +51,9 @@ const SOUNDS = {
 export type SoundName = keyof typeof SOUNDS;
 
 const MORTAR_GAIN = 1.2; // a boss's mortar firing, by the cannon's level
+// A rocket leaving a deck and a powder keg blowing up: the cannon's sound, by its level and played this much faster
+const ROCKET_SOUND = { gain: 0.7, rate: 1.7 } as const;
+const KEG_SOUND = { gain: 1.4, rate: 0.6 } as const;
 const PITCH_SPREAD = 0.07; // ± share of speed a sound plays at, so a run of them doesn't sound like a loop
 // A volley of more guns sounds louder, up to this many times one gun; from VOLLEY_LAYER guns a second shot follows a
 // moment later, for the rumble of a broadside
@@ -192,6 +195,17 @@ export class Sounds {
         case 'shellLanded':
           near('splash', event.at, 1.2);
           break;
+        // A rocket's bang is sharper than a gun's; a keg goes off as a big gun does, deeper, with the sea thrown up
+        case 'rocket':
+          near('cannon', event.at, ROCKET_SOUND.gain, ROCKET_SOUND.rate);
+          break;
+        case 'kegDropped':
+          near('splash', event.at, 0.8, 1.3);
+          break;
+        case 'kegBlast':
+          near('cannon', event.at, KEG_SOUND.gain, KEG_SOUND.rate);
+          near('splash', event.at, KEG_SOUND.gain, 0.8);
+          break;
         case 'damage': {
           if (event.source === 'bite') break;
           if (event.amount <= 0) near('splash', event.at);
@@ -231,7 +245,8 @@ export class Sounds {
         case 'level':
           if (mine(event)) this.play('levelUp', 1, 0.2);
           break;
-        case 'pathStep':
+        // An objective of the story met, or a step of it done with no gold to ring for it
+        case 'story':
           if (mine(event) && !leveled && !paid('quest')) this.play('pathStep', 1, 0.6);
           break;
         case 'repair':

@@ -1,16 +1,16 @@
 import { CanvasTextMetrics, Container, Graphics, Rectangle, TextStyle, type Text } from 'pixi.js';
 import type { GameState } from '../../game';
 import type { Slot } from '../storage/Store';
-import { CombatLog, LOG_FILTERS, inFilter, statsLines, type LogEntry, type LogFilter } from './combatLog';
-import { BRASS, THEME, brassButton, drawCard, drawWell, subheading, themedPanel } from './theme';
+import { CombatLog, LOG_FILTERS, inFilter, type LogEntry, type LogFilter } from './combatLog';
+import { THEME, subheading } from './theme';
+import { NIGHT, NIGHT_SPOT, drawNightWell, moonButton, moonButtonEnd, nightPlate } from './nightTheme';
 import { Tooltip, type TooltipText } from './Tooltip';
 import { Tile, show, text, tint } from './ui';
 import { t } from '../i18n/i18n';
 
 const MARGIN = 16; // pixels from the screen's edges
-const GAP = 30; // above the skill bar (and its status line), when the panel would overlap it
-const INSET = 14; // pixels from the panel's edge to what is in it, clear of its brass rim, brackets and gold hairline
-const SPACE = 6; // pixels between the rows in it: the tabs, the totals, the log's filters, the well
+const INSET = 10; // pixels from the plate's edge to what is in it, clear of its gold edge and rounded corners
+const SPACE = 6; // pixels between the rows in it: the tabs, the log's filters, the well
 const CLOSED = { width: 500, lines: 5 };
 const OPEN = { width: 660, height: 560 };
 const LEAST_LINES = 4; // lines the open panel shows at least, however little room the screen leaves it
@@ -21,15 +21,15 @@ const WRAP_INDENT = 10; // pixels the rest of a line too long for the well is se
 // Texts kept wrapped at most, at both the folded and the unfolded width: then they are all wrapped again as they come
 const WRAPPED_KEPT = 8000;
 const WELL = { x: 8, y: 5 } as const; // pixels inside the well, round its lines
-const STATS_LINES = 4;
-const STATS = { x: 10, y: 6 } as const; // pixels inside the totals' board, round its lines
 const POOL = 60; // lines of text drawn at once at most
 const WHEEL_LINES = 3; // lines one notch of the mouse wheel scrolls
-// Pixels: the tabs along the top: their height, the room beside a name (and the least of it, squeezed into a narrow
-// panel), between two tabs, and between the log's tab and the channels'; their names' size
-const TAB = { height: 22, pad: 9, least: 4, gap: 3, apart: 10, font: 11 } as const;
-const TOGGLE = 22; // pixels: the square button that unfolds and folds the panel
-const FILTER = { height: 18, pad: 8, gap: 4, font: 10 } as const; // pixels: the combat log's filters
+// Pixels: the tabs along the top: their height, the room beside a name past the stars on a tab's points (and the
+// least of it, squeezed into a narrow panel), between two tabs, and between the log's tab and the channels'; their
+// names' size
+const TAB = { height: 24, pad: 5, least: 1, gap: 2, apart: 10, font: 11 } as const;
+const TOGGLE = 24; // pixels: the square button that unfolds and folds the panel
+// Pixels: the combat log's filters, the room beside a name past the stars on their points
+const FILTER = { height: 20, pad: 4, gap: 4, font: 10 } as const;
 // Pixels: a channel's line to write in at the bottom of its well, its Send button, their letters
 const INPUT = { height: 24, send: 72, font: 11 } as const;
 // Pixels: the scroll bar inside the well's right edge, how wide a strip round it takes a grab, its thumb at least
@@ -47,7 +47,7 @@ const KIND_COLORS = {
   repair: 0x9dffb0,
   gold: 0xffcf3f,
   level: 0x9fd4ff,
-  note: THEME.dim,
+  note: NIGHT.dim,
 } as const;
 const FILTER_NAMES: Readonly<Record<LogFilter, string>> = {
   all: 'All',
@@ -93,6 +93,8 @@ interface Tab {
   readonly id: TabId;
   readonly tile: Tile;
   readonly label: Text;
+  /** Makes the tab another width, its stars and name kept in their places */
+  readonly resize: (width: number) => void;
   /** Lit while the tab has news since it was last looked at */
   readonly dot: Graphics;
 }
@@ -104,32 +106,32 @@ function entryColor(entry: LogEntry) {
 }
 
 /**
- * The chat in the bottom left corner, dark wood under a brass frame like the windows: tabs along its top, the combat
- * log and the chat's channels, and the lines of the one picked in a deep blue well. Folded, it shows the last few
- * lines; unfolded (its button, or J for the combat log) the log's totals, filters to pick what to list, and every
- * entry with all its dice, scrolled with the mouse wheel or the bar beside them. A channel shows who it is for and
+ * The chat in the bottom left corner, a plate in the night look like the frames at the top: tabs along its top (the
+ * windows' moonlit buttons), the combat log and the chat's channels, and the lines of the one picked in a dark well.
+ * Folded, it shows the last few lines; unfolded (its button, or J for the combat log) filters to pick what to list,
+ * and every entry with all its dice, scrolled with the mouse wheel or the bar beside them. A channel shows who it is for and
  * a line to write in, closed until the online game. Only the lines in view are drawn, from a fixed pool of texts, so
  * a long log costs nothing more
  */
 export class ChatPanel {
+  /** Pixels: the folded panel's height */
+  static readonly FOLDED_HEIGHT = CLOSED_HEIGHT;
   readonly container = new Container();
   readonly log = new CombatLog();
-  /** The wood and brass under everything, made again at every new size */
+  /** Its size as last laid out, pixels */
+  width = 0;
+  height = 0;
+  /** The plate under everything, made again at every new size */
   private frame = new Container();
-  /** Over the wood: the well, and a channel's line to write in */
+  /** Over the plate: the well, and a channel's line to write in */
   private readonly boards = new Graphics();
-  private readonly toggleButton = new Tile(TOGGLE, TOGGLE, () => this.toggle(), 4, BRASS);
+  private readonly toggleButton = new Tile(TOGGLE, TOGGLE, () => this.toggle(), 4, NIGHT_SPOT);
   private readonly chevron = new Graphics();
   private toggleHovered = false;
   private readonly hints: { readonly fold: TooltipText; readonly unfold: TooltipText };
-  private readonly tooltip = new Tooltip();
+  private readonly tooltip: Tooltip;
   private readonly tabs: readonly Tab[];
-  private readonly filters: readonly { filter: LogFilter; tile: Tile; label: Text }[];
-  /** The combat log's totals, on a board of their own */
-  private readonly statsBoard = new Graphics();
-  private readonly stats: Text[];
-  /** How many rows each of the totals takes, wrapped to the panel's width */
-  private readonly statsRows = Array.from({ length: STATS_LINES }, () => 1);
+  private readonly filters: readonly { filter: LogFilter; tile: Tile }[];
   private readonly list = new Container();
   private readonly clip = new Graphics();
   private readonly pool: Text[] = [];
@@ -137,8 +139,8 @@ export class ChatPanel {
   private readonly latest: Tile;
   /** An empty channel's name and what it is for, in the middle of its well */
   private readonly emptyTitle = subheading('', 15);
-  private readonly emptyText = text('', FONT, THEME.dim, { align: 'center', wordWrap: true });
-  private readonly placeholder = text('', INPUT.font, THEME.dim, { fontStyle: 'italic' });
+  private readonly emptyText = text('', FONT, NIGHT.dim, { align: 'center', wordWrap: true });
+  private readonly placeholder = text('', INPUT.font, NIGHT.dim, { fontStyle: 'italic' });
   private readonly send: Tile;
   private open = false;
   private tab: TabId = 'combat';
@@ -174,8 +176,10 @@ export class ChatPanel {
   /** The log's version when it was last kept */
   private keptVersion = -1;
 
-  constructor(kept: Slot) {
+  /** screen: the screen its tooltip stays inside */
+  constructor(kept: Slot, screen: { readonly width: number }) {
     this.kept = kept;
+    this.tooltip = new Tooltip(screen);
     const saved = kept.get();
     if (typeof saved === 'object' && saved !== null) {
       if ('log' in saved) this.log.restore(saved.log);
@@ -188,22 +192,20 @@ export class ChatPanel {
     this.seen = this.log.version;
 
     this.tabs = TABS.map((id) => {
-      const label = text(t(TAB_NAMES[id]), TAB.font, THEME.text, { fontWeight: 'bold' });
-      const tile = new Tile(Math.ceil(label.width) + TAB.pad * 2, TAB.height, () => this.pick(id), 5, BRASS);
-      label.anchor.set(0.5);
+      const { tile, text: label, resize } = moonButton(0, TAB.height, t(TAB_NAMES[id]), () => this.pick(id), TAB.font);
       const dot = new Graphics().circle(0, 0, DOT).fill({ color: THEME.title }).stroke({ width: 1, color: 0x000000 });
       dot.visible = false;
-      tile.content.addChild(label, dot);
-      return { id, tile, label, dot };
+      tile.content.addChild(dot);
+      return { id, tile, label, resize, dot };
     });
     this.filters = LOG_FILTERS.map((filter) => {
-      const label = text(t(FILTER_NAMES[filter]), FILTER.font, THEME.text, { fontWeight: 'bold' });
-      const width = Math.ceil(label.width) + FILTER.pad * 2;
-      const tile = new Tile(width, FILTER.height, () => this.pickFilter(filter), 4, BRASS);
-      label.anchor.set(0.5);
-      label.position.set(width / 2, FILTER.height / 2);
-      tile.content.addChild(label);
-      return { filter, tile, label };
+      const {
+        tile,
+        text: label,
+        resize,
+      } = moonButton(0, FILTER.height, t(FILTER_NAMES[filter]), () => this.pickFilter(filter), FILTER.font);
+      resize(Math.ceil(label.width) + (moonButtonEnd(FILTER.height) + FILTER.pad) * 2);
+      return { filter, tile };
     });
 
     // A chevron pointing up, the way the panel unfolds; turned over while it is unfolded
@@ -211,7 +213,7 @@ export class ChatPanel {
       .moveTo(-4.5, 2.25)
       .lineTo(0, -2.25)
       .lineTo(4.5, 2.25)
-      .stroke({ width: 2, color: THEME.text, cap: 'round', join: 'round' });
+      .stroke({ width: 2, color: THEME.brassLight, cap: 'round', join: 'round' });
     this.chevron.position.set(TOGGLE / 2, TOGGLE / 2);
     this.toggleButton.content.addChild(this.chevron);
     this.toggleButton.container.on('pointerover', () => (this.toggleHovered = true));
@@ -219,22 +221,13 @@ export class ChatPanel {
     const key = t('J opens the combat log');
     this.hints = { fold: { title: t('Fold'), lines: [key] }, unfold: { title: t('Unfold'), lines: [key] } };
 
-    this.latest = brassButton(
-      LATEST.width,
-      LATEST.height,
-      `${t('Latest')} ▼`,
-      () => this.scrollTo(0),
-      FILTER.font,
-    ).tile;
-    this.send = brassButton(INPUT.send, INPUT.height - 2, t('Send'), null, INPUT.font).tile;
+    this.latest = moonButton(LATEST.width, LATEST.height, `${t('Latest')} ▼`, () => this.scrollTo(0), FILTER.font).tile;
+    this.send = moonButton(INPUT.send, INPUT.height - 2, t('Send'), null, INPUT.font).tile;
     show(this.placeholder, t('The chat opens with the online game'));
     this.placeholder.anchor.set(0, 0.5);
     this.emptyTitle.anchor.set(0.5, 1);
     this.emptyText.anchor.set(0.5, 0);
 
-    this.stats = Array.from({ length: STATS_LINES }, () =>
-      text('', FONT, THEME.dim, { wordWrap: true, breakWords: true, lineHeight: LINE }),
-    );
     for (let i = 0; i < POOL; i++) {
       const line = text('', FONT, THEME.text);
       line.visible = false;
@@ -251,8 +244,6 @@ export class ChatPanel {
     this.container.addChild(
       this.frame,
       this.boards,
-      this.statsBoard,
-      ...this.stats,
       ...this.tabs.map((tab) => tab.tile.container),
       this.toggleButton.container,
       ...this.filters.map((f) => f.tile.container),
@@ -295,20 +286,24 @@ export class ChatPanel {
     this.kept.set({ open: this.open, tab: this.tab, filter: this.filter, log: this.log.toData() });
   }
 
+  /** Pixels wide, folded or unfolded as it is now, on a screen that wide */
+  widthOn(screenWidth: number) {
+    return Math.min(this.open ? OPEN.width : CLOSED.width, screenWidth - MARGIN * 2);
+  }
+
   /**
-   * Records this update's events, then lays the panel out in the bottom left corner: above the skill bar (`bar`, its
-   * box on the screen) if it would overlap it, and unfolded no higher than `top` (what the HUD shows above it)
+   * Records this update's events, then lays the panel out: unfolded no taller than `room` pixels (what the screen
+   * leaves it), down from its top when it is put at the top of the screen (`down`), else up. The HUD puts it where it
+   * goes, by its `width` and `height`
    */
-  update(state: GameState, screenWidth: number, screenHeight: number, bar: Rectangle, top: number) {
+  update(state: GameState, screenWidth: number, room: number, down: boolean) {
     this.log.record(state);
     const combat = this.tab === 'combat';
-    const width = Math.min(this.open ? OPEN.width : CLOSED.width, screenWidth - MARGIN * 2);
-    const overlaps = MARGIN + width > bar.x && bar.width > 0;
-    const bottom = overlaps ? bar.y - GAP : screenHeight - MARGIN;
-    if (combat && this.open) this.measureStats(width);
-    const height = this.open ? Math.max(this.leastHeight(), Math.min(OPEN.height, bottom - top)) : CLOSED_HEIGHT;
-    this.container.position.set(MARGIN, Math.round(bottom - height));
-    const size = `${width}x${height}/${this.open}/${this.tab}/${this.statsRows.join()}`;
+    const width = this.widthOn(screenWidth);
+    const height = this.open ? Math.max(this.leastHeight(), Math.min(OPEN.height, Math.floor(room))) : CLOSED_HEIGHT;
+    this.width = width;
+    this.height = height;
+    const size = `${width}x${height}/${this.open}/${this.tab}`;
     if (size !== this.laidOut) {
       this.laidOut = size;
       this.layout(width, height);
@@ -326,22 +321,19 @@ export class ChatPanel {
       this.seen = this.log.version;
       this.scrollTo(this.scroll);
       this.paint();
-      for (const { filter, tile, label } of this.filters) {
-        tile.setLook({ pressed: filter === this.filter });
-        tint(label, filter === this.filter ? THEME.darkText : THEME.text);
-      }
+      for (const { filter, tile } of this.filters) tile.setLook({ pressed: filter === this.filter });
     }
     this.latest.container.visible = combat && this.open && this.scroll > 0;
-    for (const { id, tile, label, dot } of this.tabs) {
+    for (const { id, tile, dot } of this.tabs) {
       tile.setLook({ pressed: id === this.tab });
-      tint(label, id === this.tab ? THEME.darkText : THEME.text);
       dot.visible = id === 'combat' && !combat && this.log.version !== this.seen;
     }
 
-    this.chevron.scale.y = this.open ? -1 : 1;
+    // Pointing the way a click moves the panel's far edge
+    this.chevron.scale.y = this.open !== down ? -1 : 1;
     const { x, y } = this.toggleButton.container;
     const hint = this.open ? this.hints.fold : this.hints.unfold;
-    this.tooltip.point(this.toggleHovered ? hint : null, x + TOGGLE / 2, y);
+    this.tooltip.point(this.toggleHovered ? hint : null, x + TOGGLE / 2, y, { under: y + TOGGLE });
   }
 
   private pick(tab: TabId) {
@@ -368,7 +360,7 @@ export class ChatPanel {
   /** The unfolded panel's least height: the rows over the well, and a few lines in it */
   private leastHeight() {
     const combat = this.tab === 'combat';
-    const over = combat ? this.statsHeight() + SPACE + FILTER.height + SPACE : 0;
+    const over = combat ? FILTER.height + SPACE : 0;
     return TOP + over + LEAST_LINES * LINE + WELL.y * 2 + (combat ? 0 : INPUT.height) + INSET;
   }
 
@@ -390,7 +382,7 @@ export class ChatPanel {
     for (const entry of entries) {
       if (!inFilter(entry, this.filter)) continue;
       add(entry.summary, entryColor(entry), 0);
-      for (const detail of entry.details) add(detail, THEME.dim, INDENT);
+      for (const detail of entry.details) add(detail, NIGHT.dim, INDENT);
     }
     return lines;
   }
@@ -408,29 +400,13 @@ export class ChatPanel {
     return parts;
   }
 
-  /** The log's totals, wrapped to the panel's width: their texts, and how many rows each takes */
-  private measureStats(width: number) {
-    const wrap = width - INSET * 2 - STATS.x * 2;
-    statsLines(this.log.stats).forEach((value, i) => {
-      const line = this.stats[i];
-      if (line.style.wordWrapWidth !== wrap) line.style.wordWrapWidth = wrap;
-      show(line, value);
-      this.statsRows[i] = CanvasTextMetrics.measureText(value, line.style).lines.length;
-    });
-  }
-
-  /** The totals' board: their rows, and room round them, pixels */
-  private statsHeight() {
-    return this.statsRows.reduce((sum, rows) => sum + rows, 0) * LINE + STATS.y * 2;
-  }
-
   /**
-   * The panel at a new size or on a new tab: the wood under it, the tabs along its top, then under them the combat
-   * log's totals and filters (unfolded), and the well: the log's lines and its scroll bar, or a channel's name and what
+   * The panel at a new size or on a new tab: the plate under it, the tabs along its top, then under them the combat
+   * log's filters (unfolded), and the well: the log's lines and its scroll bar, or a channel's name and what
    * it is for over its line to write in
    */
   private layout(width: number, height: number) {
-    const frame = themedPanel(width, height);
+    const frame = nightPlate(width, height);
     this.container.addChildAt(frame, 0);
     this.frame.destroy({ children: true });
     this.frame = frame;
@@ -440,18 +416,8 @@ export class ChatPanel {
     const combat = this.tab === 'combat';
     const full = combat && this.open;
     let y = TOP;
-    this.statsBoard.visible = full;
-    for (const line of this.stats) line.visible = full;
     for (const { tile } of this.filters) tile.container.visible = full;
     if (full) {
-      drawCard(this.statsBoard.clear(), width - INSET * 2, this.statsHeight());
-      this.statsBoard.position.set(INSET, y);
-      let row = 0;
-      this.stats.forEach((line, i) => {
-        line.position.set(INSET + STATS.x, y + STATS.y + row * LINE);
-        row += this.statsRows[i];
-      });
-      y += this.statsHeight() + SPACE;
       let x = INSET;
       for (const { tile } of this.filters) {
         tile.container.position.set(x, y);
@@ -461,7 +427,7 @@ export class ChatPanel {
     }
 
     const well = new Rectangle(INSET, y, width - INSET * 2, height - INSET - y);
-    drawWell(this.boards.clear(), well.x, well.y, well.width, well.height);
+    drawNightWell(this.boards.clear(), well.x, well.y, well.width, well.height);
     const box = new Rectangle(
       well.x + WELL.x,
       well.y + WELL.y,
@@ -503,24 +469,27 @@ export class ChatPanel {
     const sendX = well.right - WELL.x - INPUT.send;
     this.boards
       .roundRect(box.x, lineTop, sendX - SPACE - box.x, lineHeight, 4)
-      .fill({ color: 0x000000, alpha: 0.35 })
+      .fill({ color: NIGHT.glassDark, alpha: 0.7 })
       .stroke({ width: 1, color: THEME.brass, alpha: 0.35 });
     this.placeholder.position.set(box.x + WELL.x, lineTop + lineHeight / 2);
     this.send.container.position.set(sendX, lineTop);
   }
 
-  /** The tabs in a row along the top, squeezed closer in a narrow panel; the button that folds it at its right end */
+  /**
+   * The tabs in a row along the top, squeezed closer in a narrow panel; the button that folds it at its right end. A
+   * tab's light for news sits on its top edge, over the star on its right point
+   */
   private layTabs(width: number) {
     const room = width - INSET * 2 - TOGGLE - SPACE;
-    const names = this.tabs.reduce((sum, { label }) => sum + Math.ceil(label.width), 0);
+    const end = moonButtonEnd(TAB.height);
+    const names = this.tabs.reduce((sum, { label }) => sum + Math.ceil(label.width) + end * 2, 0);
     const gaps = (this.tabs.length - 2) * TAB.gap + TAB.apart;
     const pad = Math.max(TAB.least, Math.min(TAB.pad, Math.floor((room - names - gaps) / (this.tabs.length * 2))));
     let x = INSET;
-    for (const { id, tile, label, dot } of this.tabs) {
-      tile.resize(Math.ceil(label.width) + pad * 2, TAB.height);
+    for (const { id, tile, label, resize, dot } of this.tabs) {
+      resize(Math.ceil(label.width) + (end + pad) * 2);
       tile.container.position.set(x, INSET);
-      label.position.set(tile.width / 2, TAB.height / 2);
-      dot.position.set(tile.width - DOT - 2, DOT + 2);
+      dot.position.set(tile.width - end, DOT);
       x += tile.width + (id === 'combat' ? TAB.apart : TAB.gap);
     }
     this.toggleButton.container.position.set(width - INSET - TOGGLE, INSET);

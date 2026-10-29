@@ -1,4 +1,4 @@
-import { Assets, Container, Graphics, Rectangle, Sprite, type Text, type Texture } from 'pixi.js';
+import { Assets, Container, Graphics, Rectangle, Sprite, type Point, type Text, type Texture } from 'pixi.js';
 import {
   ABILITY_LEVELS,
   AMMO,
@@ -6,18 +6,23 @@ import {
   PERKS,
   REPAIR_HP_PER_GOLD,
   REPAIR_TICK,
-  TALENTS,
+  SIGNATURES,
   WEAPONS,
   WEAPON_IDS,
   abilityCooldown,
+  abilityTarget,
   canPayRepair,
   findUnit,
   reloadShare,
   repairStep,
+  talentOf,
   type AmmoId,
   type GameState,
   type HoldReason,
+  type ItemId,
+  type Player,
   type Ship,
+  type SignatureId,
   type WeaponId,
 } from '../../game';
 import {
@@ -27,6 +32,7 @@ import {
   drawBroadside,
   drawHarpoon,
   drawSail,
+  drawStar,
   drawWrench,
   playTap,
   show,
@@ -34,52 +40,61 @@ import {
   tierColor,
   tint,
   whole,
+  type ScreenEdges,
 } from './ui';
 import { THEME, glowFill } from './theme';
-import { AMMO_ICONS, SKILL_ICONS, type SkillIconId } from './iconAtlas';
+import { AMMO_ICONS, ITEM_ICONS, SKILL_ICONS, type SkillIconId } from './iconAtlas';
+import { QUICK_KEYS, itemColor, itemHint } from './itemLook';
+import type { GuideTarget } from './StoryGuide';
 import { Tooltip, type TooltipText } from './Tooltip';
 import { t } from '../i18n/i18n';
 
-// Made by blender-assets/hud/build_skill_bar.py, which prints the figures in FRAME
+// Made by blender-assets/hud/build_skill_bar.py, which prints the figures in FRAME: the frame, and each weapon painted
+// on it as it looks picked, glowing
 const FRAME_URL = `${import.meta.env.BASE_URL}sprites/hud/skill_bar.webp`;
+const litUrl = (weapon: WeaponId) => `${import.meta.env.BASE_URL}sprites/hud/skill_bar_${weapon}.webp`;
 /** A well's box in the frame's picture: its left, top, width and height, in the picture's pixels */
 type Box = readonly [number, number, number, number];
 /**
  * The frame's picture, in its own pixels: its size, and its dark wells, where the buttons go: the ten quick slots on
- * top, left to right (their keys, 1…0, painted over their tops); the skills' four squares, row by row; the weapons'
- * plates, left to right; and the places for their ammo hanging under the plates, the first plate's two, then the
- * second's
+ * top, left to right (their keys, 1…0, painted over their tops); the skills' four squares, row by row; each weapon
+ * painted with its key, left to right (the weapon itself, its glow left out) and its lit picture, laid over it while it
+ * is picked; and the places for their ammo under them, the first weapon's two, then the second's
  */
 const FRAME = {
-  width: 851,
-  height: 225,
+  width: 864,
+  height: 268,
   quick: [
-    [34.4, 22.4, 63.6, 59.2],
-    [114.4, 22.4, 63.6, 59.2],
-    [194.4, 22.4, 63.6, 59.2],
-    [274.0, 22.4, 63.2, 59.2],
-    [353.6, 22.0, 63.2, 59.6],
-    [432.8, 22.0, 63.6, 59.6],
-    [512.8, 22.4, 63.6, 59.2],
-    [592.8, 22.4, 63.2, 59.2],
-    [672.4, 22.4, 64.0, 59.2],
-    [752.4, 22.4, 63.2, 59.2],
+    [45.6, 69.2, 60.4, 60.4],
+    [121.6, 69.2, 62.0, 60.4],
+    [199.2, 69.2, 63.6, 60.4],
+    [279.6, 69.2, 62.8, 60.0],
+    [358.8, 69.2, 63.6, 60.4],
+    [439.6, 69.2, 63.2, 60.4],
+    [519.2, 69.2, 64.4, 60.4],
+    [600.0, 69.2, 63.2, 60.4],
+    [680.0, 69.2, 60.8, 60.4],
+    [756.4, 69.2, 60.8, 60.4],
   ],
   skills: [
-    [78.8, 102.8, 48.8, 44.4],
-    [141.6, 102.4, 48.8, 44.8],
-    [78.8, 160.4, 48.8, 45.2],
-    [141.6, 160.4, 48.8, 45.2],
+    [81.2, 178.0, 60.8, 60.0],
+    [157.6, 178.0, 60.0, 60.0],
+    [233.6, 178.0, 61.2, 60.0],
+    [311.6, 178.0, 61.2, 60.0],
   ],
-  plates: [
-    [226.8, 108.4, 263.6, 42.4],
-    [520.0, 108.4, 254.0, 42.0],
+  weapons: [
+    [424.3, 129.8, 89.2, 41.0],
+    [623.1, 137.3, 154.0, 32.9],
+  ],
+  lit: [
+    [418.7, 125.5, 99.0, 50.0],
+    [617.7, 132.0, 165.0, 43.0],
   ],
   ammo: [
-    [294.4, 157.2, 52.8, 50.4],
-    [362.8, 157.6, 52.4, 50.0],
-    [586.8, 157.2, 52.8, 50.4],
-    [655.2, 157.2, 52.4, 50.4],
+    [427.2, 178.0, 62.0, 60.0],
+    [504.8, 178.0, 61.6, 60.0],
+    [620.8, 178.0, 71.6, 60.0],
+    [710.0, 178.0, 72.0, 60.0],
   ],
 } as const;
 const BAR_WIDTH = 454; // pixels on the screen
@@ -88,6 +103,7 @@ const BAR_HEIGHT = Math.round(FRAME.height * SCALE);
 const BOTTOM = 6; // pixels between the bar and the screen's bottom
 const STATUS_GAP = 2; // pixels between the status line and the bar
 const STATUS_HEIGHT = 20; // pixels: the status line's
+const STATUS_EDGE = 4; // pixels the status line keeps from the screen's sides, the bar moved to one of them
 const COLORS = {
   lit: 0xf3d58a, // the rim and glow of a well whose skill is at work, whose weapon is picked or ammo loaded
   drop: 0xffd447, // a place that takes the ammo dragged out of the loadout
@@ -98,19 +114,29 @@ const COLORS = {
 } as const;
 const SWEEP_ALPHA = 0.55;
 const DISABLED_ALPHA = 0.45; // a dimmed well's content
+const LIT_HOVER_ALPHA = 0.5; // a weapon's lit picture under the pointer, while the weapon isn't picked
+// Pixels and seconds: the light round an ability loaded for the next volley, rings out from the well, breathing
+const ARMED = { rings: 3, pad: 3, step: 4, swell: 3, width: 3, glow: 10, corner: 4, alpha: 1, speed: 5 } as const;
+const ARMED_COLOR = 0xfff1b8; // brighter than the lit rim's gold, to stand out on the frame's brass
 const SKILL_ICON = 16; // pixels: a skill's drawn icon, until its picture has loaded or for one not painted yet
 const AMMO_ICON = 20; // pixels: an ammo's painted picture
-const RELOAD = { inset: 6, height: 2, bottom: 4 } as const; // pixels: the strip along the bottom of a weapon's plate
-// Pixels: the letters' sizes: a weapon's name and key on its plate, a skill's countdown, a key in a well's corner, an
-// ammo's count, the plus in an empty place
-const FONT = { name: 11, plateKey: 9, countdown: 13, key: 8, count: 9, plus: 14 } as const;
+const ITEM_INSET = 2; // pixels between an item's painted picture and its quick slot's sides
+const ITEM_DOT = 6; // pixels: the radius of the dot in its grade's colour that stands for an item until its icons load
+// Pixels a press on an item in a quick slot moves before it is a drag; the picture that follows the pointer, and how
+// clear it is
+const DRAG = { threshold: 5, size: 44, alpha: 0.85 } as const;
+// Pixels: the strip under a weapon's two places for ammo, on the frame's bottom board: how far under their wells, and
+// its height
+const RELOAD = { below: 5, height: 2 } as const;
+// Pixels: the letters' sizes: a skill's countdown, a key in a well's corner, an ammo's count, the plus in an empty place
+const FONT = { countdown: 13, key: 8, count: 9, plus: 14 } as const;
 // The keys that load the picked weapon's two kinds of ammo at hand (keyboardInput.ts), in their places' corners
 const AMMO_KEYS = ['Z', 'X'] as const;
-// The key that picks each weapon (keyboardInput.ts), shown on its plate
+// The key that picks each weapon (keyboardInput.ts), painted by it
 const WEAPON_KEYS: Readonly<Record<WeaponId, string>> = { cannon: 'Q', harpoon: 'E' };
 const NATURE_NAMES = { creature: 'to creatures', object: 'to ships and objects' } as const;
-// The level the first ability's talents open at
-const ABILITY_LEVEL = ABILITY_LEVELS[0];
+// The keys that use the ship's abilities, by their slot (keyboardInput.ts), in their wells' corners
+const ABILITY_KEYS = ['F', 'G', 'T'] as const;
 
 /** A box of the frame's picture on the screen, in whole pixels from the bar's top left corner */
 function onScreen(box: Box) {
@@ -126,32 +152,47 @@ function label(value: string, size: number, color: number) {
 
 export interface SkillBarActions {
   repair: () => void;
-  /** Uses the ship's ability (its level 5 talent) */
-  useAbility: () => void;
+  /** Uses the ship's ability in a slot: 0 its level 5 talent (F), 1 its level 25 one (G), 2 its level 50 one (T) */
+  useAbility: (slot: number) => void;
   setWeapon: (weapon: WeaponId) => void;
   loadAmmo: (ammo: AmmoId) => void;
-  /** Opens the loadout, where the ammo at hand is picked (a click on an empty place); open, it stays open */
-  openLoadout: () => void;
+  /**
+   * Opens the loadout on a weapon's tab, where its ammo at hand is picked (a click on an empty place of that weapon's);
+   * open, it stays open and turns to that tab
+   */
+  openLoadout: (weapon: WeaponId) => void;
+  /** Empties a quick slot: its item dragged back into the hold */
+  clearQuickSlot: (slot: number) => void;
+  /** Moves the item in one quick slot to another, the two swapping */
+  swapQuickSlots: (from: number, to: number) => void;
+  /** Whether a point on the screen is over the open hold: an item dragged off the bar is put back there, and only there */
+  overHold: (x: number, y: number) => boolean;
+  /** Lights the hold while an item is dragged off the bar, where it can go back; false when the drag ends */
+  showTakeBack: (on: boolean) => void;
 }
 
 /**
  * How a well looks: lit (its skill at work, its weapon picked, its ammo loaded) in a colour; dimmed (it can't be used
- * now); or locked (a skill not open yet: as it is, but it takes no clicks)
+ * now; cooling, the pointer an hourglass over it); or locked (a skill not open yet: as it is, but it takes no clicks).
+ * One that takes no clicks may still be dragged from (`grab`: a quick slot with an item)
  */
 interface WellLook {
   readonly lit?: boolean;
   readonly color?: number;
   readonly disabled?: boolean;
+  readonly cooling?: boolean;
   readonly locked?: boolean;
+  readonly grab?: boolean;
 }
 
 /** What the tooltip over a well says, as the game is now; null for nothing */
 type Hint = (state: GameState) => TooltipText | null;
 
 /**
- * A button in one of the frame's painted wells: the well is its face, so it adds only what changes, a light under the
- * pointer, and when lit a glow under whatever the owner puts in `content` and a rim over it (a skill's picture would
- * hide the glow). Clicks never reach the stage, which would steer the ship
+ * A button in one of the frame's painted wells, or on a weapon painted on it: the frame is its face, so it adds only
+ * what changes, a light under the pointer, and when lit a glow under whatever the owner puts in `content` and a rim
+ * over it (a skill's picture would hide the glow), or a lit picture of its own (`wearLit`). Clicks never reach the
+ * stage, which would steer the ship
  */
 class Well {
   readonly container = new Container();
@@ -162,8 +203,12 @@ class Well {
   readonly hint: Hint;
   private readonly glow = new Graphics();
   private readonly over = new Graphics();
+  /** Its face lit, painted, once loaded: shown in place of the glow and rim drawn */
+  private litPicture: Sprite | null = null;
   private hovered = false;
   private look: WellLook = {};
+  /** Whether a click does anything: an empty slot's, waiting for a skill to come, never does */
+  private readonly tappable: boolean;
   /** As last painted, to repaint only on change */
   private painted = '';
 
@@ -172,6 +217,7 @@ class Well {
     this.width = width;
     this.height = height;
     this.hint = hint;
+    this.tappable = onTap !== null;
     this.container.position.set(x, y);
     this.container.addChild(this.glow, this.content, this.over);
     this.container.eventMode = 'static';
@@ -205,6 +251,20 @@ class Well {
     this.paint();
   }
 
+  /**
+   * Lights it with a painted picture (`box`: where it goes, in the frame's picture's pixels) in place of the glow and
+   * rim drawn; under the pointer, the picture shows faintly
+   */
+  wearLit(texture: Texture, box: Box) {
+    const picture = new Sprite(texture);
+    picture.position.set(box[0] * SCALE - this.container.x, box[1] * SCALE - this.container.y);
+    picture.setSize(box[2] * SCALE, box[3] * SCALE);
+    this.container.addChildAt(picture, 0);
+    this.litPicture = picture;
+    this.painted = '';
+    this.paint();
+  }
+
   /** Whether a point on the screen is in the well: its content may not fill it */
   contains(x: number, y: number) {
     const local = this.container.toLocal({ x, y });
@@ -212,15 +272,25 @@ class Well {
   }
 
   private paint() {
-    const { lit = false, color = COLORS.lit, disabled = false, locked = false } = this.look;
+    const {
+      lit = false,
+      color = COLORS.lit,
+      disabled = false,
+      cooling = false,
+      locked = false,
+      grab = false,
+    } = this.look;
     const hovered = this.hovered && !disabled && !locked;
-    const key = `${lit}${color}${disabled}${locked}${hovered}`;
+    const key = `${lit}${color}${disabled}${cooling}${locked}${grab}${hovered}`;
     if (key === this.painted) return;
     this.painted = key;
-    const { width, height } = this;
+    const { width, height, litPicture } = this;
     this.glow.clear();
     const over = this.over.clear();
-    if (lit) {
+    if (litPicture) {
+      litPicture.visible = lit || hovered;
+      litPicture.alpha = lit ? 1 : LIT_HOVER_ALPHA;
+    } else if (lit) {
       this.glow.rect(0, 0, width, height).fill(glowFill(color));
       over
         .rect(1, 1, width - 2, height - 2)
@@ -228,14 +298,22 @@ class Well {
         .rect(-1, -1, width + 2, height + 2)
         .stroke({ width: 2, color, alpha: 0.35 });
     }
-    if (hovered) {
+    if (hovered && !litPicture) {
       over
         .rect(0, 0, width, height)
         .fill({ color: COLORS.hover, alpha: 0.08 })
         .rect(0.5, 0.5, width - 1, height - 1)
         .stroke({ width: 1, color: COLORS.hover, alpha: 0.35 });
     }
-    this.container.cursor = locked ? 'default' : 'pointer';
+    this.container.cursor = !this.tappable
+      ? grab
+        ? 'pointer'
+        : 'default'
+      : cooling
+        ? 'wait'
+        : disabled || locked
+          ? 'not-allowed'
+          : 'pointer';
     this.content.alpha = disabled ? DISABLED_ALPHA : 1;
   }
 }
@@ -250,6 +328,28 @@ interface SkillWell {
 /** Draws a skill's icon round (0, 0), `size` pixels, in `color` (ui.ts's drawWrench, drawSail, drawBroadside) */
 type DrawIcon = (g: Graphics, size: number, color: number) => void;
 
+/**
+ * An ability's well (`slot`: 0 the first, F; 1 the second, G; 2 the third, T): the seconds till it is ready, a shade
+ * going round
+ */
+interface AbilityWell extends SkillWell {
+  readonly slot: number;
+  readonly sweep: Graphics;
+  readonly count: Text;
+  /** A light breathing round it while it waits to go off (a Broadside loaded for the next volley) */
+  readonly halo: Graphics;
+}
+
+/** Each ability's painted picture, and its icon drawn until the pictures have loaded */
+const ABILITY_FACES: Partial<Readonly<Record<SignatureId, { readonly icon: SkillIconId; readonly draw: DrawIcon }>>> = {
+  broadside: { icon: 'broadside', draw: drawBroadside },
+  fullSail: { icon: 'fullSail', draw: drawSail },
+  rocket: { icon: 'rocket', draw: drawHarpoon },
+  powderKeg: { icon: 'powderKeg', draw: drawBall },
+  bombardment: { icon: 'bombardment', draw: drawBall },
+  royalStandard: { icon: 'royalStandard', draw: (g, size, color) => drawStar(g, size * 0.45, color) },
+};
+
 /** One of a weapon's two places for ammo, in a well under its plate */
 interface AmmoPlace {
   readonly well: Well;
@@ -260,6 +360,23 @@ interface AmmoPlace {
   readonly key: Text;
   /** Its count, while there is an ammo in it */
   count: Text | null;
+}
+
+/** One of the ten quick slots on the bar's top, keys 1…0: an item of the hold, put there from the hold's window */
+interface QuickSlot {
+  readonly index: number;
+  readonly well: Well;
+  /** The item in it, as last shown */
+  item: ItemId | null;
+  /** How many of it are in the hold, while it has one */
+  count: Text | null;
+}
+
+/** A press on a quick slot's item: where it started, and the picture following the pointer once it is a drag */
+interface QuickPress {
+  readonly slot: QuickSlot;
+  readonly from: { readonly x: number; readonly y: number };
+  ghost: Sprite | Graphics | null;
 }
 
 /** What the player is told when the ship holds fire, and what to do about it */
@@ -275,7 +392,7 @@ const HOLD_MESSAGES: Readonly<Record<HoldReason, (ship: Ship) => string>> = {
   range: (ship) =>
     t("Target beyond your {weapon}' reach ({range}): sail closer", {
       ...weaponNames(ship.weapon),
-      range: ship.range(),
+      range: Math.round(ship.range()),
     }),
 };
 
@@ -285,12 +402,16 @@ function weaponNames(weapon: WeaponId) {
   return { weapon: name.toLowerCase(), Weapon: name };
 }
 
-/** A weapon's part of the bar: its plate, which picks it (lit when picked), and its two kinds of ammo at hand below */
+/**
+ * A weapon's part of the bar: the weapon painted on the frame, which picks it (lit when picked), its two kinds of ammo
+ * at hand below, and under them its reload
+ */
 interface Group {
   readonly weapon: WeaponId;
-  readonly plate: Well;
-  readonly name: Text;
+  readonly button: Well;
+  /** The reload's strip, under the places for ammo, and its width in pixels */
   readonly reload: Graphics;
+  readonly strip: number;
   readonly places: readonly AmmoPlace[];
   /** The ammo the places were filled for, to fill them again only when it changes */
   shown: string;
@@ -298,59 +419,98 @@ interface Group {
 
 /**
  * The bar at the bottom of the screen, in a painted frame of wood and brass (`FRAME`). On top, ten quick slots, keys
- * 1…0, waiting for what the hold will carry to use at sea. Under them on the left, the skills, painted: the repair (R)
- * and the ship's ability (F; a lock until its talent is picked at level 5), and two locks on its second and third
- * abilities, still to come (a ship of a lower tier has none: they say which tier brings them); on the
- * right, each weapon's plate (a click on it, or its key, Q or E, picks it) with its two kinds of ammo at hand under it
- * (Ship.ammoBar, put there in the loadout: their counts, the loaded one lit, a click or Z or X loads the other; an
- * empty place, as one whose ammo has run out is, shows a plus that opens the loadout). Ammo dragged out of the loadout
- * drops on its places (`ammoPlaceAt`). The
- * pointer over a skill or an ammo shows all about it in a tooltip. Over the bar, a line about what is going on: why the
- * ship holds fire, that its weapon is the wrong one for the target, the repair. Until the frame's picture has loaded,
- * its wells are drawn plain
+ * 1…0, for the items of the hold (player.quickSlots): each its painted picture and how many are in the hold, dragged
+ * there from the hold's window (`quickSlotAt`); dragged from one slot to another they swap, and only dropped back into
+ * the open hold does one leave the bar, so a slip of the mouse never empties a slot. Using them comes with an update:
+ * a click or their key does nothing yet. Under them on the left, the skills, painted: the repair (R),
+ * the ship's ability (F; a lock until its talent is picked at level 5), its second (G; from tier 3, picked at level
+ * 25: a rocket, dimmed while nothing it could fly at is attacked or picked out, or a powder keg) and its third (T; from
+ * tier 5, picked at level 50: a bombardment, dimmed as the rocket is, or a Royal standard; a ship of a lower tier has
+ * neither of the last two: they say which tier brings them); on the
+ * right, each weapon painted with its key (a click on it, or its key, Q or E, picks it; picked, its lit picture glows
+ * over it, faintly under the pointer) with its two kinds of ammo at hand under it (Ship.ammoBar, put there in the
+ * loadout: their counts, the loaded one lit, a click or Z or X loads the other; an empty place, as one whose ammo has
+ * run out is, shows a plus that opens the loadout), and under them how far its soonest gun has reloaded. Ammo dragged
+ * out of the loadout drops on its places (`ammoPlaceAt`). The pointer over a weapon, a skill or an ammo shows all about
+ * it in a tooltip. Over the bar, a line about what is going on: why the ship holds fire, that its weapon is the wrong
+ * one for the target, the repair. Until the frame's picture has loaded, its wells are drawn plain
  */
 export class SkillBar {
-  /** Pixels at the bottom of the screen the bar and its line take: what a window over it leaves clear (the loadout) */
-  static readonly ROOM = BOTTOM + BAR_HEIGHT + STATUS_GAP + STATUS_HEIGHT;
+  static readonly WIDTH = BAR_WIDTH;
+  static readonly HEIGHT = BAR_HEIGHT;
+  /** Pixels between the bar and the screen's bottom, where the HUD lays it out */
+  static readonly BOTTOM = BOTTOM;
   readonly container = new Container();
+  /** Over everything: the picture of an item dragged off a quick slot */
+  readonly dragLayer = new Container();
   private readonly status = text('', 14, UI.text, { fontWeight: 'bold', stroke: { color: 0x000000, width: 4 } });
-  private readonly tooltip = new Tooltip();
+  /** Whether its line is under it: the bar is at the screen's top, with no room above */
+  private statusUnder = false;
+  private readonly tooltip: Tooltip;
+  /** The screen it is on: its tooltips and its line stay inside it */
+  private readonly screen: { readonly width: number };
   private readonly repair: SkillWell;
   private readonly repairArc = new Graphics();
   private readonly repairCount = label('', FONT.countdown, THEME.text);
-  /** The ship's ability: its picture, the seconds till it is ready again, its cooling down as a shade going round */
-  private readonly ability: SkillWell;
-  private readonly abilitySweep = new Graphics();
-  private readonly abilityCount = label('', FONT.countdown, THEME.text);
-  /** The wells of the second and third abilities, to come: locked */
-  private readonly toCome: readonly SkillWell[];
-  /** The ability the skills' faces were laid for, '' to lay them again (the pictures have loaded) */
+  /** The ship's abilities, F, G and T: each its picture, the seconds till it is ready again, its cooling as a shade */
+  private readonly abilities: readonly AbilityWell[];
+  /** The abilities the skills' faces were laid for, '' to lay them again (the pictures have loaded) */
   private facesFor = '';
   private readonly groups: Group[];
   private readonly actions: SkillBarActions;
   /** The weapon whose ammo is being dragged out of the loadout: its places are lit to take it */
   private dropFor: WeaponId | null = null;
+  private readonly quick: readonly QuickSlot[];
+  /** Every well with a button in it, or an item */
+  private readonly wells: readonly Well[];
+  /** The items the quick slots were filled for, to fill them again only when they change ('' once the icons load) */
+  private quickShown = '';
+  /** Whether an item is being dragged out of the hold's window: every quick slot is lit to take it */
+  private itemDrop = false;
+  private press: QuickPress | null = null;
 
-  constructor(actions: SkillBarActions) {
+  constructor(screen: { readonly width: number }, actions: SkillBarActions) {
+    this.screen = screen;
     this.actions = actions;
+    this.tooltip = new Tooltip(screen);
     this.status.anchor.set(0.5, 1);
     this.status.position.set(BAR_WIDTH / 2, -STATUS_GAP);
 
+    // No click: an item's use comes later. A well that takes none still lights under the pointer, unlocked
+    this.quick = FRAME.quick.map((box, index): QuickSlot => {
+      const slot: QuickSlot = {
+        index,
+        well: new Well(box, null, ({ player }) => quickHint(player, slot)),
+        item: null,
+        count: null,
+      };
+      this.grabbable(slot);
+      return slot;
+    });
+    ITEM_ICONS.load(() => (this.quickShown = ''));
+    this.dragLayer.eventMode = 'none';
+
     this.repair = skillWell(FRAME.skills[0], actions.repair, repairHint);
-    this.ability = skillWell(FRAME.skills[1], actions.useAbility, abilityHint);
-    this.toCome = [FRAME.skills[2], FRAME.skills[3]].map((box, i) => skillWell(box, null, toComeHint(i + 1)));
     this.repair.well.content.addChild(this.repairArc, this.repairCount, keyLabel('R', this.repair.well));
-    this.ability.well.content.addChild(this.abilitySweep, this.abilityCount, keyLabel('F', this.ability.well));
-    for (const [{ well }, count] of [
-      [this.repair, this.repairCount],
-      [this.ability, this.abilityCount],
-    ] as const) {
-      count.anchor.set(0.5);
-      count.position.set(well.width / 2, well.height / 2);
-    }
+    centre(this.repairCount, this.repair.well);
+    this.abilities = ABILITY_KEYS.map((key, slot): AbilityWell => {
+      const skill = skillWell(FRAME.skills[slot + 1], () => actions.useAbility(slot), abilityHint(slot));
+      const sweep = new Graphics();
+      const count = label('', FONT.countdown, THEME.text);
+      centre(count, skill.well);
+      skill.well.content.addChild(sweep, count, keyLabel(key, skill.well));
+      const halo = new Graphics();
+      halo.position.set(skill.well.container.x, skill.well.container.y);
+      return { ...skill, slot, sweep, count, halo };
+    });
     SKILL_ICONS.load(() => (this.facesFor = ''));
 
     this.groups = WEAPON_IDS.map((weapon, w) => this.group(weapon, w));
+    this.wells = [
+      ...this.quick.map((slot) => slot.well),
+      ...[this.repair, ...this.abilities].map((skill) => skill.well),
+      ...this.groups.flatMap((g) => [g.button, ...g.places.map((p) => p.well)]),
+    ];
     // The painted icons, as the arsenal's: the places are filled again with them once they are there
     AMMO_ICONS.load(() => {
       for (const group of this.groups) group.shown = '';
@@ -375,7 +535,9 @@ export class SkillBar {
       plain,
       frame,
       this.status,
-      ...this.wells().map((well) => well.container),
+      ...this.groups.map((group) => group.reload),
+      ...this.wells.map((well) => well.container),
+      ...this.abilities.map((skill) => skill.halo),
       this.tooltip.container,
     );
   }
@@ -383,6 +545,19 @@ export class SkillBar {
   /** Where the bar is on the screen */
   get box() {
     return new Rectangle(this.container.x, this.container.y, BAR_WIDTH, BAR_HEIGHT);
+  }
+
+  /**
+   * What the bar and its line take of a screen `screenHeight` pixels high: what a window over it leaves clear (the
+   * loadout), at the top when the bar is in the screen's upper half, else at the bottom
+   */
+  edges(screenHeight: number): ScreenEdges {
+    const { y } = this.container;
+    const line = STATUS_GAP + STATUS_HEIGHT;
+    const top = this.statusUnder ? y : y - line;
+    const bottom = this.statusUnder ? y + BAR_HEIGHT + line : y + BAR_HEIGHT;
+    if (y + BAR_HEIGHT / 2 < screenHeight / 2) return { top: Math.max(0, bottom), bottom: 0 };
+    return { top: 0, bottom: Math.max(0, screenHeight - top) };
   }
 
   /** The place for ammo under a point on the screen, if there is one there: for ammo dragged out of the loadout */
@@ -399,47 +574,132 @@ export class SkillBar {
     this.dropFor = weapon;
   }
 
-  update(state: GameState, screenWidth: number, screenHeight: number) {
-    this.container.position.set(Math.round((screenWidth - BAR_WIDTH) / 2), screenHeight - BOTTOM - BAR_HEIGHT);
+  /** The quick slot under a point on the screen, if there is one there: for an item dragged out of the hold */
+  quickSlotAt(x: number, y: number): number | null {
+    return this.quick.find(({ well }) => well.contains(x, y))?.index ?? null;
+  }
+
+  /** Lights every quick slot while an item is dragged out of the hold, to take it; false when the drag ends */
+  showItemDrop(on: boolean) {
+    this.itemDrop = on;
+  }
+
+  /**
+   * x, y: the bar's top left corner on the screen; its line goes under it when it has no room above. picked: the unit
+   * the player picked out, which a rocket flies at when the ship attacks nothing (and shells fall round)
+   */
+  update(state: GameState, x: number, y: number, picked: number | null) {
+    this.container.position.set(x, y);
+    this.statusUnder = y < STATUS_GAP + STATUS_HEIGHT;
+    this.status.anchor.set(0.5, this.statusUnder ? 0 : 1);
+    this.status.y = this.statusUnder ? BAR_HEIGHT + STATUS_GAP : -STATUS_GAP;
     for (const group of this.groups) this.updateGroup(group, state.ship);
+    this.updateQuick(state);
     this.updateFaces(state.ship);
     this.updateRepair(state);
-    this.updateAbility(state);
+    for (const skill of this.abilities) this.updateAbility(state, skill, picked);
     this.updateStatus(state);
-    // Not while ammo is dragged out of the loadout: the places lit say where it goes
-    const hovered = this.dropFor === null ? this.wells().find((well) => well.isHovered) : undefined;
-    if (hovered) this.tooltip.point(hovered.hint(state), hovered.container.x + hovered.width / 2, hovered.container.y);
-    else this.tooltip.point(null, 0, 0);
+    // Over the bar's middle, but kept on the screen: the bar moved to its side, a long line would run off it
+    const half = this.status.width / 2 + STATUS_EDGE;
+    const middle = x + BAR_WIDTH / 2;
+    this.status.x = BAR_WIDTH / 2 + Math.max(half, Math.min(middle, this.screen.width - half)) - middle;
+    // Not while ammo or an item is dragged: the places lit say where it goes
+    const dragging = this.dropFor !== null || this.itemDrop || this.press?.ghost;
+    const hovered = dragging ? undefined : this.wells.find((well) => well.isHovered);
+    if (hovered) {
+      const { container, width, height } = hovered;
+      this.tooltip.point(hovered.hint(state), container.x + width / 2, container.y, { under: container.y + height });
+    } else this.tooltip.point(null, 0, 0);
   }
 
-  /** Every well with a button in it */
-  private wells() {
-    return [
-      ...[this.repair, this.ability, ...this.toCome].map((skill) => skill.well),
-      ...this.groups.flatMap((g) => [g.plate, ...g.places.map((p) => p.well)]),
-    ];
+  /**
+   * The whole bar and the room of its line over it, for the story's guide's note to keep clear of: over them, not over
+   * the slots or the line
+   */
+  get frame(): GuideTarget {
+    const line = STATUS_GAP + STATUS_HEIGHT;
+    return { container: this.container, box: { x: 0, y: -line, width: BAR_WIDTH, height: BAR_HEIGHT + line } };
   }
 
-  /** A weapon's plate with its name, key and reload, and its two places for ammo under it (`w`: its order) */
+  /** The repair's well, or a weapon's painted on the frame, for the story's guide to point at */
+  target(what: 'repair' | WeaponId): GuideTarget | null {
+    const well = what === 'repair' ? this.repair.well : this.groups.find((g) => g.weapon === what)?.button;
+    return well ? { container: well.container, box: { x: 0, y: 0, width: well.width, height: well.height } } : null;
+  }
+
+  /**
+   * The quick slots: filled again with their items when they change, each lit while an item dragged (out of the hold,
+   * or off another slot) can go there, and how many of its item the hold has
+   */
+  private updateQuick({ player }: GameState) {
+    const key = player.quickSlots.join();
+    if (key !== this.quickShown) {
+      this.quickShown = key;
+      for (const slot of this.quick) fillQuick(slot, player.quickSlots[slot.index] ?? null);
+    }
+    const from = this.press?.ghost ? this.press.slot : null;
+    for (const slot of this.quick) {
+      const lit = this.itemDrop || (from !== null && slot !== from);
+      slot.well.setLook({ lit, color: COLORS.drop, grab: slot.item !== null });
+      if (slot.count && slot.item) show(slot.count, compact(player.items[slot.item] ?? 0));
+    }
+  }
+
+  /**
+   * What a press on a quick slot's item does: past a few pixels it is a drag, its picture following the pointer; let go
+   * over another slot, the two swap; over the open hold, the slot is emptied; anywhere else, nothing
+   */
+  private grabbable(slot: QuickSlot) {
+    const { container } = slot.well;
+    container.on('pointerdown', (e) => {
+      if (slot.item) this.press = { slot, from: { x: e.global.x, y: e.global.y }, ghost: null };
+    });
+    container.on('globalpointermove', (e) => this.drag(slot, e.global));
+    container.on('pointerup', (e) => this.drop(slot, e.global));
+    container.on('pointerupoutside', (e) => this.drop(slot, e.global));
+  }
+
+  private drag(slot: QuickSlot, point: Point) {
+    const press = this.press;
+    if (press?.slot !== slot || !slot.item) return;
+    if (!press.ghost) {
+      if (Math.hypot(point.x - press.from.x, point.y - press.from.y) < DRAG.threshold) return;
+      press.ghost = itemGhost(slot.item);
+      this.dragLayer.addChild(press.ghost);
+      this.actions.showTakeBack(true);
+    }
+    press.ghost.position.set(point.x, point.y);
+  }
+
+  private drop(slot: QuickSlot, point: Point) {
+    const press = this.press;
+    if (press?.slot !== slot) return;
+    this.press = null;
+    if (!press.ghost) return;
+    press.ghost.destroy();
+    this.actions.showTakeBack(false);
+    const to = this.quickSlotAt(point.x, point.y);
+    if (to !== null) {
+      if (to !== slot.index) this.actions.swapQuickSlots(slot.index, to);
+    } else if (this.actions.overHold(point.x, point.y)) {
+      this.actions.clearQuickSlot(slot.index);
+    }
+  }
+
+  /**
+   * A weapon painted on the frame, lit by its own picture once loaded, its two places for ammo under it and its reload
+   * under them (`w`: its order)
+   */
   private group(weapon: WeaponId, w: number): Group {
-    const plate = new Well(
-      FRAME.plates[w],
-      () => this.actions.setWeapon(weapon),
-      () => null,
-    );
-    const name = label('', FONT.name, THEME.text);
-    name.anchor.set(0, 0.5);
-    name.position.set(RELOAD.inset + 2, (plate.height - RELOAD.bottom) / 2);
-    const key = label(WEAPON_KEYS[weapon], FONT.plateKey, THEME.dim);
-    key.anchor.set(1, 0.5);
-    key.position.set(plate.width - RELOAD.inset - 2, (plate.height - RELOAD.bottom) / 2);
-    const reload = new Graphics();
-    plate.content.addChild(name, key, reload);
+    const button = new Well(FRAME.weapons[w], () => this.actions.setWeapon(weapon), weaponHint(weapon));
+    Assets.load<Texture>({ src: litUrl(weapon), data: { autoGenerateMipmaps: true } })
+      .then((texture) => button.wearLit(texture, FRAME.lit[w]))
+      .catch((error) => console.warn(`The skill bar's lit ${weapon} failed to load`, error));
     const places = AMMO_KEYS.map((letter, i): AmmoPlace => {
       const place: AmmoPlace = {
         well: new Well(
           FRAME.ammo[w * AMMO_KEYS.length + i],
-          () => (place.ammo ? this.actions.loadAmmo(place.ammo) : this.actions.openLoadout()),
+          () => (place.ammo ? this.actions.loadAmmo(place.ammo) : this.actions.openLoadout(weapon)),
           (state) => ammoHint(state.ship, place),
         ),
         ammo: null,
@@ -450,54 +710,90 @@ export class SkillBar {
       place.key.position.set(2, 0);
       return place;
     });
-    return { weapon, plate, name, reload, places, shown: '' };
+    const first = places[0].well;
+    const last = places[places.length - 1].well;
+    const reload = new Graphics();
+    reload.position.set(first.container.x, first.container.y + first.height + RELOAD.below);
+    return { weapon, button, reload, strip: last.container.x + last.width - reload.x, places, shown: '' };
   }
 
-  /** The skills' faces: the repair's, the ability's (painted, drawn or a lock) and the locks on the skills to come */
+  /** The skills' faces: the repair's and the abilities' (painted, drawn or a lock) */
   private updateFaces(ship: Ship) {
-    const { ability } = ship;
-    const key = `${ability}`;
+    const key = this.abilities.map(({ slot }) => ship.abilityIn(slot)).join();
     if (key === this.facesFor) return;
     this.facesFor = key;
     setFace(this.repair, 'repair', drawWrench);
-    if (ability === 'fullSail') setFace(this.ability, 'fullSail', drawSail);
-    else if (ability === 'broadside') setFace(this.ability, null, drawBroadside);
-    else setFace(this.ability, 'locked', null);
-    for (const skill of this.toCome) setFace(skill, 'locked', null);
+    for (const skill of this.abilities) {
+      const ability = ship.abilityIn(skill.slot);
+      const face = ability === null ? undefined : ABILITY_FACES[ability];
+      if (face) setFace(skill, face.icon, face.draw);
+      else setFace(skill, 'locked', null);
+    }
   }
 
   /**
-   * Lit while it works (Broadside loaded, Full sail up); dim, shaded and counting down while it cools; locked till its
-   * talent is picked
+   * An ability's well: lit while it works (Broadside loaded, Full sail or a Royal standard up); dim, shaded and
+   * counting down while it cools; dim while a rocket or a bombardment has nothing to aim at (the unit attacked, or else
+   * the one picked out, in its range and sight); locked till its talent is picked
    */
-  private updateAbility(state: GameState) {
+  private updateAbility(state: GameState, skill: AbilityWell, picked: number | null) {
     const { ship, time } = state;
-    const { ability } = ship;
-    const working = ship.broadsideArmed || time < ship.fullSailUntil;
-    const wait = ship.abilityReadyAt - time;
+    const ability = ship.abilityIn(skill.slot);
+    const working =
+      ability === 'broadside'
+        ? ship.broadsideArmed
+        : (ability === 'fullSail' && time < ship.fullSailUntil) ||
+          (ability === 'royalStandard' && time < ship.standardUntil);
+    const wait = (ship.abilityReadyAt[skill.slot] ?? 0) - time;
     const cooling = ability !== null && !working && wait > 0;
-    this.ability.well.setLook({
+    const aimless =
+      (ability === 'rocket' || ability === 'bombardment') &&
+      !abilityTarget(state, ship, ability, ship.attackTarget ?? picked);
+    skill.well.setLook({
       lit: working,
       locked: ability === null,
-      disabled: ability !== null && !working && (wait > 0 || ship.isSinking || ship.docked),
+      disabled: ability !== null && !working && (wait > 0 || ship.isSinking || ship.docked || aimless),
+      cooling,
     });
-    show(this.abilityCount, cooling ? `${Math.ceil(wait)}` : '');
-    const sweep = this.abilitySweep.clear();
-    const { width, height } = this.ability.well;
-    if (cooling) drawSweep(sweep, width, height, wait / abilityCooldown(ship));
+    show(skill.count, cooling ? `${Math.ceil(wait)}` : '');
+    const sweep = skill.sweep.clear();
+    const { width, height } = skill.well;
+    if (cooling) drawSweep(sweep, width, height, wait / abilityCooldown(ship, skill.slot));
+    // Loaded for the next volley: a light breathing round the well, so it isn't missed in a fight
+    const halo = skill.halo.clear();
+    if (ability === 'broadside' && working) {
+      const breath = 0.5 + 0.5 * Math.sin(time * ARMED.speed);
+      // A soft glow under the rings, then the rings out from the well, fainter outwards
+      const glow = ARMED.pad + ARMED.glow / 2;
+      halo.roundRect(-glow, -glow, width + glow * 2, height + glow * 2, ARMED.corner + glow).stroke({
+        width: ARMED.glow,
+        color: ARMED_COLOR,
+        alpha: 0.15 + 0.2 * breath,
+      });
+      for (let ring = 0; ring < ARMED.rings; ring++) {
+        const pad = ARMED.pad + ring * ARMED.step + breath * ARMED.swell;
+        halo.roundRect(-pad, -pad, width + pad * 2, height + pad * 2, ARMED.corner + pad).stroke({
+          width: ARMED.width,
+          color: ARMED_COLOR,
+          alpha: ARMED.alpha * (1 - ring / ARMED.rings) * (0.5 + 0.5 * breath),
+        });
+      }
+    }
   }
 
   private updateRepair(state: GameState) {
     const { ship, time } = state;
     const combat = ship.inCombat(time);
     const mended = ship.hp >= ship.maxHp;
+    // In combat: the seconds till a repair can start, over the dimmed icon
+    const waiting = combat && !ship.repairing && !mended;
     this.repair.well.setLook({
       lit: ship.repairing,
       color: UI.heal,
       disabled: !ship.repairing && (ship.isSinking || mended || combat || !canPayRepair(state, ship)),
+      cooling: waiting && !ship.isSinking,
     });
-    // In combat: the seconds till a repair can start, over the dimmed icon
-    show(this.repairCount, combat && !ship.repairing && !mended ? `${Math.ceil(ship.combatUntil - time)}` : '');
+    show(this.repairCount, waiting ? `${Math.ceil(ship.combatUntil - time)}` : '');
     const arc = this.repairArc.clear();
     if (ship.repairing) {
       const { width, height } = this.repair.well;
@@ -530,12 +826,12 @@ export class SkillBar {
       color = UI.dim;
     } else if (ship.broadsideArmed) {
       message = t('{talent}: your next volley does ×{n} damage', {
-        talent: t(TALENTS.broadside.name),
+        talent: t(SIGNATURES.broadside.name),
         n: PERKS.broadside,
       });
       color = UI.active;
     } else if (time < ship.fullSailUntil) {
-      message = t('{talent}: {n} s', { talent: t(TALENTS.fullSail.name), n: Math.ceil(ship.fullSailUntil - time) });
+      message = t('{talent}: {n} s', { talent: t(SIGNATURES.fullSail.name), n: Math.ceil(ship.fullSailUntil - time) });
       color = UI.active;
     } else if (ship.repairing) {
       message = t('Repairing: +{hp} hull every second, 1 gold for every {per}', {
@@ -558,26 +854,19 @@ export class SkillBar {
 
   /** Lights the picked weapon and loaded ammo, counts the ammo, and fills the places again if their ammo changed */
   private updateGroup(group: Group, ship: Ship) {
-    const { weapon, plate } = group;
-    const fitted = ship.fittedGuns(weapon);
-    const selected = ship.weapon === weapon;
-    plate.setLook({ lit: selected });
-    tint(group.name, selected ? THEME.text : THEME.dim);
-    show(group.name, `${t(WEAPONS[weapon].name)} ×${fitted.length}`);
+    const { weapon, strip } = group;
+    group.button.setLook({ lit: ship.weapon === weapon });
     // How far the soonest gun is reloaded: full and green when one is ready
     const reloads = ship.reloads[weapon];
     const share = reloadShare(ship, weapon);
-    const progress = fitted.reduce(
-      (best, { gun, slot }) => Math.max(best, 1 - reloads[slot] / (gun.reload * share)),
-      0,
-    );
-    const strip = plate.width - RELOAD.inset * 2;
-    const y = plate.height - RELOAD.bottom;
+    const progress = ship
+      .fittedGuns(weapon)
+      .reduce((best, { gun, slot }) => Math.max(best, 1 - reloads[slot] / (gun.reload * share)), 0);
     group.reload
       .clear()
-      .rect(RELOAD.inset, y, strip, RELOAD.height)
+      .rect(0, 0, strip, RELOAD.height)
       .fill({ color: 0x000000, alpha: 0.45 })
-      .rect(RELOAD.inset, y, strip * progress, RELOAD.height)
+      .rect(0, 0, strip * progress, RELOAD.height)
       .fill({ color: progress >= 1 ? UI.good : UI.warn });
 
     const loaded = ship.loaded[weapon];
@@ -600,7 +889,7 @@ export class SkillBar {
   /** The bar's wells drawn plain on a dark panel, until the frame's picture has loaded */
   private plainFrame() {
     const g = new Graphics().roundRect(0, 0, BAR_WIDTH, BAR_HEIGHT, 10).fill({ color: UI.panel, alpha: UI.panelAlpha });
-    for (const box of [...FRAME.quick, ...FRAME.skills, ...FRAME.plates, ...FRAME.ammo]) {
+    for (const box of [...FRAME.quick, ...FRAME.skills, ...FRAME.weapons, ...FRAME.ammo]) {
       const { x, y, width, height } = onScreen(box);
       g.rect(x, y, width, height).fill({ color: COLORS.well }).stroke({ width: 1, color: THEME.brass, alpha: 0.6 });
     }
@@ -619,19 +908,28 @@ function skillWell(box: Box, onTap: (() => void) | null, hint: Hint): SkillWell 
 }
 
 /**
- * A skill's face: its painted picture (`icon`) stretched over the well, or until the pictures have loaded (or for a
- * skill not painted yet, no `icon`) its icon drawn by `draw`; nothing for a lock that hasn't loaded
+ * A skill's face: its painted picture (`icon`) as big as the well lets it, unstretched, in its middle; or until the
+ * pictures have loaded (or for a skill not painted yet, no `icon`) its icon drawn by `draw`; nothing for a lock that
+ * hasn't loaded
  */
 function setFace(skill: SkillWell, icon: SkillIconId | null, draw: DrawIcon | null) {
   const { well, picture, drawn } = skill;
   const texture = icon ? SKILL_ICONS.get(icon) : null;
   picture.visible = texture !== null;
   if (texture) {
+    const side = Math.min(well.width, well.height);
     picture.texture = texture;
-    picture.setSize(well.width, well.height);
+    picture.setSize(side, side);
+    picture.position.set((well.width - side) / 2, (well.height - side) / 2);
   }
   drawn.clear();
   if (!texture && draw) draw(drawn, SKILL_ICON, THEME.text);
+}
+
+/** A countdown in the middle of a well */
+function centre(count: Text, well: Well) {
+  count.anchor.set(0.5);
+  count.position.set(well.width / 2, well.height / 2);
 }
 
 /** The key that works the button too, small in its bottom right corner */
@@ -682,34 +980,65 @@ function repairHint({ ship }: GameState): TooltipText {
   };
 }
 
-/** The ability's tooltip: its talent and what it does, or how it opens */
-function abilityHint({ ship }: GameState): TooltipText {
-  const { ability } = ship;
-  if (ability === null) {
-    return {
-      title: t('Ability (F)'),
-      color: THEME.dim,
-      lines: [
-        t('Opens with a signature talent at level {level}: pick it in the talents (K)', { level: ABILITY_LEVEL }),
-      ],
-    };
-  }
-  return { title: t(TALENTS[ability].name), lines: [t(TALENTS[ability].text)] };
+/**
+ * An ability's tooltip (`slot`: 0 the first, 1 the second, 2 the third): its talent and what it does, how it opens,
+ * or on a ship of a lower tier the tier that brings it
+ */
+function abilityHint(slot: number): Hint {
+  return ({ ship }) => {
+    const key = ABILITY_KEYS[slot];
+    if (slot >= ship.shipClass.abilities) {
+      const [title, line] =
+        slot === 1
+          ? [t('Second ability ({key})', { key }), t('Ships of tier 3 and up have it')]
+          : [t('Third ability ({key})', { key }), t('Ships of tier 5 and up have it')];
+      return { title, color: THEME.dim, lines: [line] };
+    }
+    const ability = ship.abilityIn(slot);
+    if (ability === null) {
+      const level = ABILITY_LEVELS[slot];
+      return {
+        title: t('Ability ({key})', { key }),
+        color: THEME.dim,
+        lines: [t('Opens with a signature talent at level {level}: pick it in the talents (K)', { level })],
+      };
+    }
+    const talent = talentOf(ability);
+    const lines = [t(talent.text, talent.figures)];
+    if (ability === 'broadside') {
+      lines.push(
+        ship.broadsideArmed
+          ? t('Loaded: the next volley fires it. Press {key} again to put it away, its cooldown not started', { key })
+          : t('Press {key} to load it for the next volley, again to put it away', { key }),
+      );
+    }
+    return { title: t(talent.name), lines };
+  };
 }
 
 /**
- * The tooltip of an ability still to come (`index`: 1 for the second, 2 for the third): the level it opens at on a
- * ship that has it, or the tier that brings it
+ * A weapon's tooltip: its name and key, how many of its guns are fitted, what it does full damage to, and how to pick
+ * it while it isn't picked
  */
-function toComeHint(index: number): Hint {
+function weaponHint(weapon: WeaponId): Hint {
   return ({ ship }) => {
-    const title = t(index === 1 ? 'Second ability' : 'Third ability');
-    if (index < ship.shipClass.abilities) {
-      const level = ABILITY_LEVELS[index];
-      return { title, color: THEME.dim, lines: [t('Opens at level {level}: still to come', { level })] };
-    }
-    const tier = index === 1 ? 'Ships of tier 4 and up have it' : 'Ships of tier 6 have it';
-    return { title, color: THEME.dim, lines: [t(tier)] };
+    const key = WEAPON_KEYS[weapon];
+    const guns = ship.guns[weapon];
+    const fitted = guns.filter((gun) => gun !== null).length;
+    const { name, against } = WEAPONS[weapon];
+    return {
+      title: `${t(name)} (${key})`,
+      lines: [
+        fitted === 0
+          ? t('No {weapon} fitted: fit some in the loadout (L)', weaponNames(weapon))
+          : t('{n} of {slots} fitted', { n: fitted, slots: guns.length }),
+        t('Full damage {targets}, {share}% to the rest', {
+          targets: t(NATURE_NAMES[against]),
+          share: OFF_TARGET_SHARE * 100,
+        }),
+        ...(ship.weapon === weapon ? [] : [t('Click or {key}: pick them', { key })]),
+      ],
+    };
   };
 }
 
@@ -734,6 +1063,60 @@ function ammoHint(ship: Ship, place: AmmoPlace): TooltipText {
       ...(loaded ? [] : [t('Click or {key}: load it', { key: place.letter })]),
     ],
   };
+}
+
+/** A quick slot's tooltip: its item, all about it and how it leaves the bar; or how one is put there */
+function quickHint(player: Player, slot: QuickSlot): TooltipText {
+  const key = QUICK_KEYS[slot.index];
+  if (!slot.item) {
+    return {
+      title: t('Quick slot {key}', { key }),
+      color: THEME.dim,
+      lines: [t('Open the hold (H) and drag an item here from its Items')],
+    };
+  }
+  return itemHint(player, slot.item, [
+    t('Quick slot {key}', { key }),
+    t('Drag it onto another quick slot to swap them, or back into the open hold (H) to take it off the bar'),
+  ]);
+}
+
+/**
+ * A quick slot's content for an item (`id`): its painted picture as big as the well lets it, unstretched (a dot in its
+ * grade's colour until the icons load), and how many are in the hold (set each frame); nothing for none
+ */
+function fillQuick(slot: QuickSlot, id: ItemId | null) {
+  const { well } = slot;
+  for (const child of well.content.removeChildren()) child.destroy({ children: true });
+  slot.item = id;
+  slot.count = null;
+  if (!id) return;
+  const texture = ITEM_ICONS.get(id);
+  if (texture) {
+    const side = Math.min(well.width, well.height) - ITEM_INSET * 2;
+    const picture = new Sprite({ texture, anchor: 0.5 });
+    picture.setSize(side, side);
+    picture.position.set(well.width / 2, well.height / 2);
+    well.content.addChild(picture);
+  } else {
+    well.content.addChild(new Graphics().circle(well.width / 2, well.height / 2, ITEM_DOT).fill(itemColor(id)));
+  }
+  const count = label('', FONT.count, THEME.text);
+  count.anchor.set(1, 1);
+  count.position.set(well.width - 2, well.height);
+  well.content.addChild(count);
+  slot.count = count;
+}
+
+/** The picture of an item that follows the pointer while it is dragged off its quick slot */
+function itemGhost(id: ItemId) {
+  const texture = ITEM_ICONS.get(id);
+  const ghost = texture
+    ? new Sprite({ texture, anchor: 0.5 })
+    : new Graphics().circle(0, 0, DRAG.size / 3).fill(itemColor(id));
+  ghost.width = ghost.height = DRAG.size;
+  ghost.alpha = DRAG.alpha;
+  return ghost;
 }
 
 /**

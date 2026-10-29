@@ -1,14 +1,14 @@
 # Ships
 
 Every player starts on the **Starter Sloop** (line `starter`, tier 0). Later ships come in lines: families with their own style
-and role, six tiers each, and the masterworks, bought. The sloop and the whole European line, the **Coastal Bark**
-(the goal of the starting waters, sold at the shipyard once the Captain's path is done), the **Corsair**, the
-**Frigate**, the **Royal Galleon**, the **Admiral** and the **Imperial Ship of the Line** (the next goals, sold the
-same way), are built; the other 54 are planned. `SHIP_LINES` in `src/game/ships/shipLines.ts` lists every line and
+and role, six tiers each, and the masterworks, bought. The sloop and the whole European line, the **Royal Herald**
+(the goal of the starting waters, sold at the shipyard once the Captain's path is done), the **Salamander**, the
+**Peregrine**, the **Crowned Lion**, the **Black Eagle** and the **Sovereign of the Seas** (the next goals, sold the
+same way; named after the beasts and titles of heraldry, each after what its hull shows), are built; the other 54 are planned. `SHIP_LINES` in `src/game/ships/shipLines.ts` lists every line and
 its ships: a planned one has a name, a tier, a role, provisional figures and how it is got, which the shipyard shows
 (its legend and each line's look are in `src/client/hud/shipLore.ts`). A player keeps every ship they buy: one
 sailed, the others laid up in port (`src/game/economy/fleet.ts`). Every ship levels on its own from 1 (the sloop to
-10, a line's ships to ten a tier, 60 at tier 6) and has talents of its own.
+10, a line's ships to ten a tier, 60 at tier 6) and has a talent tree of its own (`src/game/ships/talentTrees.ts`).
 
 ## Lines
 
@@ -24,8 +24,9 @@ sailed, the others laid up in port (`src/game/economy/fleet.ts`). Every ship lev
 
 Tiers 1 → 6, with their ids (built ones in bold):
 
-- **Royal Navies:** **Coastal Bark** (`coastalBark`), **Corsair** (`corsair`), **Frigate** (`frigate`), **Royal
-  Galleon** (`royalGalleon`), **Admiral** (`admiral`), **Imperial Ship of the Line** (`shipOfTheLine`)
+- **Royal Navies:** **Royal Herald** (`coastalBark`), **Salamander** (`corsair`), **Peregrine** (`frigate`), **Crowned
+  Lion** (`royalGalleon`), **Black Eagle** (`admiral`), **Sovereign of the Seas** (`shipOfTheLine`): the ids are
+  their first names, kept so saves, atlases and talent trees stay as they are
 - **Empires of the East:** River Junk (`riverJunk`), Sea Merchant (`seaMerchant`), Dragon Sentinel (`dragonSentinel`),
   Celestial Frigate (`celestialFrigate`), Imperial Junk (`imperialJunk`), Dragon Armada (`dragonArmada`)
 - **Brotherhood of the Black Flag:** Smuggler (`smuggler`), Sea Wolf (`seaWolf`), Black Corsair (`blackCorsair`),
@@ -53,7 +54,7 @@ Sun (`midnightSun`) and Mirage (`mirage`, Forbidden Fleets). Each is bought with
 the same tier of another line at its last level (`tierMastered` in `src/game/economy/shipyard.ts`; the sloop, tier 0,
 opens none).
 
-The planned ships' figures are provisional: the European line's ladder (the Coastal Bark's own at tier 1), each line
+The planned ships' figures are provisional: the European line's ladder (the Royal Herald's own at tier 1), each line
 leaning its own way (the comment over `PLANNED` says how). Harpoon guns come in numbers like the cannons', in its
 line's mix: about even in the European line and the East (a few more harpoon guns there), mostly cannons for the
 pirates, mostly harpoon guns in the North, each ship its own way in the Forbidden Fleets. Each is balanced when it is
@@ -69,6 +70,7 @@ A ship has one id, unique across all lines (`sloop`), and the same `<line>/<id>`
 | Sprite atlases           | `public/sprites/ships/<line>/<id>/[<look>/]<stage>.{webp,json}`, one per damage stage |
 | Size, speed and handling | `SHIP_CLASSES` in `src/game/ships/shipClasses.ts`                                     |
 | Gun slots, starting guns | `slots`, `startingGuns` of its entry in `SHIP_CLASSES`                                |
+| Talent tree              | `TALENT_TREES` in `src/game/ships/talentTrees.ts`                                     |
 | Which atlases exist      | `ART` in `src/client/scene/models/ShipSprite.ts` (stages, looks)                      |
 | Fire and smoke points    | `EMITTERS` in `src/client/scene/effects/ShipFire.ts`                                  |
 
@@ -98,9 +100,15 @@ every frame of its animations from every direction (see the turtle below).
    slots have a gun when the ship is new, from the first: `UNARMED` for a ship the shipyard sells, which comes with none
    (a bot's hull has its kind's guns); `hold` its places for cargo. A line's ship takes `...lineTier(tier)` for its
    `tier`, `maxLevel` (the last level it reaches: ten a tier) and `abilities`; a bot's has its `tier` and `...BOT_HULL`. A ship of the European line keeps to its ladder (the comment over
-   the Coastal Bark): a fight of 20–30 s between two of a tier, and each tier beats two of the tier below. Its `name` is English, in `src/client/i18n/uk.ts`
-   and `ru.ts` (a planned ship's is already there). For the shipyard to sell it, an offer in `SHIP_OFFERS`
-   (`src/game/economy/shipyard.ts`). A class renamed goes in `RENAMED_CLASSES` (`src/game/save.ts`), so a save keeps it.
+   the Royal Herald, `coastalBark`): a fight of 20–30 s between two of a tier, and each tier beats two of the tier below. Its `name` is English, in `src/client/i18n/uk.ts`
+   and `ru.ts` (a planned ship's is already there). The shipyard sells it once it is built: a ship of a
+   line in `LADDER_LINES` (`src/game/economy/shipyard.ts`) by its tier's `TIER_TERMS` (a price, a level, quests, the
+   story), the same for every line, to a player sailing its line's ship of the tier below (after the starter sloop, a
+   tier 1 ship of any of them). The Forbidden Fleets' ships and the masterworks are got their own ways (`OBTAIN`,
+   `src/game/ships/shipLines.ts`), which the shipyard only shows for now. A class renamed goes in `RENAMED_CLASSES` (`src/game/save.ts`), so a save keeps it.
+   Its talent tree goes in `TALENT_TREES` (`src/game/ships/talentTrees.ts`): as long and tangled as its tier asks (the
+   trees of the same tier of the European line show how), every row reachable, more ranks than its points at its last
+   level; its talents' names and branches in `uk.ts` and `ru.ts`.
 4. **Client.** Add the class to `ART` (the stages it has atlases for, and its looks if it has several) and to
    `EMITTERS` (where it burns, in the model's coordinates with y negated, in units of the sloop's size: times
    9 / the class's `radius`).

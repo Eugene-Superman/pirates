@@ -1,0 +1,1010 @@
+{
+ "file": "talents.webp",
+ "tile": 64,
+ "icons": {
+  "sloop.quickHands": [
+   0,
+   0
+  ],
+  "sloop.harpoonDrill": [
+   1,
+   0
+  ],
+  "sloop.tarredPlanks": [
+   2,
+   0
+  ],
+  "sloop.lightRigging": [
+   3,
+   0
+  ],
+  "sloop.shipsCarpenter": [
+   4,
+   0
+  ],
+  "sloop.steadyAim": [
+   5,
+   0
+  ],
+  "coastalBark.quickLoaders": [
+   6,
+   0
+  ],
+  "coastalBark.heavyShot": [
+   7,
+   0
+  ],
+  "coastalBark.harpoonDrill": [
+   8,
+   0
+  ],
+  "coastalBark.steadyHands": [
+   9,
+   0
+  ],
+  "coastalBark.powderMonkeys": [
+   10,
+   0
+  ],
+  "coastalBark.keenEye": [
+   11,
+   0
+  ],
+  "coastalBark.chainShot": [
+   0,
+   1
+  ],
+  "coastalBark.grapeshot": [
+   1,
+   1
+  ],
+  "coastalBark.swift": [
+   2,
+   1
+  ],
+  "coastalBark.nimble": [
+   3,
+   1
+  ],
+  "coastalBark.chaseGuns": [
+   4,
+   1
+  ],
+  "coastalBark.marksmen": [
+   5,
+   1
+  ],
+  "coastalBark.evasiveSailing": [
+   6,
+   1
+  ],
+  "coastalBark.weatherGauge": [
+   7,
+   1
+  ],
+  "coastalBark.bountyHunter": [
+   8,
+   1
+  ],
+  "coastalBark.thickHull": [
+   9,
+   1
+  ],
+  "coastalBark.ironBow": [
+   10,
+   1
+  ],
+  "coastalBark.carpenters": [
+   11,
+   1
+  ],
+  "coastalBark.reinforcedSides": [
+   0,
+   2
+  ],
+  "coastalBark.bilgePumps": [
+   1,
+   2
+  ],
+  "coastalBark.damageControl": [
+   2,
+   2
+  ],
+  "coastalBark.secondWind": [
+   3,
+   2
+  ],
+  "coastalBark.oakAndIron": [
+   4,
+   2
+  ],
+  "corsair.quickLoaders": [
+   5,
+   2
+  ],
+  "corsair.hotShot": [
+   6,
+   2
+  ],
+  "corsair.steadyHands": [
+   7,
+   2
+  ],
+  "corsair.powderMonkeys": [
+   8,
+   2
+  ],
+  "corsair.keenEye": [
+   9,
+   2
+  ],
+  "corsair.harpoonCrews": [
+   10,
+   2
+  ],
+  "corsair.rollingThunder": [
+   11,
+   2
+  ],
+  "corsair.hotBarrels": [
+   0,
+   3
+  ],
+  "corsair.rakingFire": [
+   1,
+   3
+  ],
+  "corsair.rakedMasts": [
+   2,
+   3
+  ],
+  "corsair.sharpHelm": [
+   3,
+   3
+  ],
+  "corsair.marksmen": [
+   4,
+   3
+  ],
+  "corsair.crowdSail": [
+   5,
+   3
+  ],
+  "corsair.evasiveSailing": [
+   6,
+   3
+  ],
+  "corsair.chaseGuns": [
+   7,
+   3
+  ],
+  "corsair.sharpshooters": [
+   8,
+   3
+  ],
+  "corsair.plunderer": [
+   9,
+   3
+  ],
+  "corsair.hiddenHold": [
+   10,
+   3
+  ],
+  "corsair.oakPlanking": [
+   11,
+   3
+  ],
+  "corsair.bosunsMates": [
+   0,
+   4
+  ],
+  "corsair.reinforcedSides": [
+   1,
+   4
+  ],
+  "corsair.ironBow": [
+   2,
+   4
+  ],
+  "corsair.damageControl": [
+   3,
+   4
+  ],
+  "corsair.tarredSeams": [
+   4,
+   4
+  ],
+  "corsair.bilgePumps": [
+   5,
+   4
+  ],
+  "corsair.secondWind": [
+   6,
+   4
+  ],
+  "corsair.ironKeel": [
+   7,
+   4
+  ],
+  "frigate.longBarrels": [
+   8,
+   4
+  ],
+  "frigate.gunDrill": [
+   9,
+   4
+  ],
+  "frigate.keenEye": [
+   10,
+   4
+  ],
+  "frigate.heavyShot": [
+   11,
+   4
+  ],
+  "frigate.marksmen": [
+   0,
+   5
+  ],
+  "frigate.rakingFire": [
+   1,
+   5
+  ],
+  "frigate.steadyHands": [
+   2,
+   5
+  ],
+  "frigate.harpoonCrews": [
+   3,
+   5
+  ],
+  "frigate.rollingThunder": [
+   4,
+   5
+  ],
+  "frigate.chainShot": [
+   5,
+   5
+  ],
+  "frigate.doubleShotted": [
+   6,
+   5
+  ],
+  "frigate.crowsNest": [
+   7,
+   5
+  ],
+  "frigate.cleanHull": [
+   8,
+   5
+  ],
+  "frigate.weatherHelm": [
+   9,
+   5
+  ],
+  "frigate.chaseGuns": [
+   10,
+   5
+  ],
+  "frigate.sharpshooters": [
+   11,
+   5
+  ],
+  "frigate.evasiveSailing": [
+   0,
+   6
+  ],
+  "frigate.darkLanterns": [
+   1,
+   6
+  ],
+  "frigate.gatheringWay": [
+   2,
+   6
+  ],
+  "frigate.eagleEye": [
+   3,
+   6
+  ],
+  "frigate.weatherGauge": [
+   4,
+   6
+  ],
+  "frigate.tarredSeams": [
+   5,
+   6
+  ],
+  "frigate.carpenters": [
+   6,
+   6
+  ],
+  "frigate.reinforcedSides": [
+   7,
+   6
+  ],
+  "frigate.ironBow": [
+   8,
+   6
+  ],
+  "frigate.damageControl": [
+   9,
+   6
+  ],
+  "frigate.bulwarks": [
+   10,
+   6
+  ],
+  "frigate.oakPlanking": [
+   11,
+   6
+  ],
+  "frigate.bilgePumps": [
+   0,
+   7
+  ],
+  "frigate.holdFast": [
+   1,
+   7
+  ],
+  "frigate.secondWind": [
+   2,
+   7
+  ],
+  "frigate.ironKeel": [
+   3,
+   7
+  ],
+  "royalGalleon.heavyShot": [
+   4,
+   7
+  ],
+  "royalGalleon.gunCrews": [
+   5,
+   7
+  ],
+  "royalGalleon.fullBroadside": [
+   6,
+   7
+  ],
+  "royalGalleon.steadyHands": [
+   7,
+   7
+  ],
+  "royalGalleon.keenEye": [
+   8,
+   7
+  ],
+  "royalGalleon.rollingThunder": [
+   9,
+   7
+  ],
+  "royalGalleon.harpoonCrews": [
+   10,
+   7
+  ],
+  "royalGalleon.chainShot": [
+   11,
+   7
+  ],
+  "royalGalleon.doubleShotted": [
+   0,
+   8
+  ],
+  "royalGalleon.mainCourses": [
+   1,
+   8
+  ],
+  "royalGalleon.bigRudder": [
+   2,
+   8
+  ],
+  "royalGalleon.longGuns": [
+   3,
+   8
+  ],
+  "royalGalleon.sharpshooters": [
+   4,
+   8
+  ],
+  "royalGalleon.evasiveSailing": [
+   5,
+   8
+  ],
+  "royalGalleon.gatheringWay": [
+   6,
+   8
+  ],
+  "royalGalleon.heavyWeather": [
+   7,
+   8
+  ],
+  "royalGalleon.eagleEye": [
+   8,
+   8
+  ],
+  "royalGalleon.weatherGauge": [
+   9,
+   8
+  ],
+  "royalGalleon.oakPlanking": [
+   10,
+   8
+  ],
+  "royalGalleon.shipwrights": [
+   11,
+   8
+  ],
+  "royalGalleon.reinforcedSides": [
+   0,
+   9
+  ],
+  "royalGalleon.damageControl": [
+   1,
+   9
+  ],
+  "royalGalleon.bulwarks": [
+   2,
+   9
+  ],
+  "royalGalleon.ironBow": [
+   3,
+   9
+  ],
+  "royalGalleon.bilgePumps": [
+   4,
+   9
+  ],
+  "royalGalleon.holdFast": [
+   5,
+   9
+  ],
+  "royalGalleon.secondWind": [
+   6,
+   9
+  ],
+  "royalGalleon.ironKeel": [
+   7,
+   9
+  ],
+  "royalGalleon.deepHold": [
+   8,
+   9
+  ],
+  "royalGalleon.finePowder": [
+   9,
+   9
+  ],
+  "royalGalleon.doublePay": [
+   10,
+   9
+  ],
+  "royalGalleon.salvagers": [
+   11,
+   9
+  ],
+  "royalGalleon.gildedChests": [
+   0,
+   10
+  ],
+  "royalGalleon.prizeCrew": [
+   1,
+   10
+  ],
+  "royalGalleon.hiredMarines": [
+   2,
+   10
+  ],
+  "royalGalleon.royalTreasury": [
+   3,
+   10
+  ],
+  "royalGalleon.letterOfMarque": [
+   4,
+   10
+  ],
+  "admiral.gunDrill": [
+   5,
+   10
+  ],
+  "admiral.heavyShot": [
+   6,
+   10
+  ],
+  "admiral.fullBroadside": [
+   7,
+   10
+  ],
+  "admiral.steadyHands": [
+   8,
+   10
+  ],
+  "admiral.keenEye": [
+   9,
+   10
+  ],
+  "admiral.rollingThunder": [
+   10,
+   10
+  ],
+  "admiral.harpoonCrews": [
+   11,
+   10
+  ],
+  "admiral.thunderOfTheFlag": [
+   0,
+   11
+  ],
+  "admiral.chainShot": [
+   1,
+   11
+  ],
+  "admiral.cleanHull": [
+   2,
+   11
+  ],
+  "admiral.bigRudder": [
+   3,
+   11
+  ],
+  "admiral.longGuns": [
+   4,
+   11
+  ],
+  "admiral.sharpshooters": [
+   5,
+   11
+  ],
+  "admiral.evasiveSailing": [
+   6,
+   11
+  ],
+  "admiral.gatheringWay": [
+   7,
+   11
+  ],
+  "admiral.darkLanterns": [
+   8,
+   11
+  ],
+  "admiral.eagleEye": [
+   9,
+   11
+  ],
+  "admiral.windward": [
+   10,
+   11
+  ],
+  "admiral.oakPlanking": [
+   11,
+   11
+  ],
+  "admiral.shipwrights": [
+   0,
+   12
+  ],
+  "admiral.reinforcedSides": [
+   1,
+   12
+  ],
+  "admiral.damageControl": [
+   2,
+   12
+  ],
+  "admiral.bulwarks": [
+   3,
+   12
+  ],
+  "admiral.ironBow": [
+   4,
+   12
+  ],
+  "admiral.bilgePumps": [
+   5,
+   12
+  ],
+  "admiral.holdFast": [
+   6,
+   12
+  ],
+  "admiral.ironKeel": [
+   7,
+   12
+  ],
+  "admiral.secondWind": [
+   8,
+   12
+  ],
+  "admiral.drillMaster": [
+   9,
+   12
+  ],
+  "admiral.veteranOfficers": [
+   10,
+   12
+  ],
+  "admiral.battleCry": [
+   11,
+   12
+  ],
+  "admiral.flagCaptain": [
+   0,
+   13
+  ],
+  "admiral.holdTheLine": [
+   1,
+   13
+  ],
+  "admiral.signalFlags": [
+   2,
+   13
+  ],
+  "admiral.fightingTops": [
+   3,
+   13
+  ],
+  "admiral.admiralsFlag": [
+   4,
+   13
+  ],
+  "admiral.drumsOfWar": [
+   5,
+   13
+  ],
+  "shipOfTheLine.heavyShot": [
+   6,
+   13
+  ],
+  "shipOfTheLine.fullCharges": [
+   7,
+   13
+  ],
+  "shipOfTheLine.fullBroadside": [
+   8,
+   13
+  ],
+  "shipOfTheLine.rollingThunder": [
+   9,
+   13
+  ],
+  "shipOfTheLine.rakingFire": [
+   10,
+   13
+  ],
+  "shipOfTheLine.ironRain": [
+   11,
+   13
+  ],
+  "shipOfTheLine.gunDrill": [
+   0,
+   14
+  ],
+  "shipOfTheLine.redHotShot": [
+   1,
+   14
+  ],
+  "shipOfTheLine.broadsideDrill": [
+   2,
+   14
+  ],
+  "shipOfTheLine.thunderOfThreeDecks": [
+   3,
+   14
+  ],
+  "shipOfTheLine.chainShot": [
+   4,
+   14
+  ],
+  "shipOfTheLine.quickLoaders": [
+   5,
+   14
+  ],
+  "shipOfTheLine.harpoonCrews": [
+   6,
+   14
+  ],
+  "shipOfTheLine.longGuns": [
+   7,
+   14
+  ],
+  "shipOfTheLine.keenEye": [
+   8,
+   14
+  ],
+  "shipOfTheLine.steadyHands": [
+   9,
+   14
+  ],
+  "shipOfTheLine.gunCaptains": [
+   10,
+   14
+  ],
+  "shipOfTheLine.swivelCrews": [
+   11,
+   14
+  ],
+  "shipOfTheLine.twinBatteries": [
+   0,
+   15
+  ],
+  "shipOfTheLine.gunDeckDiscipline": [
+   1,
+   15
+  ],
+  "shipOfTheLine.barbedHarpoons": [
+   2,
+   15
+  ],
+  "shipOfTheLine.oakPlanking": [
+   3,
+   15
+  ],
+  "shipOfTheLine.shipwrights": [
+   4,
+   15
+  ],
+  "shipOfTheLine.reinforcedSides": [
+   5,
+   15
+  ],
+  "shipOfTheLine.damageControl": [
+   6,
+   15
+  ],
+  "shipOfTheLine.bulwarks": [
+   7,
+   15
+  ],
+  "shipOfTheLine.ironBow": [
+   8,
+   15
+  ],
+  "shipOfTheLine.bilgePumps": [
+   9,
+   15
+  ],
+  "shipOfTheLine.holdFast": [
+   10,
+   15
+  ],
+  "shipOfTheLine.secondPlanking": [
+   11,
+   15
+  ],
+  "shipOfTheLine.oakAndIron": [
+   0,
+   16
+  ],
+  "shipOfTheLine.ironKeel": [
+   1,
+   16
+  ],
+  "shipOfTheLine.bigRudder": [
+   2,
+   16
+  ],
+  "shipOfTheLine.mainCourses": [
+   3,
+   16
+  ],
+  "shipOfTheLine.drillMaster": [
+   4,
+   16
+  ],
+  "shipOfTheLine.flagCaptain": [
+   5,
+   16
+  ],
+  "shipOfTheLine.holdTheLine": [
+   6,
+   16
+  ],
+  "shipOfTheLine.battleCry": [
+   7,
+   16
+  ],
+  "shipOfTheLine.signalFlags": [
+   8,
+   16
+  ],
+  "shipOfTheLine.fightingTops": [
+   9,
+   16
+  ],
+  "shipOfTheLine.prideOfTheLine": [
+   10,
+   16
+  ],
+  "shipOfTheLine.drumsOfWar": [
+   11,
+   16
+  ],
+  "broadside": [
+   0,
+   17
+  ],
+  "fullSail": [
+   1,
+   17
+  ],
+  "ambush": [
+   2,
+   17
+  ],
+  "relentless": [
+   3,
+   17
+  ],
+  "seasonedCrew": [
+   4,
+   17
+  ],
+  "grogRations": [
+   5,
+   17
+  ],
+  "lastStand": [
+   6,
+   17
+  ],
+  "unsinkable": [
+   7,
+   17
+  ],
+  "rocket": [
+   8,
+   17
+  ],
+  "powderKeg": [
+   9,
+   17
+  ],
+  "masterGunner": [
+   10,
+   17
+  ],
+  "ironDiscipline": [
+   11,
+   17
+  ],
+  "coupDeGrace": [
+   0,
+   18
+  ],
+  "spoilsOfBattle": [
+   1,
+   18
+  ],
+  "terrorOfTheSeas": [
+   2,
+   18
+  ],
+  "heartOfOak": [
+   3,
+   18
+  ],
+  "gunDeckDrill": [
+   4,
+   18
+  ],
+  "carpentersWatch": [
+   5,
+   18
+  ],
+  "bombardment": [
+   6,
+   18
+  ],
+  "royalStandard": [
+   7,
+   18
+  ],
+  "thunderOfTheFleet": [
+   8,
+   18
+  ],
+  "neverStrike": [
+   9,
+   18
+  ],
+  "rulerOfTheWaves": [
+   10,
+   18
+  ],
+  "floatingFortress": [
+   11,
+   18
+  ],
+  "signatures": [
+   0,
+   19
+  ],
+  "sloop/crew": [
+   1,
+   19
+  ],
+  "coastalBark/gunnery": [
+   2,
+   19
+  ],
+  "coastalBark/seamanship": [
+   3,
+   19
+  ],
+  "coastalBark/hull": [
+   4,
+   19
+  ],
+  "corsair/raidersGuns": [
+   5,
+   19
+  ],
+  "corsair/seaWolf": [
+   6,
+   19
+  ],
+  "corsair/hull": [
+   7,
+   19
+  ],
+  "frigate/longGuns": [
+   8,
+   19
+  ],
+  "frigate/navysEyes": [
+   9,
+   19
+  ],
+  "frigate/hull": [
+   10,
+   19
+  ],
+  "royalGalleon/broadsides": [
+   11,
+   19
+  ],
+  "royalGalleon/seamanship": [
+   0,
+   20
+  ],
+  "royalGalleon/oakWalls": [
+   1,
+   20
+  ],
+  "royalGalleon/treasure": [
+   2,
+   20
+  ],
+  "admiral/flagGunnery": [
+   3,
+   20
+  ],
+  "admiral/seamanship": [
+   4,
+   20
+  ],
+  "admiral/hull": [
+   5,
+   20
+  ],
+  "admiral/command": [
+   6,
+   20
+  ],
+  "shipOfTheLine/lowerDeck": [
+   7,
+   20
+  ],
+  "shipOfTheLine/upperDeck": [
+   8,
+   20
+  ],
+  "shipOfTheLine/oakWalls": [
+   9,
+   20
+  ],
+  "shipOfTheLine/quarterdeck": [
+   10,
+   20
+  ]
+ }
+}

@@ -1,0 +1,86 @@
+{
+ "file": "arrows.webp",
+ "tile": 96,
+ "icons": {
+  "downIvory": [
+   0,
+   0
+  ],
+  "downRuby": [
+   0,
+   1
+  ],
+  "upSpear": [
+   0,
+   2
+  ],
+  "upViolet": [
+   0,
+   3
+  ],
+  "downEmerald": [
+   1,
+   0
+  ],
+  "downWinged": [
+   1,
+   1
+  ],
+  "upCyan": [
+   1,
+   2
+  ],
+  "upGold": [
+   1,
+   3
+  ],
+  "downSteel": [
+   2,
+   0
+  ],
+  "downGreen": [
+   2,
+   1
+  ],
+  "upRuby": [
+   2,
+   2
+  ],
+  "upAnchor": [
+   2,
+   3
+  ],
+  "downGold": [
+   3,
+   0
+  ],
+  "downCyan": [
+   3,
+   1
+  ],
+  "upCrescent": [
+   3,
+   2
+  ],
+  "upJade": [
+   3,
+   3
+  ],
+  "downMoon": [
+   4,
+   0
+  ],
+  "downStar": [
+   4,
+   1
+  ],
+  "upEmerald": [
+   4,
+   2
+  ],
+  "upFlame": [
+   4,
+   3
+  ]
+ }
+}

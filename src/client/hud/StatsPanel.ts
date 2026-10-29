@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, type Rectangle } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, type Rectangle } from 'pixi.js';
 import {
   BOT_KINDS,
   GOLD_REASONS,
@@ -14,22 +14,44 @@ import {
   type Stats,
   type WeaponId,
 } from '../../game';
-import { SHIP_ICONS } from './iconAtlas';
-import { BRASS, THEME, THEMED_WINDOW, TITLE_STYLE, drawCard, drawDivider, iconSlot, subheading } from './theme';
-import { HudWindow, Tile, UI, drawSail, show, text, tierColor, tint, whole } from './ui';
+import { MINIMAP_BUTTONS, SHIP_ICONS, type MinimapButtonId } from './iconAtlas';
+import {
+  NIGHT,
+  NIGHT_HEADER,
+  NIGHT_TAB,
+  NIGHT_WINDOW,
+  emblemMiddle,
+  nightBoard,
+  nightDivider,
+  nightEmblem,
+  nightHeader,
+  type NightBoardLayout,
+} from './nightTheme';
+import { THEME, iconSlot } from './theme';
+import { HudWindow, Tile, UI, drawSail, goldCoin, show, text, tierColor, tint, whole } from './ui';
 import { t } from '../i18n/i18n';
 
-const WIDTH = 980; // pixels, before scaling down to fit the screen
+const WIDTH = 1000; // pixels, before scaling down to fit the screen
 const PAD = 24;
-const DIVIDER = PAD + 50; // the gold line under the title
-const TOP = DIVIDER + 16; // where the tabs and the columns start
-const TAB = { width: 230, height: 56, gap: 8, icon: 42 } as const; // pixels: a ship's tab, and its picture's slot
-const COLUMNS_X = PAD + TAB.width + 20;
-const COLUMN_GAP = 16;
+const DIVIDER = PAD + NIGHT_HEADER.rule; // the gold line under the header
+const HEADER_MIDDLE = PAD + NIGHT_HEADER.middle; // pixels: the header's middle, down the window
+const NOTE_GAP = 20; // pixels between the title and the line beside it
+const CLOSE_ROOM = 70; // pixels the line beside the title keeps clear of the window's right edge: its gold cross
+const TOP = DIVIDER + 18; // pixels: the tabs' and the boards' top
+const BOTTOM = PAD + 14; // pixels under the taller column, clear of the window's bottom corner pieces
+const TAB = { width: 230, height: 58, gap: 10, icon: 44 } as const; // pixels: a ship's tab, and its picture's slot
+const COLUMNS_X = PAD + TAB.width + 18;
+const COLUMN_GAP = 14;
 const COLUMN_WIDTH = (WIDTH - COLUMNS_X - PAD - COLUMN_GAP) / 2;
-const SECTION = { pad: 12, heading: 30, gap: 12 } as const; // pixels: inside a section's board, its heading, between two
+// A section's board, pixels: inside it, its corner pieces (high), its emblem's radius, its heading
+const BOARD: NightBoardLayout = { pad: 18, corner: 24, emblem: 16, heading: { y: 12, size: 17 } };
+const BOARD_GAP = 14; // pixels between two boards
+const BOARD_STAR = 120; // pixels: the painted star of the divider under a board's heading, across
+// Pixels down a board: the divider under its heading, its first line, and the room under its last
+const LINES = { divider: 48, top: 58, bottom: 18 } as const;
 const ROW = 22; // pixels a line
 const INDENT = 14; // pixels a part of the line above is set in
+const SHADE = 0.04; // how light every other line is
 const REFRESH = 0.5; // seconds between two refreshes while open: the numbers grow as the game goes on
 const ALL_SHIPS = 0xc99a45; // the glow of the "all ships" tab's slot: brass
 
@@ -55,6 +77,12 @@ interface Line {
   readonly value?: string;
   readonly color?: number;
   readonly part?: boolean;
+}
+
+/** A section's board: its lines, the first its heading; its emblem a painted button of the minimap's, or the gold coin */
+interface Section {
+  readonly lines: readonly Line[];
+  readonly emblem: MinimapButtonId | 'gold';
 }
 
 /** A tab: all the player's ships together, or one of them */
@@ -84,14 +112,15 @@ function distance(units: number) {
 
 /** A part of the line above, or a count still at nothing, is dim */
 function labelColor(line: Line) {
-  return line.color === THEME.dim || line.part ? THEME.dim : THEME.text;
+  return line.color === NIGHT.dim || line.part ? NIGHT.dim : THEME.text;
 }
 
 /**
- * The statistics (I, or a click on the player's frame), in the windows' theme: what the player has done, all their
- * ships together, and each ship's own: the ship sailed and the ones laid up in port, a tab each with its picture. Ships
- * and monsters sunk by kind, the fight, the gold and the voyage, each on a board of its own. Counted by the game
- * (records/stats.ts) for the medals to come. Closed by Close, Escape, I or a click beside it
+ * The statistics (I, or a click on the player's frame), in the night look like the hold: what the player has done,
+ * all their ships together, and each ship's own: the ship sailed and the ones laid up in port, a tab each with its
+ * picture, lit while its page shows. Ships and monsters sunk by kind, the fight, the gold and the voyage, each on a
+ * board of blue glass under a painted emblem. Counted by the game (records/stats.ts) for the medals to come. Closed by
+ * its gold cross, Escape, I or a click beside it
  */
 export class StatsPanel {
   readonly container: Container;
@@ -103,36 +132,42 @@ export class StatsPanel {
   private sinceRefresh = Infinity;
   /** What the tabs were built for, so they are rebuilt only when the fleet changes */
   private tabsFor = '';
+  /** How tall the tabs are, and the columns: not their bounds, which take in a lit tab's moonlight round it */
+  private tabsHeight = 0;
+  private columnsHeight = 0;
   /** The sections' texts in the order of their lines: a heading's and its total, or a line's label and value */
   private cells: { readonly label: Text; readonly value: Text; readonly heading: boolean }[] = [];
   /** How many lines each section had when the cells were made: they are made again only when that changes */
   private cellsFor = '';
   /** As tall as the tabs or the columns, whichever is taller; it only grows, so a tab picked doesn't jolt it */
-  private height = TOP + PAD;
+  private height = TOP + BOTTOM;
 
   constructor(screen: Rectangle) {
     this.window = new HudWindow(
       screen,
       { width: WIDTH, height: this.height, pad: PAD },
       () => this.hide(),
-      THEMED_WINDOW,
+      NIGHT_WINDOW,
     );
     this.container = this.window.container;
-    const title = new Text({ text: t('Statistics'), style: { ...TITLE_STYLE, fontSize: 28 } });
-    title.position.set(PAD, PAD - 6);
-    const note = text(t('What you have done at sea: all your ships together, or each one'), 13, THEME.dim);
-    note.position.set(PAD, PAD + 30);
+
+    // The header: a star, the title, a line about the window beside it, and Close
+    const header = nightHeader(WIDTH, PAD, t('Statistics'));
+    const noteLeft = header.title.x + header.title.width + NOTE_GAP;
+    const note = text(t('What you have done at sea: all your ships together, or each one'), 13, NIGHT.dim, {
+      wordWrap: true,
+      wordWrapWidth: WIDTH - noteLeft - CLOSE_ROOM,
+      lineHeight: 16,
+    });
+    note.anchor.set(0, 0.5);
+    note.position.set(noteLeft, HEADER_MIDDLE + 2);
+
     this.tabs.position.set(PAD, TOP);
     this.columns.position.set(COLUMNS_X, TOP);
-    this.window.panel.addChild(
-      title,
-      note,
-      drawDivider(new Graphics(), PAD, DIVIDER, WIDTH - PAD * 2),
-      this.tabs,
-      this.columns,
-    );
-    // The tabs again with the ships' pictures, once they are there
+    this.window.panel.addChild(header.container, note, this.tabs, this.columns);
+    // The tabs and the boards again with their pictures, once they are there
     SHIP_ICONS.load(() => (this.tabsFor = ''));
+    MINIMAP_BUTTONS.load(() => (this.cellsFor = ''));
   }
 
   get isOpen() {
@@ -163,7 +198,7 @@ export class StatsPanel {
             ? state.ship.stats
             : state.player.fleet[this.picked - 1].stats;
       this.showColumns(stats, this.picked < 0);
-      const needed = TOP + Math.max(this.tabs.height, this.columns.height) + PAD;
+      const needed = TOP + Math.max(this.tabsHeight, this.columnsHeight) + BOTTOM;
       if (needed > this.height) {
         this.height = needed;
         this.window.resize(needed);
@@ -204,9 +239,10 @@ export class StatsPanel {
       tab.position.set(0, i * (TAB.height + TAB.gap));
       this.tabs.addChild(tab);
     });
+    this.tabsHeight = entries.length * (TAB.height + TAB.gap) - TAB.gap;
   }
 
-  /** A tab: the ship's picture in a slot lit in its tier's colour, its name and level; gold while picked */
+  /** A tab: the ship's picture in a slot lit in its tier's colour, its name and level; lit, its name gold, while picked */
   private tab(entry: Entry, index: number) {
     const picked = index === this.picked;
     const tile = new Tile(
@@ -216,8 +252,8 @@ export class StatsPanel {
         this.picked = index;
         this.sinceRefresh = Infinity;
       },
-      6,
-      BRASS,
+      0,
+      NIGHT_TAB,
     );
     tile.setLook({ pressed: picked });
     const shipClass = entry.shipClass ? SHIP_CLASSES[entry.shipClass] : null;
@@ -229,12 +265,12 @@ export class StatsPanel {
       sail.position.set(TAB.icon / 2, TAB.icon / 2);
       slot.container.addChildAt(sail, 1);
     }
-    slot.container.position.set(7, (TAB.height - TAB.icon) / 2);
-    const x = 7 + TAB.icon + 12;
-    const name = text(entry.name, 14, picked ? THEME.darkText : THEME.text, { fontWeight: 'bold' });
-    name.position.set(x, 10);
-    const note = text(entry.note, 11, picked ? THEME.darkText : THEME.dim);
-    note.position.set(x, 30);
+    slot.container.position.set(8, (TAB.height - TAB.icon) / 2);
+    const x = 8 + TAB.icon + 12;
+    const name = text(entry.name, 14, picked ? THEME.title : THEME.text, { fontWeight: 'bold' });
+    name.position.set(x, 11);
+    const note = text(entry.note, 11, picked ? THEME.text : NIGHT.dim);
+    note.position.set(x, 32);
     tile.content.addChild(slot.container, name, note);
     return tile.container;
   }
@@ -251,7 +287,7 @@ export class StatsPanel {
         label: t(shipClass.name),
         value: whole(n),
         part: true,
-        color: n === 0 ? THEME.dim : BOSSES.has(shipClass.id) ? THEME.title : THEME.text,
+        color: n === 0 ? NIGHT.dim : BOSSES.has(shipClass.id) ? THEME.title : THEME.text,
       });
     }
     const fight: Line[] = [
@@ -283,61 +319,90 @@ export class StatsPanel {
       { label: t('Time in port'), value: duration(stats.timeInPort) },
       { label: t('Hull mended at sea'), value: whole(stats.repaired) },
     ];
-    const shape = [kills, fight, gold, voyage].map((section) => section.length).join();
+    const left: Section[] = [
+      { lines: kills, emblem: 'bestiary' },
+      { lines: fight, emblem: 'loadout' },
+    ];
+    const right: Section[] = [
+      { lines: gold, emblem: 'gold' },
+      { lines: voyage, emblem: 'world' },
+    ];
+    const sections = [...left, ...right];
+    const shape = sections.map((section) => section.lines.length).join();
     if (shape !== this.cellsFor) {
       this.cellsFor = shape;
       for (const child of this.columns.removeChildren()) child.destroy({ children: true });
       this.cells = [];
-      this.column([kills, fight], 0);
-      this.column([gold, voyage], COLUMN_WIDTH + COLUMN_GAP);
+      this.columnsHeight = Math.max(this.column(left, 0), this.column(right, COLUMN_WIDTH + COLUMN_GAP));
     }
-    [kills, fight, gold, voyage].flat().forEach((line, i) => {
-      const { label, value, heading } = this.cells[i];
-      show(label, line.label);
-      show(value, line.value ?? '');
-      if (heading) return;
-      tint(label, labelColor(line));
-      tint(value, line.color ?? THEME.text);
-    });
+    sections
+      .flatMap((section) => section.lines)
+      .forEach((line, i) => {
+        const { label, value, heading } = this.cells[i];
+        show(label, line.label);
+        show(value, line.value ?? '');
+        if (heading) return;
+        tint(label, labelColor(line));
+        tint(value, line.color ?? THEME.text);
+      });
   }
 
-  /** Sections one under another, each on its board: a gold heading, then its lines, every other one shaded */
-  private column(sections: readonly (readonly Line[])[], x: number) {
+  /**
+   * Boards one under another at `x`, each of blue glass under its emblem: a gold heading and its total, a divider, then
+   * its lines, every other one lit a little. How tall they are together
+   */
+  private column(sections: readonly Section[], x: number) {
     let y = 0;
-    for (const [heading, ...lines] of sections) {
-      const height = SECTION.pad * 2 + SECTION.heading + lines.length * ROW;
-      const board = drawCard(new Graphics(), COLUMN_WIDTH, height);
+    for (const { lines: all, emblem } of sections) {
+      const [heading, ...lines] = all;
+      const height = LINES.top + lines.length * ROW + LINES.bottom;
+      const {
+        container: board,
+        card: glass,
+        title,
+      } = nightBoard(COLUMN_WIDTH, height, BOARD, boardEmblem(emblem), heading.label);
       board.position.set(x, y);
+      const shaded = COLUMN_WIDTH - (BOARD.pad - 6) * 2;
       lines.forEach((_, i) => {
         if (i % 2 === 0) return;
-        board
-          .rect(SECTION.pad - 4, SECTION.pad + SECTION.heading + i * ROW, COLUMN_WIDTH - (SECTION.pad - 4) * 2, ROW)
-          .fill({ color: 0xffffff, alpha: 0.035 });
+        glass.roundRect(BOARD.pad - 6, LINES.top + i * ROW, shaded, ROW, 3).fill({ color: 0xffffff, alpha: SHADE });
       });
-      const title = subheading(heading.label, 16);
-      title.position.set(x + SECTION.pad, y + SECTION.pad - 2);
       // Its total, if it has one, in plain figures: the serif's old-style 0 reads as an o
       const total = text(heading.value ?? '', 15, THEME.title, { fontWeight: 'bold' });
       total.anchor.set(1, 0.5);
-      total.position.set(x + COLUMN_WIDTH - SECTION.pad, title.y + title.height / 2);
-      board
-        .rect(SECTION.pad, SECTION.pad + SECTION.heading - 5, COLUMN_WIDTH - SECTION.pad * 2, 1)
-        .fill({ color: THEME.brass, alpha: 0.35 });
-      this.columns.addChild(board, title, total);
+      total.position.set(COLUMN_WIDTH - BOARD.pad, emblemMiddle(BOARD));
+      const divider = nightDivider(COLUMN_WIDTH - BOARD.pad * 2, BOARD_STAR);
+      divider.position.set(BOARD.pad, LINES.divider);
+      board.addChild(total, divider);
       this.cells.push({ label: title, value: total, heading: true });
-      let row = y + SECTION.pad + SECTION.heading;
-      for (const line of lines) {
+      lines.forEach((line, i) => {
+        const middle = LINES.top + i * ROW + ROW / 2;
         const label = text(line.label, 13, labelColor(line));
         label.anchor.set(0, 0.5);
-        label.position.set(x + SECTION.pad + (line.part ? INDENT : 0), row + ROW / 2);
+        label.position.set(BOARD.pad + (line.part ? INDENT : 0), middle);
         const value = text(line.value ?? '', 13, line.color ?? THEME.text, { fontWeight: 'bold' });
         value.anchor.set(1, 0.5);
-        value.position.set(x + COLUMN_WIDTH - SECTION.pad, row + ROW / 2);
-        this.columns.addChild(label, value);
+        value.position.set(COLUMN_WIDTH - BOARD.pad, middle);
+        board.addChild(label, value);
         this.cells.push({ label, value, heading: false });
-        row += ROW;
-      }
-      y += height + SECTION.gap;
+      });
+      this.columns.addChild(board);
+      y += height + BOARD_GAP;
     }
+    return y - BOARD_GAP;
   }
+}
+
+/**
+ * A board's emblem round (0, 0) in a dark well under a brass ring: a minimap button's painting (empty till it loads),
+ * or the gold coin
+ */
+function boardEmblem(id: Section['emblem']) {
+  if (id === 'gold') return nightEmblem(BOARD.emblem, goldCoin(BOARD.emblem - 4));
+  const painted = MINIMAP_BUTTONS.get(id);
+  if (!painted) return nightEmblem(BOARD.emblem);
+  const sprite = new Sprite(painted);
+  sprite.anchor.set(0.5);
+  sprite.setSize(BOARD.emblem * 2 - 2);
+  return nightEmblem(BOARD.emblem, sprite);
 }

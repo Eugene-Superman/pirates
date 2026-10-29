@@ -152,7 +152,7 @@ const EMITTERS: Readonly<Partial<Record<ShipClassId, { burning: Emitter[]; sinki
       { x: -12.3, y: 0.7, z: 7.5, spread: [1, 1, 0.2] },
     ],
   },
-  // Matches blender-assets/ships/european/shipOfTheLine/build.py (y negated, times 9 / its radius 22): the Admiral's
+  // Matches blender-assets/ships/european/shipOfTheLine/build.py (y negated, times 9 / its radius 22): the Black Eagle's
   // places on a ship 15% larger with its decks a little higher
   shipOfTheLine: {
     burning: [
