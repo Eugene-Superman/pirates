@@ -22,17 +22,17 @@ export const SHIP_LORE: Readonly<Record<LineShipId, string>> = {
   sloop:
     'One mast, a handful of guns and a crew that has just signed on. Every captain of Saltwind starts on one, and the old ones still speak of theirs fondly.',
   coastalBark:
-    'Built in the yards of Saltwind for the coastal patrols: twice the guns of a sloop behind a stout oak hull, two masts and the royal crest on the main course. Not the fastest on the sea, but it answers for itself.',
+    "Built in the yards of Saltwind to carry the crown's word along the coasts: white sails on two masts, a hull banded in royal blue and gilt, the royal crest over its stern. Where it drops anchor the king's law has come, with twice a sloop's guns behind it.",
   corsair:
-    "A raider under a royal letter of marque: lean, quick for its guns and painted in the king's blue. Its captains take what the crown's enemies carry and keep a share of it.",
+    'Named for the beast that lives in fire unharmed, it sails under canvas the orange of flame, a crowned gilt salamander leaning over the iron ram at its bow. A raider under a royal letter of marque, it goes through broadsides as its namesake goes through fire.',
   frigate:
-    'The eyes of the navy: a long, fast hull with two gun decks and raked masts under sharp orange and lilac sails. It finds the enemy first, and when it must, it fights well above its size.',
+    'Named for the swiftest of falcons: a long, fine hull, raked masts and sharp sails in the orange and lilac of dawn. It sights its prey first and stoops on it out of the rising sun, as the falcon does, a gilt lance aimed from the sunburst at its beak.',
   royalGalleon:
-    'A deep hull with gilded galleries that brings the treasure fleets home. Its holds are full of silver and its decks bristle with guns, for every pirate knows what it carries.',
+    "The king's own treasure galleon: a crimson hull under gilt, silver sails on four masts, a crowned lion at its beak and a great gilt crown over its stern. It brings the treasure fleets' silver home, and the pirates who know what it carries know its broadside too.",
   admiral:
-    "The flagship of a squadron, the admiral's pennant at the main and a band playing on the quarterdeck. Its signals move whole fleets, and its broadsides end the battles they start.",
+    "A flagship built to strike fear: three gun decks of black banded in gold, towering black sails hemmed with gilt and a gilt eagle spreading its wings at its head. When it rises on the horizon, the crown's squadrons form up behind it and the enemy's scatter.",
   shipOfTheLine:
-    "Three gun decks, a hundred ports and the emperor's arms carved across the stern. When it opens fire the sea itself seems to shake. There are few of them, and fewer captains who have faced one.",
+    "The mightiest ship afloat, gold from waterline to truck: cloth-of-gold sails, emerald strakes along three gun decks and a great gilt sun over its stern. Its fins and tail are a shark's, cast in gold, for it rules the sea as the shark rules the deep.",
   riverJunk:
     'A flat-bottomed junk from the great rivers, with ribbed red sails and an eye painted on its bow to see the way. It slips through shallows where deeper keels run aground.',
   seaMerchant:

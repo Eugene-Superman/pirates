@@ -44,6 +44,14 @@ export function arrivalPoint(state: GameState, nav: NavGrid, from: ZoneId, clear
 }
 
 /**
+ * Whether a sea is open to a ship of this tier: not one of a higher tier than its own. The gates keep to it, a ship
+ * taken to sea from a port (economy/fleet.ts, fitsSea), and the client's charts and pointers with them
+ */
+export function seaOpenTo(zone: ZoneId, shipTier: number) {
+  return ZONES[zone].tier <= shipTier;
+}
+
+/**
  * A player's ship in a gate leaves for the sea beyond it (`player.departure`: the client takes them there,
  * Game.travel), once the gate lets it through: not into a sea of a higher tier than its ship's, not in combat (a
  * `gateClosed` event, once a time it sails in; a ship that waits in the gate till its fight is over goes then). Bots
@@ -61,7 +69,7 @@ export function stepGates(state: GameState) {
     const player = playerOf(state, ship.id);
     if (!gate || !player || player.departure) continue;
     const { tier } = ZONES[gate.to];
-    const reason = tier > ship.shipClass.tier ? 'tier' : ship.inCombat(state.time) ? 'combat' : null;
+    const reason = !seaOpenTo(gate.to, ship.shipClass.tier) ? 'tier' : ship.inCombat(state.time) ? 'combat' : null;
     if (!reason) player.departure = gate.to;
     else if (entered) {
       const at = { x: ship.x, y: ship.y, z: ship.height };

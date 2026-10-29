@@ -1,52 +1,89 @@
 import type { GameState } from '../GameState';
-import { SHIP_CLASSES, STARTER_SHIP, type ShipClassId } from '../ships/shipClasses';
+import { SHIP_CLASSES, STARTER_SHIP, type PlayerLineId, type ShipClassId } from '../ships/shipClasses';
+import { SHIP_LINES } from '../ships/shipLines';
 import { levelOf } from '../ships/talents';
+import { storyReached, type StoryStepId } from '../story/story';
 import { shipOf, type Player } from './player';
 
 /**
- * The Captain's path: what a new player does in the starting waters, step by step, to earn the next ship. The first
- * steps teach the game (a kill, a talent, a repair at sea, a sale at the market), the rest are the shipyard's terms
+ * The Captain's path: what the shipyard asks of a player for the next ship. The starting waters' story first (it
+ * teaches the game), then the shipwright's terms: a level, the price
  */
-export type PathStepId = 'sink' | 'talent' | 'repair' | 'sell' | 'quests' | 'level' | 'baron' | 'gold';
+export type PathStepId = 'story' | 'level' | 'gold';
 
-/** A ship the port's shipyard sells, and its terms: the level of the ship sailed now, quests turned in, the boss sunk */
-export interface ShipOffer {
-  readonly shipClass: ShipClassId;
+/**
+ * The lines whose ships the shipyard sells for gold, tier by tier: the ladders a player climbs after the starter
+ * sloop. Its first ship is one of tier 1 of any of them; each next one, the next of the line of the ship sailed
+ */
+export const LADDER_LINES: readonly PlayerLineId[] = ['european', 'eastern', 'pirate', 'northern'];
+
+/**
+ * What the shipyard asks for a ship of a tier, of whichever line: its price, the level of the ship sailed now, and how
+ * far along the story
+ */
+export interface TierTerms {
+  readonly tier: number;
   readonly price: number;
   readonly level: number;
-  readonly quests: number;
-  readonly baron: boolean;
+  /** The step of the story the player must have got to; null: none asked */
+  readonly story: StoryStepId | null;
 }
 
-// The ladder, in order: the next one the player doesn't own is the goal. The Coastal Bark is the goal of the starting
-// waters: a couple of hours of play, the starter sloop at its last level (10); the gold is some 80 kills with their
-// cargo, less the repairs. Each next ship asks for the one before it at its last level (the level is the ship's sailed now, the quests are counted from the start):
-// the Corsair a Coastal Bark at 10, and three times the gold; the Frigate a Corsair at 20, and near three times the
-// Corsair's gold again; the Royal Galleon a Frigate at 30, and two and a half times the Frigate's gold; the Admiral a
-// Royal Galleon at 40, and two and a half times the Galleon's gold; the Ship of the Line, the line's last, an Admiral
-// at 50, and two and a half times the Admiral's gold
-export const SHIP_OFFERS: readonly ShipOffer[] = [
-  { shipClass: 'coastalBark', price: 3000, level: 10, quests: 5, baron: true },
-  { shipClass: 'corsair', price: 9000, level: 10, quests: 12, baron: false },
-  { shipClass: 'frigate', price: 24000, level: 20, quests: 20, baron: false },
-  { shipClass: 'royalGalleon', price: 60000, level: 30, quests: 30, baron: false },
-  { shipClass: 'admiral', price: 150000, level: 40, quests: 45, baron: false },
-  { shipClass: 'shipOfTheLine', price: 375000, level: 50, quests: 65, baron: false },
+// The ladder, the same for every line (the European one is the yardstick the others are balanced against). Tier 1 is
+// the starting waters' goal: a couple of hours of play, the starter sloop at its last level (10) and its story told up
+// to the Seam's seal (the Baron sunk); the gold is some 80 kills with their cargo, less the repairs. Each next tier asks
+// for the one before it at its last level (the level is the ship's sailed now) and its gold, nothing more: the tavern's
+// quests are for the XP and gold on the way, never asked for. Its gold is three times at tier 2, near three times again
+// at tier 3, two and a half times at each tier after it
+const TIER_TERMS: readonly TierTerms[] = [
+  { tier: 1, price: 3000, level: 10, story: 'seal' },
+  { tier: 2, price: 9000, level: 10, story: null },
+  { tier: 3, price: 24000, level: 20, story: null },
+  { tier: 4, price: 60000, level: 30, story: null },
+  { tier: 5, price: 150000, level: 40, story: null },
+  { tier: 6, price: 375000, level: 50, story: null },
 ];
+
+/** The next ship a player works towards: a tier, of a line or of any (the first after the starter sloop), and its terms */
+export interface ShipGoal {
+  readonly tier: number;
+  /** The line its ship is of; null: of any of the ladders (LADDER_LINES) */
+  readonly line: PlayerLineId | null;
+  readonly terms: TierTerms;
+}
 
 /** A step of the path, as the HUD shows it: done or not, and how far for a counted one */
 export interface PathStep {
   readonly id: PathStepId;
   readonly text: string;
   readonly done: boolean;
-  /** Where a counted step stands: quests, levels, gold */
+  /** Where a counted step stands: levels, gold */
   readonly have: number | null;
   readonly need: number | null;
 }
 
-/** Whether a class is one a player can sail: the starter, or one the shipyard sells */
+function isClass(id: unknown): id is ShipClassId {
+  return typeof id === 'string' && Object.hasOwn(SHIP_CLASSES, id);
+}
+
+/** The line of a ladder a ship is of, if it is one the shipyard sells for gold */
+function ladderOf(id: string): PlayerLineId | null {
+  return LADDER_LINES.find((line) => SHIP_LINES[line].ships.some((ship) => ship === id)) ?? null;
+}
+
+/** Whether a ship of a line (built or planned) is one the shipyard sells for gold, by its tier's terms */
+export function isLadderShip(id: string) {
+  return ladderOf(id) !== null;
+}
+
+/** What the shipyard asks for a ship of a tier: its terms, or null past the last */
+export function tierTerms(tier: number): TierTerms | null {
+  return TIER_TERMS.find((terms) => terms.tier === tier) ?? null;
+}
+
+/** Whether a class is one a player can sail: the starter, or a built ship of a ladder */
 export function isSailable(id: unknown): id is ShipClassId {
-  return id === STARTER_SHIP || SHIP_OFFERS.some((offer) => offer.shipClass === id);
+  return isClass(id) && (id === STARTER_SHIP || isLadderShip(id));
 }
 
 /** Whether the player owns a ship of this class: the one they sail, or one laid up in port (economy/fleet.ts) */
@@ -55,9 +92,35 @@ function ownsClass(state: GameState, player: Player, id: ShipClassId) {
   return sailed?.shipClass.id === id || player.fleet.some((laidUp) => laidUp.shipClass === id);
 }
 
-/** The next ship the player works towards: the first offer they don't own yet; null once they own them all */
-export function goalOffer(state: GameState, player: Player): ShipOffer | null {
-  return SHIP_OFFERS.find((offer) => !ownsClass(state, player, offer.shipClass)) ?? null;
+/** The ships a goal may be bought as: built, of its tier and line (any ladder's, for none), not owned yet */
+export function goalShips(state: GameState, player: Player, goal: ShipGoal): ShipClassId[] {
+  const lines = goal.line ? [goal.line] : LADDER_LINES;
+  return lines.flatMap((line) => {
+    const id = SHIP_LINES[line].ships.find((ship) => isClass(ship) && SHIP_CLASSES[ship].tier === goal.tier);
+    return isClass(id) && !ownsClass(state, player, id) ? [id] : [];
+  });
+}
+
+/**
+ * The next ship the player works towards, by the ship they sail: after the starter sloop a tier 1 ship of any ladder,
+ * after a ladder's ship the next of its line. Null when there is none to buy: a ship of the last tier or of no ladder
+ * (a masterwork), or every ship it may be built and owned already (or not built yet)
+ */
+export function shipGoal(state: GameState, player: Player): ShipGoal | null {
+  const sailed = shipOf(state, player)?.shipClass;
+  if (!sailed) return null;
+  const starter = sailed.id === STARTER_SHIP;
+  const line = starter ? null : ladderOf(sailed.id);
+  const terms = tierTerms(starter ? 1 : sailed.tier + 1);
+  if (!terms || (!starter && !line)) return null;
+  const goal = { tier: terms.tier, line, terms };
+  return goalShips(state, player, goal).length > 0 ? goal : null;
+}
+
+/** Whether a ship is one the player works towards now: one the shipyard sells them once every term is met */
+export function isGoalShip(state: GameState, player: Player, id: string) {
+  const goal = shipGoal(state, player);
+  return goal !== null && goalShips(state, player, goal).some((ship) => ship === id);
 }
 
 function step(id: PathStepId, text: string, done: boolean, have: number | null = null, need: number | null = null) {
@@ -66,33 +129,24 @@ function step(id: PathStepId, text: string, done: boolean, have: number | null =
 
 /** Every step of the Captain's path towards the next ship, in order, with what is done; none without a goal */
 export function captainsPath(state: GameState, player: Player): PathStep[] {
-  const offer = goalOffer(state, player);
-  if (!offer) return [];
-  const ship = shipOf(state, player);
-  const level = ship?.level ?? 1;
-  const marked = (id: PathStepId) => player.progress.steps.includes(id);
-  const { questsDone } = player.progress;
-  return [
-    step('sink', 'Sink a ship or a sea monster', marked('sink')),
-    step('talent', 'Take a talent (K)', marked('talent')),
-    step('repair', 'Repair your hull at sea (R)', marked('repair')),
-    step('sell', 'Sell cargo at the port market', marked('sell')),
-    step(
-      'quests',
-      'Turn in tavern quests',
-      questsDone >= offer.quests,
-      Math.min(questsDone, offer.quests),
-      offer.quests,
-    ),
-    step('level', 'Reach level', level >= offer.level, Math.min(level, offer.level), offer.level),
-    ...(offer.baron ? [step('baron', 'Sink the Smuggler Baron', marked('baron'))] : []),
-    step('gold', 'Save gold', player.gold >= offer.price, Math.min(player.gold, offer.price), offer.price),
-  ];
+  const goal = shipGoal(state, player);
+  if (!goal) return [];
+  const { terms } = goal;
+  const level = shipOf(state, player)?.level ?? 1;
+  const steps: PathStep[] = [];
+  if (terms.story) {
+    steps.push(step('story', 'Follow the story of the starting waters', storyReached(player, terms.story)));
+  }
+  steps.push(
+    step('level', 'Reach level', level >= terms.level, Math.min(level, terms.level), terms.level),
+    step('gold', 'Save gold', player.gold >= terms.price, Math.min(player.gold, terms.price), terms.price),
+  );
+  return steps;
 }
 
-/** Whether every term of the goal's offer is met: all the steps of the path done */
+/** Whether every term of the goal is met: all the steps of the path done */
 export function termsMet(state: GameState, player: Player) {
-  return goalOffer(state, player) !== null && captainsPath(state, player).every((s) => s.done);
+  return shipGoal(state, player) !== null && captainsPath(state, player).every((s) => s.done);
 }
 
 /**
@@ -108,9 +162,4 @@ export function tierMastered(state: GameState, player: Player, tier: number) {
     const { line, tier: its, maxLevel } = SHIP_CLASSES[id];
     return line !== 'premium' && its === tier && levelOf(xp, maxLevel) >= maxLevel;
   });
-}
-
-/** The offer's ship's name, for the HUD */
-export function offerName(offer: ShipOffer) {
-  return SHIP_CLASSES[offer.shipClass].name;
 }

@@ -25,7 +25,6 @@ export function startingLang(kept: unknown): Lang {
 export function setLang(picked: Lang) {
   current = picked;
   document.documentElement.lang = picked;
-  document.title = t('Pirate Game');
 }
 
 export function lang() {

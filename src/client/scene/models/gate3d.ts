@@ -14,7 +14,8 @@ const RING_PERIOD = 2.2; // seconds a ring takes from the edge to the middle
 
 /**
  * A gate to another sea (world/gates.ts), on the water: its circle in pale light, rings drawing in to its middle one
- * after another, and buoys round it, each with a band. Drawn with the sea
+ * after another, and buoys round it, each with a band. Drawn with the sea till its maps have loaded: then the gate is
+ * a whirlpool in the sea's shader (seaSurface.ts)
  */
 export function drawGate(p: Painter3D, gate: GatePlace, time: number) {
   const { x, y, radius } = gate;

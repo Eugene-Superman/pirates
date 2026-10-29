@@ -1,24 +1,363 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pirate Game</title>
-    <style>
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-        overflow: hidden;
-        background: #0b3a52;
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moonwreck — Naval Battles in Your Browser</title>
+    <meta
+      name="description"
+      content="Sail a painted sea, fight ships and sea monsters with cannons and harpoons, haul their gold aboard and rise from a sloop to a ship of the line, in your browser."
+    />
+    <link rel="canonical" href="%VITE_SITE_URL%/" />
+    <link rel="alternate" hreflang="en" href="%VITE_SITE_URL%/" />
+    <link rel="alternate" hreflang="uk" href="%VITE_SITE_URL%/uk/" />
+    <link rel="alternate" hreflang="ru" href="%VITE_SITE_URL%/ru/" />
+    <link rel="alternate" hreflang="x-default" href="%VITE_SITE_URL%/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#050b1a" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Moonwreck" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="uk_UA" />
+    <meta property="og:locale:alternate" content="ru_RU" />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:title" content="Moonwreck — Naval Battles in Your Browser" />
+    <meta
+      property="og:description"
+      content="Fight ships and sea monsters with cannons and harpoons, haul their gold aboard and rise from a sloop to a ship of the line."
+    />
+    <meta property="og:image" content="%VITE_SITE_URL%/landing/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="A harbour town under a hilltop castle, ships at anchor inside its stone walls"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image:alt"
+      content="A harbour town under a hilltop castle, ships at anchor inside its stone walls"
+    />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "%VITE_SITE_URL%/#website",
+            "name": "Moonwreck",
+            "url": "%VITE_SITE_URL%/",
+            "inLanguage": "en"
+          },
+          {
+            "@type": "VideoGame",
+            "@id": "%VITE_SITE_URL%/#game",
+            "name": "Moonwreck",
+            "url": "%VITE_SITE_URL%/",
+            "description": "A naval adventure in the browser: sail a painted sea, fight ships and sea monsters with cannons and harpoons, haul their gold aboard and rise from a sloop to a ship of the line across fifteen seas.",
+            "image": "%VITE_SITE_URL%/landing/og-image.jpg",
+            "genre": ["Naval action", "Role-playing game"],
+            "gamePlatform": "Web browser",
+            "applicationCategory": "Game",
+            "operatingSystem": "Any",
+            "playMode": "SinglePlayer",
+            "inLanguage": ["en", "uk", "ru"]
+          }
+        ]
       }
-      #app canvas {
-        display: block;
-      }
-    </style>
+    </script>
+
+    <link rel="stylesheet" href="/src/landing/landing.css" />
+    <script type="module" src="/src/landing/landing.ts"></script>
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header class="masthead">
+      <a class="brand" href="./">
+        <img src="/landing/emblem.webp" width="48" height="48" alt="" />
+        <span>Moonwreck</span>
+      </a>
+      <nav class="sections-nav" aria-label="Sections">
+        <ul>
+          <li><a href="#features">Life at sea</a></li>
+          <li><a href="#port">The port</a></li>
+          <li><a href="#ships">Ships</a></li>
+          <li><a class="nav-cta" href="#sign-in">Sign in</a></li>
+        </ul>
+      </nav>
+      <nav class="lang-nav" aria-label="Language">
+        <ul>
+          <li><a href="./" hreflang="en" lang="en" aria-current="page">English</a></li>
+          <li><a href="uk/" hreflang="uk" lang="uk">Українська</a></li>
+          <li><a href="ru/" hreflang="ru" lang="ru">Русский</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero" aria-labelledby="intro-title">
+        <div class="hero-art">
+          <img
+            src="/sprites/port/harbour.webp"
+            srcset="/landing/harbour-800.webp 800w, /sprites/port/harbour.webp 1586w"
+            sizes="100vw"
+            width="1586"
+            height="992"
+            fetchpriority="high"
+            alt="The port: a harbour town under a hilltop castle, with ships at anchor inside its curved stone walls"
+          />
+        </div>
+
+        <div class="hero-panels">
+          <div class="panel intro">
+            <h1 id="intro-title">Moonwreck</h1>
+            <p class="tagline">Naval battles on a painted sea, right in your browser.</p>
+            <p>
+              Click on the sea and your ship sails there, steering round the islands. Fight merchants, smugglers and sea
+              serpents with cannons and harpoons, haul their chests aboard, sell the goods in port and work your way up
+              from a little sloop to a golden ship of the line.
+            </p>
+            <ul class="facts">
+              <li><strong>15</strong> seas</li>
+              <li><strong>6</strong> tiers of ships</li>
+              <li><strong>60</strong> levels a ship</li>
+            </ul>
+          </div>
+
+          <section class="panel sign-in" id="sign-in" aria-labelledby="sign-in-title">
+            <h2 id="sign-in-title">Set sail</h2>
+            <p class="hint" id="sign-in-hint">
+              Sign in with your email and password. Accounts open with the online game: until then, any email and
+              password take you aboard.
+            </p>
+            <noscript>
+              <p class="notice">The game runs on JavaScript: turn it on in your browser to set sail.</p>
+            </noscript>
+            <form id="sign-in-form" action="play/?lang=en" method="post">
+              <div class="field">
+                <label for="email">Email</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autocomplete="username"
+                  spellcheck="false"
+                  required
+                  aria-describedby="email-error"
+                />
+                <p class="field-error" id="email-error"></p>
+              </div>
+              <div class="field">
+                <label for="password">Password</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                  aria-describedby="password-error"
+                />
+                <p class="field-error" id="password-error"></p>
+              </div>
+              <div class="check" id="show-password-row" hidden>
+                <input id="show-password" type="checkbox" aria-controls="password" />
+                <label for="show-password">Show password</label>
+              </div>
+              <button class="button" type="submit">Sign in</button>
+              <p class="form-status" id="sign-in-status" role="status"></p>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <section class="section" id="features" aria-labelledby="features-title">
+        <h2 id="features-title">Life at sea</h2>
+        <ul class="cards">
+          <li class="card">
+            <h3>Sail where you point</h3>
+            <p>
+              Click on the water and your ship plots its own course round islands and other ships. Hold and drag to
+              steer as you go.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Cannons and harpoons</h3>
+            <p>
+              Twenty guns and fourteen kinds of ammo, each with its own reach and reload. Pick a target, open fire and
+              read every blow, dice and all, in the combat log.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Ships and sea monsters</h3>
+            <p>
+              Fishing boats and merchants leave you alone; smugglers, pirates and sea serpents don't. Giant turtles,
+              sharks, crabs and krakens roam the farther seas.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Plunder and trade</h3>
+            <p>
+              Every kill pays gold and experience and leaves chests and crates of goods afloat. Haul them aboard before
+              they sink, but beware: go down, and your cargo is left where you sank.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Bosses</h3>
+            <p>
+              The Smuggler Baron and an escort hold a corner of the starting waters, mortar shells falling on marked
+              spots of the sea. Every sea beyond has a boss of its own.
+            </p>
+          </li>
+          <li class="card">
+            <h3>Fifteen seas</h3>
+            <p>
+              Past the starting waters lie fourteen more seas, each with its own map, bots and boss. Sail through the
+              gates at their edges once your ship is strong enough.
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section" id="port" aria-labelledby="port-title">
+        <h2 id="port-title">A port to come home to</h2>
+        <p class="section-lead">
+          In the middle of the sea lies a harbour town. Sail in, and its buildings are a click away.
+        </p>
+        <ul class="cards buildings">
+          <li class="card building">
+            <span class="sprite medallion medallion-tavern">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Tavern</h3>
+              <p>Bounty quests for every sea: sink what is asked and come back for the reward.</p>
+            </div>
+          </li>
+          <li class="card building">
+            <span class="sprite medallion medallion-market">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Market</h3>
+              <p>Sell the goods you hauled aboard and make room in the hold for more.</p>
+            </div>
+          </li>
+          <li class="card building">
+            <span class="sprite medallion medallion-workshop">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Workshop</h3>
+              <p>Sails, planking, a rudder and a lookout's gear for your ship, and the hull mended at once.</p>
+            </div>
+          </li>
+          <li class="card building">
+            <span class="sprite medallion medallion-shipyard">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Shipyard</h3>
+              <p>Buy your next ship, or take the helm of any ship of your fleet laid up in port.</p>
+            </div>
+          </li>
+          <li class="card building">
+            <span class="sprite medallion medallion-arsenal">
+              <img src="/sprites/port/medallions.webp" width="1792" height="256" loading="lazy" alt="" />
+            </span>
+            <div>
+              <h3>Arsenal</h3>
+              <p>Guns and ammo for every slot, and a quarter of the price back for what you no longer need.</p>
+            </div>
+          </li>
+        </ul>
+        <p class="section-note">The guild hall and the auction house open with the online game.</p>
+      </section>
+
+      <section class="section" id="ships" aria-labelledby="ships-title">
+        <h2 id="ships-title">From sloop to ship of the line</h2>
+        <p class="section-lead">
+          Every ship has levels of its own, ten a tier and sixty at tier 6, and a talent tree of its own, with a
+          signature talent every five levels: a rocket or a powder keg from level 25, a bombardment or a Royal standard
+          from level 50. Over all your ships, your captain's mastery grows: passives in seven specializations, for every
+          ship you sail.
+        </p>
+        <ol class="ships">
+          <li class="ship">
+            <span class="sprite ship-picture ship-sloop">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Starter Sloop</h3>
+            <p class="ship-tier">Your first ship</p>
+            <p>Small and light: a ship to learn the sea on.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-herald">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Royal Herald</h3>
+            <p class="ship-tier">Tier 1</p>
+            <p>The crown's herald, a sturdy all-rounder.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-salamander">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Salamander</h3>
+            <p class="ship-tier">Tier 2</p>
+            <p>A royal raider under sails of flame.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-peregrine">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Peregrine</h3>
+            <p class="ship-tier">Tier 3</p>
+            <p>The fleet's falcon: fast and keen-eyed.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-lion">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Crowned Lion</h3>
+            <p class="ship-tier">Tier 4</p>
+            <p>Treasure and guns under the king's crown.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-eagle">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Black Eagle</h3>
+            <p class="ship-tier">Tier 5</p>
+            <p>The black flagship of the crown's squadrons.</p>
+          </li>
+          <li class="ship">
+            <span class="sprite ship-picture ship-sovereign">
+              <img src="/sprites/icons/ships.webp" width="1536" height="512" loading="lazy" alt="" />
+            </span>
+            <h3>Sovereign of the Seas</h3>
+            <p class="ship-tier">Tier 6</p>
+            <p>A golden three-decker that rules the sea.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="section call" aria-labelledby="call-title">
+        <h2 id="call-title">Your ship is waiting</h2>
+        <p>The sloop waits at the quay, the sea is calm and the Smuggler Baron is not.</p>
+        <a class="button" href="#sign-in">Sign in and set sail</a>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Runs in any modern browser with WebGL: Chrome, Firefox, Safari or Edge.</p>
+      <p>© 2026 Moonwreck</p>
+    </footer>
   </body>
 </html>

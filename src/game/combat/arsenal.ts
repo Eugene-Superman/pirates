@@ -170,19 +170,22 @@ export const AMMO_IDS: Readonly<Record<WeaponId, readonly AmmoId[]>> = {
   ],
 };
 
-/** What a new ship carries. Later bought and looted; for now the loadout window adds more */
+/**
+ * What a new ship carries: a few hundred of the plainest cannonballs and harpoons, the first kind of each weapon, and
+ * no other. The rest is bought at the arsenal
+ */
 export const STARTING_AMMO: Readonly<Record<AmmoId, number>> = {
-  ball1: 120,
+  ball1: 300,
   chainShot: 0,
-  ball2: 30,
-  ball3: 10,
+  ball2: 0,
+  ball3: 0,
   heatedShot: 0,
   explosiveShell: 0,
   royalShot: 0,
-  harpoon1: 80,
+  harpoon1: 200,
   barbedHarpoon: 0,
-  harpoon2: 20,
-  harpoon3: 6,
+  harpoon2: 0,
+  harpoon3: 0,
   poisonHarpoon: 0,
   explosiveHarpoon: 0,
   leviathanHarpoon: 0,
@@ -228,9 +231,21 @@ export interface VolleyRoll {
   /** How many dice rolled a critical hit and how many a miss */
   readonly crits: number;
   readonly misses: number;
+  /**
+   * The volley as a whole a critical hit: a die crit and the sum came up `CRITICAL_SPREADS` over its average (a lone
+   * die: its crit). A broadside of many guns has a crit among them nearly every time, so a crit alone tells nothing;
+   * this stays about one volley in ten however many guns fired
+   */
+  readonly critical: boolean;
   /** Every die, in the order given: for the combat log */
   readonly rolls: readonly DieRoll[];
 }
+
+/**
+ * Standard deviations of a volley's sum over its average for it to be critical: the luckiest tenth of a sum of many
+ * dice, near enough for a few
+ */
+const CRITICAL_SPREADS = 1.28;
 
 /**
  * Rolls every die (a gun that fires, or a monster's jaws), adds them up with the bonus and scales the sum by `share`:
@@ -241,6 +256,8 @@ export function rollVolley(dice: readonly DamageDie[], bonus: number, share: num
   let sum = 0;
   let crits = 0;
   let misses = 0;
+  let mean = 0;
+  let variance = 0;
   const rolls: DieRoll[] = [];
   for (const die of dice) {
     const roll = 1 + Math.floor(random() * die.die);
@@ -249,6 +266,18 @@ export function rollVolley(dice: readonly DamageDie[], bonus: number, share: num
     const damage = rollDamage(roll, die, bonus);
     sum += damage;
     rolls.push({ roll, damage });
+    // What the die does on average and how far it strays, every face once: no random numbers, the dice stay as they were
+    let faces = 0;
+    let squares = 0;
+    for (let face = 1; face <= die.die; face++) {
+      const d = rollDamage(face, die, bonus);
+      faces += d;
+      squares += d * d;
+    }
+    mean += faces / die.die;
+    variance += squares / die.die - (faces / die.die) ** 2;
   }
-  return { damage: Math.round(sum * share), crits, misses, rolls };
+  // A lone die's crit is all there is to it, however often it comes up
+  const critical = crits > 0 && (dice.length === 1 || sum >= mean + CRITICAL_SPREADS * Math.sqrt(variance));
+  return { damage: Math.round(sum * share), crits, misses, critical, rolls };
 }

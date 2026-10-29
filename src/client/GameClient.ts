@@ -2,26 +2,36 @@ import type { Application } from 'pixi.js';
 import {
   buyAmmo,
   buyGun,
+  buyItem,
   buyOutfit,
   buyShip,
+  choosePortrait,
   dropQuest,
   findUnit,
   fitFromHold,
   fitOutfit,
+  forgetMastery,
+  giveDoubloons,
   giveGold,
   giveLevels,
   isAfloat,
-  leavePort,
   orderRepair,
   repairInPort,
   resetTalents,
+  seePrologue,
+  setSail,
   sellAmmo,
   sellCargo,
   sellGun,
+  setQuickSlot,
+  skipStoryStep,
+  swapQuickSlots,
   throwOverboard,
   takeHelm,
+  takePassive,
   takeQuest,
   takeTalent,
+  tellStory,
   turnInQuest,
   useAbility,
   type Game,
@@ -37,15 +47,16 @@ import { bindKeyboardInput } from './input/keyboardInput';
 import { bindPointerInput } from './input/pointerInput';
 import { Selection } from './input/selection';
 import type { GpuInfo } from './render/gpu';
-import type { CameraMode } from './scene/cameraControl';
 import type { FogLayer } from './scene/effects/fogOfWar';
 import type { NavDebug } from './scene/effects/navDebug';
-import { setLang, startingLang, type Lang } from './i18n/i18n';
+import { isLang, lang as langPicked, setLang, startingLang, type Lang } from './i18n/i18n';
 import { SceneView } from './scene/SceneView';
 import type { Store } from './storage/Store';
 
 const MAX_DT = 0.05; // seconds: a long frame (tab in background) must not teleport the ship
 const AUTOSAVE = 5; // seconds of play between two saves of the progress and the log; and whenever the page is hidden
+// The landing, where logging out goes: at the site's root in English, its Ukrainian and Russian in their own folders
+const LANDING = import.meta.env.BASE_URL;
 
 // Connects the game logic to the browser: scene, HUD, input and the frame loop
 export class GameClient {
@@ -74,7 +85,15 @@ export class GameClient {
     this.game = game;
     this.store = store;
     this.renderer = renderer;
-    // Before anything with text is made
+    // The language the landing was read in, when the player came from it (play/?lang=uk): kept as picked, the address
+    // left plain. Before anything with text is made
+    const url = new URL(window.location.href);
+    const asked = url.searchParams.get('lang');
+    if (isLang(asked)) store.set('lang', asked);
+    if (url.searchParams.has('lang')) {
+      url.searchParams.delete('lang');
+      window.history.replaceState(null, '', url);
+    }
     setLang(startingLang(store.get('lang')));
     this.sounds = new Sounds(store.slot('sound'));
     setTapSound(() => this.sounds.ui('click'));
@@ -90,7 +109,7 @@ export class GameClient {
     const { ship } = game.state;
     // Given up at the tavern or from the quest tracker, at sea too, once the player has said yes
     const giveUpQuest = (id: QuestId) => {
-      dropQuest(game.state.player, id);
+      dropQuest(game.state, game.state.player, id);
       this.sounds.ui('quest');
     };
     // The HUD's buttons act through the game's methods like any player action (the damage ones are for testing)
@@ -102,8 +121,6 @@ export class GameClient {
         // the game never knows about them
         setZoom: view((level: number) => this.view.setZoom(level)),
         toggleRanges: view(() => this.view.toggleRanges()),
-        setCameraMode: view((mode: CameraMode) => this.view.setCameraMode(mode)),
-        toggleZone: view(() => this.view.toggleZone()),
         toggleFog: view((layer: FogLayer) => this.view.toggleFog(layer)),
         toggleSky: view(() => this.view.toggleSky()),
         toggleDebug: view((kind: NavDebug) => this.view.toggleDebug(kind)),
@@ -119,6 +136,7 @@ export class GameClient {
         },
         repair: () => this.cue(orderRepair(game.state, ship)),
         dropQuest: giveUpQuest,
+        choosePortrait: (portrait) => this.cue(choosePortrait(game.state.player, portrait), 'equip'),
         // The loadout: guns from the hold, bought in port
         fitGun: (weapon, slot, gun) => this.cue(fitFromHold(game.state.player, ship, weapon, slot, gun), 'equip'),
         loadAmmo: (ammo) => ship.loadAmmo(ammo),
@@ -128,18 +146,32 @@ export class GameClient {
         },
         // Goods thrown overboard, at sea or in port: they splash down and sink
         throwCargo: (good, count) => this.cue(throwOverboard(ship, good, count), 'splash'),
+        // The items bought for doubloons, put on the skill bar's quick slots from the hold, anywhere
+        setQuickSlot: (slot, item) => this.cue(setQuickSlot(game.state.player, slot, item), 'equip'),
+        swapQuickSlots: (from, to) => this.cue(swapQuickSlots(game.state.player, from, to), 'equip'),
         changeMaxSpeed: (delta) => ship.tuneSpeeds(delta, 0),
         changeMinSpeed: (delta) => ship.tuneSpeeds(0, delta),
         changeViewRange: (delta) => ship.tuneViewRange(delta),
         addGold: (amount) => giveGold(game.state.player, amount),
+        addDoubloons: (amount) => giveDoubloons(game.state.player, amount),
         changeLevel: (delta) => this.cue(giveLevels(game.state, ship, delta)),
+        skipStory: () => this.cue(skipStoryStep(game.state, game.state.player)),
+        // The story: a conversation heard out moves it on, as any player's action does (online, a command)
+        tellStory: (key) => tellStory(game.state, game.state.player, key),
+        seePrologue: () => seePrologue(game.state.player),
         // Talents: picked anywhere, forgotten at the shipwright's
-        learnTalent: (id) => this.cue(takeTalent(game.state, ship, id), 'talent'),
+        learnTalent: (id) => this.cue(takeTalent(ship, id), 'talent'),
         resetTalents: () => this.cue(resetTalents(game.state, game.state.player), 'quest'),
-        useAbility: () => this.cue(useAbility(game.state, ship)),
+        // The captain's mastery: taken anywhere, forgotten in port
+        takePassive: (id) => this.cue(takePassive(game.state, game.state.player, id), 'talent'),
+        forgetMastery: () => this.cue(forgetMastery(game.state, game.state.player), 'quest'),
+        useAbility: (slot) => this.useAbility(slot),
         newGame: () => this.newGame(),
+        logOut: () => this.logOut(),
         setLanguage: (lang) => this.setLanguage(lang),
         toggleWorld: () => this.hud.toggleWorld(),
+        toggleBestiary: () => this.hud.toggleBestiary(),
+        editLayout: () => this.hud.editLayout(),
       },
       app.screen,
       ship.shipClass,
@@ -148,7 +180,8 @@ export class GameClient {
         name: game.state.world.port.name,
         // In port: game methods like any player action, for the player of this client
         actions: {
-          leavePort: () => leavePort(game.state, ship),
+          // The story keeps the ship in port while its guns wait in the hold
+          leavePort: () => setSail(game.state, game.state.player),
           // What it sounds like: a purchase rings, a refusal thuds; gold paid out sounds from the game's events
           buyGun: (gun) => this.cue(buyGun(game.state, game.state.player, gun), 'coins'),
           buyAmmo: (ammo, count) => this.cue(buyAmmo(game.state, game.state.player, ammo, count), 'coinsSmall'),
@@ -161,19 +194,26 @@ export class GameClient {
           turnInQuest: (id) => this.cue(turnInQuest(game.state, game.state.player, id)),
           dropQuest: giveUpQuest,
           sellCargo: (good) => this.cue(sellCargo(game.state, game.state.player, good)),
+          buyItem: (id, count) => this.cue(buyItem(game.state, game.state.player, id, count), 'coins'),
           // The HUD and the ship's sprite are made for one class of ship: a ship changed reloads the page with it
-          buyShip: () => this.reloadIf(buyShip(game.state, game.state.player)),
+          buyShip: (id) => this.reloadIf(buyShip(game.state, game.state.player, id)),
           takeHelm: (index) => this.reloadIf(takeHelm(game.state, game.state.player, index)),
         },
       },
-      { hud: store.slot('hud'), log: store.slot('log'), tracker: store.slot('tracker') },
+      {
+        hud: store.slot('hud'),
+        layout: store.slot('layout'),
+        log: store.slot('log'),
+        tracker: store.slot('tracker'),
+        tips: store.slot('tips'),
+      },
       game.state.world.zone,
       // The world chart's jump to any sea: for the developer, until the seas are reached only through their gates
       (zone) => this.travel(zone),
     );
     app.stage.addChild(this.view.container, this.hud.container);
     bindPointerInput(app, this.view, ship, this.selection, this.hover, game.state.world.port);
-    bindCursor(app, this.view, ship, this.hover);
+    bindCursor(app, this.view, game.state, this.hover);
     bindKeyboardInput(ship, this.selection, {
       toggleLoadout: () => this.hud.toggleLoadout(),
       toggleLog: () => this.hud.toggleLog(),
@@ -183,7 +223,8 @@ export class GameClient {
       toggleHold: () => this.hud.toggleHold(),
       toggleMastery: () => this.hud.toggleMastery(),
       toggleWorld: () => this.hud.toggleWorld(),
-      useAbility: () => this.cue(useAbility(game.state, ship)),
+      toggleBestiary: () => this.hud.toggleBestiary(),
+      useAbility: (slot) => this.useAbility(slot),
       repair: () => this.cue(orderRepair(game.state, ship)),
     });
   }
@@ -214,10 +255,7 @@ export class GameClient {
         ticker.elapsedMS,
         {
           zoom: this.view.zoom,
-          cameraMode: this.view.cameraMode,
           ranges: this.view.rangesShown,
-          zoneShown: this.view.zoneShown,
-          zoneBox: this.view.zoneBox,
           fog: this.view.fogShown,
           sky: this.view.skyIsShown,
           debug: this.view.debugShown,
@@ -237,6 +275,15 @@ export class GameClient {
     return worked;
   }
 
+  /**
+   * The player's ship's ability in a slot (F, G, T): a rocket flies at the unit it attacks, or else the one picked
+   * out, and the shells of a bombardment fall round it
+   */
+  private useAbility(slot: number) {
+    const { ship } = this.game.state;
+    return this.cue(useAbility(this.game.state, ship, slot, ship.attackTarget ?? this.selection.id));
+  }
+
   /** Keeps the progress and the combat log */
   private save() {
     if (this.forgetting || this.travelling) return;
@@ -250,6 +297,16 @@ export class GameClient {
     this.forgetting = true;
     this.store.clear();
     void this.store.written().then(() => window.location.reload());
+  }
+
+  /**
+   * Keeps the progress and leaves for the landing, once the store is written. There is no account to sign out of until
+   * the server: signing in again comes back to the same progress
+   */
+  private logOut() {
+    this.save();
+    this.store.flush();
+    void this.store.written().then(() => window.location.assign(landing()));
   }
 
   /** If the game changed (a ship bought or changed), keeps the progress and reloads the page, which is made for it */
@@ -288,4 +345,10 @@ export class GameClient {
     const unit = findUnit(state, id);
     if (!unit || !isAfloat(unit) || !state.ship.canSee(unit.x, unit.y)) this.selection.id = null;
   }
+}
+
+/** The landing in the language the game is read in: the English one at the site's root, the others in their folders */
+function landing() {
+  const picked = langPicked();
+  return picked === 'en' ? LANDING : `${LANDING}${picked}/`;
 }

@@ -1,6 +1,6 @@
 // Public API of the game logic. The client imports game/ only through this file,
 // so the logic can later move into a package shared with the server without touching the client
-export { BOT_KINDS, zoneBoss, zoneKinds, type BotKind, type BotKindId } from './bots/botKinds';
+export { BOT_KINDS, botsInSea, zoneBoss, zoneKinds, type BotKind, type BotKindId } from './bots/botKinds';
 export { isHostile, type BotMind } from './bots/brain';
 export {
   AMMO,
@@ -17,6 +17,7 @@ export {
   type GunId,
 } from './combat/arsenal';
 export type { Shell } from './combat/barrage';
+export { abilityTarget, type PowderKeg } from './combat/ordnance';
 export {
   projectilePosition,
   type DamageSource,
@@ -48,33 +49,54 @@ export {
   type GoodId,
 } from './economy/cargo';
 export { CHEST_TIME, LOST_CARGO_TIME, type Chest } from './economy/loot';
-export { STARTING_GOLD, fitFromHold, giveGold, type Player } from './economy/player';
+export {
+  ITEMS,
+  ITEM_CATEGORIES,
+  ITEM_CATEGORY_IDS,
+  ITEM_IDS,
+  type Item,
+  type ItemCategory,
+  type ItemFigures,
+  type ItemGroup,
+  type ItemId,
+} from './items/items';
+export { QUICK_SLOTS, setQuickSlot, swapQuickSlots } from './items/quickSlots';
+export { STARTING_GOLD, fitFromHold, giveDoubloons, giveGold, type Player } from './economy/player';
 export {
   MAX_QUESTS,
   QUESTS,
   QUEST_IDS,
   dropQuest,
   questDone,
+  questLimit,
   questOffered,
+  questReward,
+  shipQuests,
   takeQuest,
+  takenQuest,
   turnInQuest,
   zoneQuests,
   type ActiveQuest,
   type Quest,
   type QuestId,
+  type QuestReward,
+  type RewardBonus,
 } from './economy/quests';
 export {
   AMMO_PACK,
-  MAX_AMMO_DEAL,
   ammoPackPrice,
   ammoPrice,
   ammoSalePrice,
   buyAmmo,
   buyGun,
+  buyItem,
   buyOutfit,
   fitOutfit,
   gunPrice,
   gunSalePrice,
+  itemPrice,
+  marketShare,
+  marketValue,
   outfitPrice,
   repairInPort,
   repairPrice,
@@ -84,18 +106,49 @@ export {
   sellCargo,
   sellGun,
 } from './economy/shop';
-export { buyShip, laidUpLevel, takeHelm } from './economy/fleet';
+export { buyShip, fitsSea, laidUpLevel, takeHelm } from './economy/fleet';
 export {
   captainsPath,
-  goalOffer,
-  offerName,
-  SHIP_OFFERS,
+  goalShips,
+  isGoalShip,
+  isLadderShip,
+  LADDER_LINES,
+  shipGoal,
   termsMet,
   tierMastered,
+  tierTerms,
   type PathStep,
   type PathStepId,
-  type ShipOffer,
+  type ShipGoal,
+  type TierTerms,
 } from './economy/shipyard';
+export {
+  objectiveNeed,
+  objectivesMet,
+  PROLOGUE,
+  seePrologue,
+  setSail,
+  skipStoryStep,
+  SPEAKERS,
+  STORY,
+  STORY_CHAPTERS,
+  storyFitting,
+  storyGoal,
+  storyMark,
+  storyStep,
+  storyTalk,
+  storyTargets,
+  storyWatch,
+  tellStory,
+  type Line,
+  type Objective,
+  type SpeakerId,
+  type StoryGoal,
+  type StoryMark,
+  type StoryStep,
+  type StoryStepId,
+  type StoryTalk,
+} from './story/story';
 export { Game, WRECK_TIME } from './Game';
 export { SAVE_VERSION, savedZone, type SaveData, type SavedShip } from './save';
 export { GOLD_REASONS, totalGold, totalKills, type GoldReason, type Stats } from './records/stats';
@@ -119,41 +172,61 @@ export {
 } from './ships/outfit';
 export {
   ABILITY_LEVELS,
-  BRANCHES,
-  BRANCH_IDS,
   MAX_LEVEL,
   MILESTONES,
   PERKS,
-  ROW_POINTS,
-  TALENTS,
+  SIGNATURES,
   abilityCooldown,
-  branchTalents,
-  giveLevels,
+  milestonesToPick,
   pointsSpent,
+  pointsToSpend,
   reloadShare,
+  shipTalentPoints,
   signatureChoices,
   takeTalent,
   talentBlock,
+  talentFigures,
+  talentOf,
   talentPoints,
+  talentTree,
   talentsToPick,
-  useAbility,
   xpForLevel,
-  type BranchId,
+  type BranchLook,
   type BranchTalent,
+  type BranchTalentId,
+  type SignatureId,
   type SignatureTalent,
   type Talent,
+  type TalentBlock,
+  type TalentBranch,
   type TalentId,
+  type TalentTree,
 } from './ships/talents';
+export { useAbility } from './ships/abilities';
 export {
-  MASTERY_BRANCHES,
-  MASTERY_BRANCH_IDS,
+  CROWN_STEP,
+  LEGENDARY_GATE,
   MASTERY_PASSIVES,
-  MASTERY_RANKS,
-  MASTERY_RINGS,
-  type MasteryBranchId,
+  MASTERY_SPECS,
+  MASTERY_SPEC_IDS,
+  SPECIAL_STEP,
+  captainPoints,
+  forgetMastery,
+  giveLevels,
+  masteryBlock,
+  masteryPassive,
+  masteryRespecPrice,
+  masterySpent,
+  mostOf,
+  takePassive,
+  type CaptainPoints,
+  type MasteryBlock,
   type MasteryPassive,
-  type PassiveKind,
+  type MasterySpecId,
+  type PassiveTier,
 } from './account/mastery';
+export { FEATS, FEAT_IDS, RUNG_POINTS, rungsReached, type Feat, type FeatId } from './account/feats';
+export { PORTRAITS, choosePortrait } from './account/portrait';
 export { DAMAGE_STAGES, MAX_HEALTH, damageStage, type DamageStage } from './ships/damage';
 export {
   SHIP_CLASSES,
@@ -191,7 +264,7 @@ export {
   type Island,
   type Palm,
 } from './world/World';
-export { GATE_RADIUS } from './world/gates';
+export { GATE_RADIUS, seaOpenTo } from './world/gates';
 export { START_ZONE, ZONES, ZONE_IDS, isZone, tierZones, type Zone, type ZoneId } from './world/zones';
 export { coastAt } from './world/islandShape';
-export { WALL_THICKNESS, leavePort, onPort, type HarbourWall, type Port } from './world/port';
+export { WALL_THICKNESS, onPort, type HarbourWall, type Port } from './world/port';

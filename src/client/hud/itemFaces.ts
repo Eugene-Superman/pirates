@@ -4,56 +4,74 @@ import {
   AMMO_PACK,
   CURRENCIES,
   GUNS,
-  MAX_AMMO_DEAL,
+  ITEMS,
+  ITEM_CATEGORIES,
   OUTFITS,
   OUTFIT_STATS,
   SHIP_LINES,
-  SHIP_OFFERS,
   SHIP_SOURCES,
   WEAPON_IDS,
+  ZONES,
   ammoPackPrice,
   ammoPrice,
   ammoSalePrice,
   averageDamage,
   captainsPath,
   classFigures,
-  goalOffer,
+  fitsSea,
   gunPrice,
   gunSalePrice,
+  isGoalShip,
+  isLadderShip,
+  itemPrice,
   laidUpLevel,
   lineShip,
   outfitPrice,
   termsMet,
   tierMastered,
+  tierTerms,
   type AmmoId,
   type GameState,
   type GunId,
+  type ItemId,
   type LineShipId,
   type OutfitBonus,
   type OutfitId,
   type OutfitSlot,
   type OutfitStat,
   type Ship,
+  type ShipClassId,
   type ShipFigures,
   type ShipStats,
   type WeaponId,
 } from '../../game';
 import type { Question } from './ConfirmDialog';
 import { AMMO_LORE, GUN_LORE } from './arsenalLore';
-import { AMMO_ICONS, GUN_ICONS, OUTFIT_ICONS, SHIP_ICONS } from './iconAtlas';
+import { AMMO_ICONS, GUN_ICONS, ITEM_ICONS, OUTFIT_ICONS, SHIP_ICONS } from './iconAtlas';
+import { itemGrade, itemText, quickSlotName } from './itemLook';
 import { OUTFIT_LORE } from './outfitLore';
 import { SHIP_LORE } from './shipLore';
+import { whole, type CoinId } from './ui';
 import { t } from '../i18n/i18n';
 
 export const KNOT = 10; // world units per second: the HUD shows speed in knots, a tenth of the game's units
 
-/** Something the port sells: a gun, a pack of ammo, a piece of outfit, or a ship (built, or planned for later) */
+/**
+ * Something the port sells: a gun, a pack of ammo, a piece of outfit, a ship (built, or planned for later), or an item
+ * of the market's, for doubloons
+ */
 export type ShopItem =
-  { readonly gun: GunId } | { readonly ammo: AmmoId } | { readonly outfit: OutfitId } | { readonly ship: LineShipId };
+  | { readonly gun: GunId }
+  | { readonly ammo: AmmoId }
+  | { readonly outfit: OutfitId }
+  | { readonly ship: LineShipId }
+  | { readonly item: ItemId };
 
 /** What buying and fitting do: game methods for the player of this client, each saying whether it worked */
 export interface ShopActions {
   buyGun: (gun: GunId) => boolean;
+  /** Buys `count` of an item at the market, for doubloons */
+  buyItem: (id: ItemId, count?: number) => boolean;
   /** Buys shots of an ammo: a pack's, or `count` */
   buyAmmo: (ammo: AmmoId, count?: number) => boolean;
   /** Sells a gun from the hold, or a pack of an ammo, back to the arsenal */
@@ -62,8 +80,8 @@ export interface ShopActions {
   buyOutfit: (id: OutfitId) => boolean;
   /** Fits a piece of outfit from the hold into its slot, or takes the slot's piece off (null) */
   fitOutfit: (slot: OutfitSlot, id: OutfitId | null) => boolean;
-  /** Buys the ship the shipyard offers and takes its helm */
-  buyShip: () => boolean;
+  /** Buys a ship the shipyard offers and takes its helm */
+  buyShip: (id: ShipClassId) => boolean;
   /** Takes the helm of a ship laid up in port (its place in the player's fleet) */
   takeHelm: (index: number) => boolean;
 }
@@ -74,6 +92,8 @@ export interface Figure {
   readonly label: string;
   readonly value: string | ((state: GameState) => string);
   readonly gold?: boolean;
+  /** An amount of gold or doubloons: its coin before it stands for the word */
+  readonly coin?: CoinId | null;
 }
 
 /** How what pressing did reads: done, refused, or neither (a piece taken off) */
@@ -85,7 +105,10 @@ export type Tone = 'good' | 'bad' | 'plain';
  */
 export interface ItemFace {
   readonly name: string;
+  /** Its tier, or for an item of the market's its grade: the colour of its slot's glow and its card's edge */
   readonly tier: number;
+  /** What the chip in its slot's corner says: its tier (`T2`) unless given; '' for no chip (an item's) */
+  readonly chip?: string;
   /** null until the icons have loaded */
   readonly icon: Texture | null;
   /** Whether its slot shows its tier in big letters without a picture (its icon on its way); a ship's slot stays empty
@@ -95,11 +118,17 @@ export interface ItemFace {
   readonly kind: string;
   /** What it is for, under the card's name */
   readonly about: string;
+  /** Whether `about` takes two lines on the card, in place of the figures' line (an item's: what it does is all) */
+  readonly wrap?: boolean;
   /** Its figures in a line, on the card */
   readonly stats: string;
   readonly price: string;
+  /** The currency `price` is in, when it is gold or doubloons: its coin before it stands for the word */
+  readonly coin: CoinId | null;
   readonly figures: readonly Figure[];
   readonly lore: string;
+  /** The heading over `lore` in the info window (English: the window translates it); its legend unless given */
+  readonly loreTitle?: string;
   /** How many the player has, or that it is fitted; empty if none */
   owned(state: GameState): string;
   /** What the info window says beside its button, at more length than the card; `owned` when there is no more to say */
@@ -112,7 +141,7 @@ export interface ItemFace {
   press(state: GameState): { readonly message: string; readonly tone: Tone } | null;
   /** Selling it back, for what the arsenal buys back (guns, ammo): a second button, as `button` and `press` */
   readonly sell?: ItemButton;
-  /** What the arsenal pays for it, on its card under the price */
+  /** What the arsenal pays for it, in gold: on its card under the price, the coin before it */
   readonly resale?: string;
   /** How many its buttons buy and sell, for what is dealt in by count (ammo): the info window picks it */
   readonly amount?: Amount;
@@ -227,7 +256,8 @@ function gunFace(gun: GunId, actions: ShopActions): ItemFace {
     kind: `${t(kind, { tier: g.tier })}  ·  ${t(g.role)}`,
     about: t(g.role),
     stats: t('d{die} · reach {range} · {reload} s', { die: g.die, range: g.range, reload: g.reload }),
-    price: t('{n} gold', { n: price }),
+    price: whole(price),
+    coin: 'gold',
     figures: [
       { label: 'Damage', value: `d${g.die}  (1–${g.die})` },
       { label: 'Misses on', value: g.missOn > 1 ? `1–${g.missOn}` : '1' },
@@ -236,7 +266,7 @@ function gunFace(gun: GunId, actions: ShopActions): ItemFace {
       { label: 'Damage a second', value: (average / g.reload).toFixed(1) },
       { label: 'Reach', value: String(g.range) },
       { label: 'Reload', value: t('{n} s', { n: g.reload }) },
-      { label: 'Price', value: t('{n} gold', { n: price }), gold: true },
+      { label: 'Price', value: whole(price), gold: true, coin: 'gold' },
     ],
     lore: t(GUN_LORE[gun]),
     owned: ({ ship, player }) => {
@@ -255,7 +285,7 @@ function gunFace(gun: GunId, actions: ShopActions): ItemFace {
         ? { message: t('{name} is in the hold: fit it in the loadout (L)', { name }), tone: 'good' }
         : NOT_ENOUGH(),
     // Only a gun in the hold: one fitted is taken off in the loadout first, so a player never sells their guns by a slip
-    resale: t('Sells for {n} gold', { n: sale }),
+    resale: t('Sells for {n}', { n: whole(sale) }),
     sell: {
       button: ({ player }) => ({
         short: t('Sell'),
@@ -266,7 +296,7 @@ function gunFace(gun: GunId, actions: ShopActions): ItemFace {
         (player.hold[gun] ?? 0) > 0
           ? {
               title: t('Sell {name}?', { name }),
-              text: t('The arsenal pays {n} gold for it, a quarter of its price.', { n: sale }),
+              text: t('The arsenal pays {n} gold for it.', { n: sale }),
               yes: t('Sell: {n} gold', { n: sale }),
             }
           : null,
@@ -294,7 +324,8 @@ function ammoFace(ammo: AmmoId, actions: ShopActions): ItemFace {
     kind,
     about: kind,
     stats: t('+{n} to every hit', { n: bonus }),
-    price: t('{pack} for {n} gold', { pack: AMMO_PACK, n: price }),
+    price: t('{n} for {pack}', { pack: AMMO_PACK, n: whole(price) }),
+    coin: 'gold',
     figures: [
       { label: 'Bonus to every hit', value: `+${bonus}` },
       { label: 'Fired by', value: t(WEAPON_NAMES[weapon]) },
@@ -313,7 +344,7 @@ function ammoFace(ammo: AmmoId, actions: ShopActions): ItemFace {
       },
       { label: 'Loaded now', value: ({ ship }) => t(AMMO[ship.loaded[weapon]].name) },
       { label: 'Pack', value: t('{n} shot|{n} shots', { n: AMMO_PACK }) },
-      { label: 'Price', value: t('{n} gold', { n: price }), gold: true },
+      { label: 'Price', value: whole(price), gold: true, coin: 'gold' },
     ],
     lore: t(AMMO_LORE[ammo]),
     owned: ({ ship }) => {
@@ -323,9 +354,9 @@ function ammoFace(ammo: AmmoId, actions: ShopActions): ItemFace {
     inUse: ({ ship }) => loaded(ship),
     amount: {
       get: () => count,
-      set: (n) => (count = Math.min(Math.max(Math.round(n), 1), MAX_AMMO_DEAL)),
+      set: (n) => (count = Math.max(Math.round(n), 1)),
       // As many as the gold pays for, a part of a coin rounded up on each
-      most: ({ player }) => Math.min(Math.max(Math.floor((player.gold * AMMO_PACK) / price), 1), MAX_AMMO_DEAL),
+      most: ({ player }) => Math.max(Math.floor((player.gold * AMMO_PACK) / price), 1),
     },
     button: ({ player }) => ({
       short: t('Buy'),
@@ -339,7 +370,7 @@ function ammoFace(ammo: AmmoId, actions: ShopActions): ItemFace {
         : t('+{n} {name}: load it in the loadout (L)', { n: count, name });
       return { message, tone: 'good' };
     },
-    resale: t('Sells {pack} for {n} gold', { pack: AMMO_PACK, n: ammoSalePrice(ammo) }),
+    resale: t('Sells {pack} for {n}', { pack: AMMO_PACK, n: whole(ammoSalePrice(ammo)) }),
     sell: {
       button: ({ ship }) => ({
         short: t('Sell'),
@@ -351,7 +382,7 @@ function ammoFace(ammo: AmmoId, actions: ShopActions): ItemFace {
         ship.ammo[ammo] >= count && ammoSalePrice(ammo, count) >= 1
           ? {
               title: t('Sell {name}?', { name: `${name} ×${count}` }),
-              text: t('The arsenal pays {n} gold for {pack} shots, a quarter of their price. {left} left aboard.', {
+              text: t('The arsenal pays {n} gold for {pack} shots. {left} left aboard.', {
                 n: ammoSalePrice(ammo, count),
                 pack: count,
                 left: ship.ammo[ammo] - count,
@@ -396,7 +427,8 @@ function outfitFace(id: OutfitId, actions: ShopActions): ItemFace {
     kind: `${t(SLOT_KINDS[slot], { tier })}  ·  ${t(piece.role)}`,
     about: t(piece.role),
     stats: bonusText(bonus),
-    price: t('{n} gold', { n: price }),
+    price: whole(price),
+    coin: 'gold',
     figures: [
       {
         label: 'Fitted now',
@@ -406,7 +438,7 @@ function outfitFace(id: OutfitId, actions: ShopActions): ItemFace {
         },
       },
       ...changed(bonus).map(change),
-      { label: 'Price', value: t('{n} gold', { n: price }), gold: true },
+      { label: 'Price', value: whole(price), gold: true, coin: 'gold' },
     ],
     lore: t(OUTFIT_LORE[id]),
     owned: ({ ship, player }) => {
@@ -470,18 +502,20 @@ function pathDone(state: GameState) {
 function shipFace(id: LineShipId, actions: ShopActions): ItemFace {
   const ship = lineShip(id);
   const { figures, built, obtain, tier } = ship;
-  const offer = SHIP_OFFERS.find((o) => o.shipClass === id) ?? null;
+  // A ladder's ship is the shipyard's, for gold at its tier's price, built or planned; the rest, their source's
+  const ladder = isLadderShip(id) ? tierTerms(tier) : null;
   const source = SHIP_SOURCES[obtain.source];
-  // What it costs: a ship the shipyard sells, its offer's price; a planned one, its own in its source's currency
-  const price = offer?.price ?? obtain.price;
-  const currency = offer ? 'gold' : source.currency;
-  const cost = price !== null && currency ? t(CURRENCIES[currency].count, { n: price }) : '';
+  const price = ladder?.price ?? obtain.price;
+  const currency = ladder ? 'gold' : source.currency;
+  // Gold and doubloons are their coin and the number; the currencies to come, still in words
+  const coin = price !== null && (currency === 'gold' || currency === 'doubloons') ? currency : null;
+  const cost = price === null || !currency ? '' : coin ? whole(price) : t(CURRENCIES[currency].count, { n: price });
   const name = t(ship.name);
   const premium = obtain.source === 'premium';
   const laidUp = ({ player }: GameState) => player.fleet.findIndex((kept) => kept.shipClass === id);
   const sailed = (state: GameState) => state.ship.shipClass.id === id;
-  /** Whether it is the ship the player works towards now: the one the shipyard sells them */
-  const goal = (state: GameState) => offer !== null && goalOffer(state, state.player) === offer;
+  /** Whether it is a ship the player works towards now: one the shipyard sells them */
+  const goal = (state: GameState) => built !== null && isGoalShip(state, state.player, id);
   /** Its level and hull, if the player has it: the one sailed, or laid up in port; null if not */
   const yours = (state: GameState) => {
     if (sailed(state)) return t('Lv {level} · hull {hp}', { level: state.ship.level, hp: state.ship.hp });
@@ -498,6 +532,7 @@ function shipFace(id: LineShipId, actions: ShopActions): ItemFace {
     about: t(ship.role),
     stats: shipStats(figures),
     price: cost,
+    coin,
     figures: [
       shipFigure('Hull', id, figures, (of) => String(of.hp)),
       shipFigure('Top speed', id, figures, (of) => t('{speed} kn', { speed: (of.maxSpeed / KNOT).toFixed(1) })),
@@ -512,6 +547,7 @@ function shipFace(id: LineShipId, actions: ShopActions): ItemFace {
         label: 'Price',
         value: cost || (obtain.source === 'starter' ? t('Free') : t('to be set')),
         gold: cost !== '',
+        coin,
       },
     ],
     lore: t(SHIP_LORE[id]),
@@ -544,12 +580,23 @@ function shipFace(id: LineShipId, actions: ShopActions): ItemFace {
     inUse: sailed,
     button: (state) => {
       if (sailed(state)) return { short: t('At the helm'), long: t('At the helm'), enabled: false };
-      if (laidUp(state) >= 0) return { short: t('Take the helm'), long: t('Take the helm'), enabled: true };
-      if (offer && goal(state)) {
+      // A ship of a lower tier than the sea's doesn't take to it here, as its gates keep it out
+      const notHere = {
+        short: t('Not in this sea'),
+        long: t('Needs a ship of tier {tier}', { tier: ZONES[state.world.zone].tier }),
+        enabled: false,
+      };
+      const index = laidUp(state);
+      if (index >= 0) {
+        if (!fitsSea(state, state.player.fleet[index].shipClass)) return notHere;
+        return { short: t('Take the helm'), long: t('Take the helm'), enabled: true };
+      }
+      if (built && ladder && goal(state)) {
+        if (!fitsSea(state, built.id)) return notHere;
         return {
           short: t('Buy'),
-          long: t('Buy: {n} gold', { n: offer.price }),
-          enabled: termsMet(state, state.player) && state.player.gold >= offer.price,
+          long: t('Buy: {n} gold', { n: ladder.price }),
+          enabled: termsMet(state, state.player) && state.player.gold >= ladder.price,
         };
       }
       return { short: t('Later'), long: t('Coming later'), enabled: false };
@@ -561,12 +608,70 @@ function shipFace(id: LineShipId, actions: ShopActions): ItemFace {
           ? { message: t('You take the helm of the {name}', { name }), tone: 'good' }
           : null;
       }
-      if (!offer || !goal(state)) return null;
+      if (!built || !goal(state)) return null;
       if (!termsMet(state, state.player)) return { message: t('Meet every term to buy it'), tone: 'bad' };
-      return actions.buyShip()
+      return actions.buyShip(built.id)
         ? { message: t('The {name} is yours: you take its helm', { name }), tone: 'good' }
         : NOT_ENOUGH();
     },
+  };
+}
+
+/**
+ * An item of the market's, for doubloons only: its group, what it is to do (it does nothing yet), how many are in the
+ * hold and the quick slot it is in; bought by any count, picked in the info window
+ */
+function wareFace(id: ItemId, actions: ShopActions): ItemFace {
+  const { name: english, category, price } = ITEMS[id];
+  const name = t(english);
+  const group = t(ITEM_CATEGORIES[category].name);
+  const what = itemText(id);
+  // How many the buttons buy: one on a card, any count picked in the info window
+  let count = 1;
+  return {
+    name,
+    tier: itemGrade(id),
+    chip: '',
+    icon: ITEM_ICONS.get(id),
+    letters: false,
+    kind: group,
+    about: what,
+    wrap: true,
+    stats: '',
+    price: whole(price),
+    coin: 'doubloons',
+    figures: [
+      { label: 'Group', value: group },
+      { label: 'Price', value: whole(price), gold: true, coin: 'doubloons' },
+      { label: 'In the hold', value: ({ player }) => whole(player.items[id] ?? 0) },
+      { label: 'On the skill bar', value: ({ player }) => quickSlotName(player, id) },
+      { label: 'Works', value: t('Not yet: with an update') },
+    ],
+    lore: what,
+    loreTitle: 'What it will do',
+    owned: ({ player }) => {
+      const n = player.items[id] ?? 0;
+      return n > 0 ? t('{n} in the hold', { n: whole(n) }) : '';
+    },
+    // On the skill bar: its card outlined
+    inUse: ({ player }) => player.quickSlots.includes(id),
+    amount: {
+      get: () => count,
+      set: (n) => (count = Math.max(Math.round(n), 1)),
+      most: ({ player }) => Math.max(Math.floor(player.doubloons / price), 1),
+    },
+    button: ({ player }) => ({
+      short: t('Buy'),
+      long: t('Buy {count} for {n} doubloon|Buy {count} for {n} doubloons', { count, n: itemPrice(id, count) }),
+      enabled: player.doubloons >= itemPrice(id, count),
+    }),
+    press: () =>
+      actions.buyItem(id, count)
+        ? {
+            message: t('{name} ×{n} is in the hold: put it on the skill bar from there (H)', { name, n: count }),
+            tone: 'good',
+          }
+        : { message: t('Not enough doubloons'), tone: 'bad' },
   };
 }
 
@@ -575,5 +680,6 @@ export function itemFace(item: ShopItem, actions: ShopActions): ItemFace {
   if ('gun' in item) return gunFace(item.gun, actions);
   if ('ammo' in item) return ammoFace(item.ammo, actions);
   if ('ship' in item) return shipFace(item.ship, actions);
+  if ('item' in item) return wareFace(item.item, actions);
   return outfitFace(item.outfit, actions);
 }

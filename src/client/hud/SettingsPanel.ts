@@ -1,6 +1,6 @@
 import { Container, Graphics, type Rectangle, Text } from 'pixi.js';
-import { ButtonRow } from './ButtonRow';
 import { Checkbox } from './Checkbox';
+import { crossButton } from './theme';
 import { HUD_GROUPS, LABEL_STYLE, type HudFrame, type HudItem, type HudWidget } from './hudItems';
 import { t } from '../i18n/i18n';
 
@@ -9,6 +9,7 @@ const PANEL_ALPHA = 0.95;
 const DIM_ALPHA = 0.45; // darkens the game behind the panel
 const MARGIN = 24; // pixels between the panel and the screen's edge
 const PADDING = 16; // pixels inside the panel
+const CLOSE = 28; // pixels: the close button, the gold cross, square
 const ROW_GAP = 8;
 const GROUP_GAP = 16;
 const CHECK_WIDTH = 30; // pixels: the "on screen" checkbox, then the item's label
@@ -26,8 +27,8 @@ interface Row {
 
 /**
  * A development tool: every HUD item, grouped, with a checkbox for whether it is also shown on the screen, and every
- * control working right here. Opened by the gear medallion on the minimap's frame, closed by Close, Escape or a click
- * beside it.
+ * control working right here. Opened by the gear on the minimap's frame, closed by its gold cross, Escape or
+ * a click beside it.
  * The mouse wheel scrolls it when it is taller than the screen
  */
 export class SettingsPanel {
@@ -37,7 +38,7 @@ export class SettingsPanel {
   private readonly background = new Graphics();
   private readonly title = new Text({ text: t('Settings (dev)'), style: { ...HEADER_STYLE, fontSize: 18 } });
   private readonly note = new Text({ text: t('Checked: also shown on the screen'), style: NOTE_STYLE });
-  private readonly close = new ButtonRow([{ label: t('Close'), key: null, onTap: () => this.hide() }]);
+  private readonly close = crossButton(CLOSE, () => this.hide());
   private readonly content = new Container();
   private readonly clip = new Graphics();
   private readonly rows: Row[] = [];
@@ -158,7 +159,7 @@ export class SettingsPanel {
       .stroke({ width: 1, color: 0xffffff, alpha: 0.3 });
     this.title.position.set(PADDING, PADDING);
     this.note.position.set(PADDING, this.title.y + this.title.height + 4);
-    this.close.container.position.set(panelWidth - PADDING - this.close.container.width, PADDING);
+    this.close.container.position.set(panelWidth - PADDING - this.close.width, PADDING);
     this.content.x = PADDING;
     this.clip
       .clear()

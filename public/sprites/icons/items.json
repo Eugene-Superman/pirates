@@ -1,0 +1,326 @@
+{
+ "file": "items.webp",
+ "tile": 192,
+ "icons": {
+  "cabinBoysScroll": [
+   0,
+   0
+  ],
+  "navigatorsScroll": [
+   1,
+   0
+  ],
+  "captainsScroll": [
+   2,
+   0
+  ],
+  "watchLog": [
+   3,
+   0
+  ],
+  "oldBosunsWisdom": [
+   4,
+   0
+  ],
+  "fleetLog": [
+   5,
+   0
+  ],
+  "letterOfRecommendation": [
+   6,
+   0
+  ],
+  "trophyPennant": [
+   7,
+   0
+  ],
+  "couriersSeal": [
+   8,
+   0
+  ],
+  "canvasPatch": [
+   9,
+   0
+  ],
+  "spareTimbers": [
+   0,
+   1
+  ],
+  "shipyardWarrant": [
+   1,
+   1
+  ],
+  "poseidonsAegis": [
+   2,
+   1
+  ],
+  "stElmosCharm": [
+   3,
+   1
+  ],
+  "mirrorBrass": [
+   4,
+   1
+  ],
+  "boardingNets": [
+   5,
+   1
+  ],
+  "shipsBell": [
+   6,
+   1
+  ],
+  "charonsObol": [
+   7,
+   1
+  ],
+  "smokePots": [
+   8,
+   1
+  ],
+  "fogCloak": [
+   9,
+   1
+  ],
+  "whiteFlag": [
+   0,
+   2
+  ],
+  "homewardCompass": [
+   1,
+   2
+  ],
+  "admiraltyPass": [
+   2,
+   2
+  ],
+  "decoyRaft": [
+   3,
+   2
+  ],
+  "lighthouseInABottle": [
+   4,
+   2
+  ],
+  "bottledGale": [
+   5,
+   2
+  ],
+  "galleySweeps": [
+   6,
+   2
+  ],
+  "kedgeAnchor": [
+   7,
+   2
+  ],
+  "riggingGrease": [
+   8,
+   2
+  ],
+  "ghostShipNail": [
+   9,
+   2
+  ],
+  "grapplingHooks": [
+   0,
+   3
+  ],
+  "soakedPowder": [
+   1,
+   3
+  ],
+  "whaleboneNet": [
+   2,
+   3
+  ],
+  "hornOfDread": [
+   3,
+   3
+  ],
+  "flashPowder": [
+   4,
+   3
+  ],
+  "jollyRoger": [
+   5,
+   3
+  ],
+  "neptunesWrath": [
+   6,
+   3
+  ],
+  "whirlpoolFlask": [
+   7,
+   3
+  ],
+  "oilSlick": [
+   8,
+   3
+  ],
+  "towHarpoon": [
+   9,
+   3
+  ],
+  "phosphorPaint": [
+   0,
+   4
+  ],
+  "tamersWhistle": [
+   1,
+   4
+  ],
+  "bribePurse": [
+   2,
+   4
+  ],
+  "greekFire": [
+   3,
+   4
+  ],
+  "jellyfishVenom": [
+   4,
+   4
+  ],
+  "skippingShot": [
+   5,
+   4
+  ],
+  "blessedShot": [
+   6,
+   4
+  ],
+  "thunderbolt": [
+   7,
+   4
+  ],
+  "fireship": [
+   8,
+   4
+  ],
+  "hiredSloop": [
+   9,
+   4
+  ],
+  "phantomFrigate": [
+   0,
+   5
+  ],
+  "hourglassOfTides": [
+   1,
+   5
+  ],
+  "signalFlare": [
+   2,
+   5
+  ],
+  "gullsEye": [
+   3,
+   5
+  ],
+  "huntersCompass": [
+   4,
+   5
+  ],
+  "barometer": [
+   5,
+   5
+  ],
+  "lookoutParrot": [
+   6,
+   5
+  ],
+  "luckyCoin": [
+   7,
+   5
+  ],
+  "goldenHook": [
+   8,
+   5
+  ],
+  "blackSpot": [
+   9,
+   5
+  ],
+  "wantedPoster": [
+   0,
+   6
+  ],
+  "challengeHorn": [
+   1,
+   6
+  ],
+  "mapScrap": [
+   2,
+   6
+  ],
+  "treasureMap": [
+   3,
+   6
+  ],
+  "mysteryStrongbox": [
+   4,
+   6
+  ],
+  "billOfExchange": [
+   5,
+   6
+  ],
+  "fishingNets": [
+   6,
+   6
+  ],
+  "powderTender": [
+   7,
+   6
+  ],
+  "sailorsCharm": [
+   8,
+   6
+  ],
+  "stormOrb": [
+   9,
+   6
+  ],
+  "drownedKingsCrown": [
+   0,
+   7
+  ],
+  "enchantedWheel": [
+   1,
+   7
+  ],
+  "phoenixFeather": [
+   2,
+   7
+  ],
+  "fireworks": [
+   3,
+   7
+  ],
+  "sailDye": [
+   4,
+   7
+  ],
+  "captainsBanner": [
+   5,
+   7
+  ],
+  "colouredWake": [
+   6,
+   7
+  ],
+  "portraitFrame": [
+   7,
+   7
+  ],
+  "shantySingers": [
+   8,
+   7
+  ],
+  "dolphinEscort": [
+   9,
+   7
+  ]
+ }
+}

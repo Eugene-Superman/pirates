@@ -5,6 +5,7 @@ import { MAP_SQUARES, WORLD_HEIGHT, WORLD_WIDTH } from './map';
 import paintedCoasts from './paintedCoasts.json';
 import { PORT, type Port } from './port';
 import type { Zone, ZoneId } from './zones';
+import type { StoryMark } from '../story/story';
 
 export { MAP_SQUARE, MAP_SQUARES, WORLD_HEIGHT, WORLD_WIDTH } from './map';
 /** Where a player's ship comes into the game, and comes back after it was sunk: off the port in the middle */
@@ -56,6 +57,8 @@ export interface WorldData {
   port: Port;
   /** Its gates to the seas next to it: placed on open water once the sea's routes are known (world/gates.ts) */
   gates: GatePlace[];
+  /** The places the story sends the player to in this sea, placed like the gates (story/story.ts) */
+  marks: StoryMark[];
 }
 
 // The zone's fixed seed keeps its map the same on every run; the starting waters' (24 islands on an 8 × 8 map) is the
@@ -64,7 +67,7 @@ export function createWorld(zone: Zone): WorldData {
   const count = Math.round(zone.islands * MAP_SQUARES * MAP_SQUARES);
   const made = createIslands(count, createRandom(zone.seed), [PORT.island]);
   const islands = zone.painted ? made.map(withPaintedCoast) : made;
-  return { zone: zone.id, islands: [PORT.island, ...islands], port: PORT, gates: [] };
+  return { zone: zone.id, islands: [PORT.island, ...islands], port: PORT, gates: [], marks: [] };
 }
 
 /**

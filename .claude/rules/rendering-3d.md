@@ -18,7 +18,10 @@ paths:
   sorted with them by `port.json`'s points; a lamp and flags drawn over them when it has them) and `IslandSprites.ts`
   (the islands from their paintings, `public/sprites/islands/`: each in slices sorted with the ships by
   `islands.json`'s points, and its shallows, a small picture of a smooth fade stretched under them; a painting is an
-  island's whose centre it gives).
+  island's whose centre it gives). `portrait.ts` (`HullPortrait`) is a bot's hull as a picture for the HUD (the
+  bestiary), with its own camera of `CAMERA`'s pitch and yaw: a still from its atlas (a serpent's pieces laid along a
+  body raised out of the water, as `SerpentSprite` lays them), or its vector model until then or without one, fitted
+  to its box by uniform scale.
   Until their atlases load, the bots' ships (`botShip3d.ts`, a look per class; the seas' pirate brig, warship and
   flagship have only that, for now), the sea monsters (`serpent3d.ts`, `turtle3d.ts`; the seas' crab, shark and
   kraken are only `monster3d.ts`'s simple models, for now), the chests (`chest3d.ts`), the port (`port3d.ts`, its island drawn as an island) and the islands
@@ -28,26 +31,63 @@ paths:
 - `scene/effects/` — client-only decorations with their own state (foam, target marker, ship fire and smoke,
   the sinking animation, shot effects, the sea surface, the fog of war, bots' wrecks, serpents' trails, the repair,
   a level reached, a boss's barrage marks). They may use `Math.random`.
-- `scene/cameraControl.ts` — how the camera keeps up with the ship (follow / dead zone / recenter), switched in the HUD.
+- `scene/cameraControl.ts` — how the camera keeps up with the ship: it glides after it, the ship in the middle of the
+  screen; turned to what the story shows, then back.
 - `hud/` — screen-space Pixi `Text`/`Container`, not projected; `ui.ts` holds the shared colors, `Tile` (a clickable
-  rectangle), `show`/`tint` (change a `Text` only when the value changes), `clip` (a line cut short with an ellipsis)
-  and `HudWindow` (a window over the game: the dim behind it, its panel, Close, Escape, scaled to fit the screen; in
-  the `WindowLook` it is given). `theme.ts` is the windows' theme, dark wood under a brass frame: its
-  panel, `BRASS` tiles (a `TileStyle`), cards, icon slots, meters (`drawMeter`), wells (`drawWell`) and
-  `THEMED_WINDOW`; the port's windows, every `HudWindow`, the chat (`ChatPanel`) and the plates and tracker at the top
-  (`UnitFrames`, `QuestTracker`, a HUD plate being `themedPanel` with smaller brackets) wear it. A text in a panel of a
+  rectangle, painted by a `TileStyle` or drawn by a `TileSkin` of its own), `show`/`tint` (change a `Text` only when the value changes), `clip` (a line cut short with an ellipsis)
+  and `HudWindow` (a window over the game: the dim behind it, its panel, its close button, Escape, scaled to fit the
+  screen; in the `WindowLook` it is given; one with a `ScrollBand`, the talent tree's, is scaled only to the screen's
+  width and cut to its height, its `body` scrolling in the band with the mouse wheel or a bar and its `foot` moved up;
+  a window of one size whose parts scroll on their own, the loadout's slots and hold, puts each in a `ScrollPane`; every scroll bar, the band's and the port's lists' too, is `ScrollPane.ts`'s `ScrollBar`). `theme.ts` is the windows' theme, dark wood under a brass frame: its
+  panel, `BRASS` tiles (a `TileStyle`: the tabs), cards, icon slots, meters (`drawMeter`), the painted gold
+  cross every window closes with (`crossButton`: a `WindowLook`'s close, the settings', the sea chart's in its slot) and
+  `THEMED_WINDOW`; the bestiary and the world chart wear it. A window casts a shadow; nothing on the
+  main screen does (`nightPlate` has none). `nightTheme.ts` is
+  the other look a window may wear (`NIGHT_WINDOW`: the same rim and Close, `panelFrame`, round deep blue and the
+  night sky), its boards of blue glass (`drawNightCard`), wells for lines of text (`drawNightWell`), corner pieces
+  (`nightCorners`; a window's own, `nightWindowCorners`) and dividers (`nightDivider`), a window's header (`nightHeader`: the painted star before its title, the divider under them) and a board with its emblem and heading (`nightBoard`, `nightEmblem`), what the talent tree and the mastery share (`TREE_COLORS`, `DIM_TINT`, `takenGlow`), from the painted pieces `ornaments.ts` hands out by name (`ornament(id, fit)`: a sprite dressed
+  once the atlas has loaded, scaled alike both ways to a width or height, mirrored for another corner; `nightSky`);
+  the captain's mastery, the talent tree, the feats, the loadout, the hold, the statistics (its ships' tabs cards of
+  blue glass, `NIGHT_TAB`, lit while their page shows), the portraits (`PortraitPicker`), the port's windows (`PortScreen`'s buildings, a `HudWindow` each, and `ItemInfo`) and the question (`ConfirmDialog`)
+  wear it; the harbour's frame is a `nightPanel` drawn larger round its picture (`HarbourView`'s `FRAME.scale`, so its
+  rim reads on a picture shrunk to the screen), its corner pieces over the picture, the port's name on a
+  `nightPlaque`. Plainer, the plates and the tracker at the top and the chat (`UnitFrames`, `QuestTracker`,
+  `ChatPanel`: `nightPlate`, the deep blue and the sky under a fine gold edge, `drawPlateEdge` to light it, thin
+  meters `drawNightMeter`, `NIGHT_SPOT` a small clickable spot on one); the tooltip is the night's deep blue too. Its button, `moonButton` (a `TileSkin`: blue glass with pointed ends under a gold
+  edge, a painted star on each point, a halo of moonlight under the pointer; a primary one keeps a faint halo), is
+  every window's, whatever its look, the tabs too (a tab lit while its page shows; `resize` squeezes one into a
+  narrow row, `moonButtonEnd` the room its label keeps from the stars), and the harbour's Set sail; a lit (pressed)
+  one stays blue, its label light. A text in a panel of a
   fixed width wraps (`wordWrap`, or `CanvasTextMetrics` for the chat's lines): nothing runs out over its edge. `iconAtlas.ts` loads the items' painted icons (`public/sprites/icons/`) the first time a window asks,
-  and the minimap's buttons and the skill bar's skills (`public/sprites/hud/`).
+  and the minimap's buttons, the skill bar's skills, the captains' portraits, the maps' markers, the arrows and the
+  painted pointers as pictures (`public/sprites/hud/`), and the story's speakers' (`public/sprites/story/`); an
+  atlas's icons laid out anew every frame (the maps' markers, the arrows) are `IconSprites`, a pool of sprites.
+  Where the main screen's parts go (the frames, the column of items, the tracker, the chat, the skill bar, the
+  minimap) is `HudLayout`'s: `Hud.update` asks it every frame with each part's size and default place (`place`), and
+  gets that place, or where the player put the part in the layout editor (`LayoutEditor`, Edit in the settings),
+  kept by the edge of the screen it was put nearest (or its middle) so it stays there on any screen; a part that grows
+  grows away from that edge (`room`, `growsDown`: a chat at the top unfolds down), a tooltip that would run over the
+  screen's top goes under what it tells of (`Tooltip.point`'s `under`), and the loadout and the hold leave clear the
+  skill bar's band at the top or the bottom (`HudWindow`'s `clear`), the bar raised over their dim while one is open,
+  so ammo and items are dragged onto it and off it (each window's `dragLayer`, and the bar's, over everything). The parts own no place of their own: they are given it.
   `input/` — turns pointer and key events into game method calls; the unit picked out with a click (`selection.ts`)
   is client state, which the game only hears of when the player attacks it. The HUD windows that Escape closes (the
-  sea chart, the statistics, the captain's mastery, the hold, the talents, the loadout, the port with an item's window
-  over it, the settings; and over them all the question before what can't be undone, one `ConfirmDialog` for the
-  whole HUD, the port's included)
-  listen on `window` in the order the HUD makes them, top-most first and all before `keyboardInput` is bound; each
+  sea chart, the world chart, the bestiary, the portraits, the statistics, the feats, the captain's mastery, the hold, the talents, the loadout, the port with an item's window
+  over it, the settings, the layout editor under them; and over them all the question before what can't be undone, one `ConfirmDialog` for the
+  whole HUD, in the night look, the port's included)
+  listen on `window` in the order the HUD makes them, top-most first and all before `keyboardInput` is bound (the
+  story's `Prologue` first of all, over everything: Escape skips it, Enter or Space goes on; its `DialogueBox`, the
+  conversations at the bottom of the screen, hears only Enter; the bosun's tips, `Tips.ts`, show in it when the story
+  has nothing to say, going by themselves after a while); each
   skips an Escape already `defaultPrevented` and calls `preventDefault` when it acted, so one press closes only the
   top window, and Escape reaches the ship only when no window was open.
+- What the story asks a new player to press now is `storyCue` (`hud/storyCue.ts`), worked out once a frame in
+  `Hud.update` and handed to the parts it points into; each lights its own button with a `StoryGuide` of its own,
+  in its own pixels (the main screen's under the windows, the talent tree's under its card, the port's over the
+  harbour and its window, the question's), through a `GuideTarget`: a container and, where its bounds aren't its
+  face (a well painted on a frame, a medallion with its name), its box. A guide never takes a click.
 - `storage/Store.ts` — the browser's memory until there is a server: the progress (`game.save()`), the settings, the
-  quest tracker's folds, the combat log and the language, by key. IndexedDB, else localStorage, else memory alone; read once at the start, written
+  main screen's layout, the quest tracker's folds, the tips given, the combat log and the language, by key. IndexedDB, else localStorage, else memory alone; read once at the start, written
   a moment after a change and at once when the page is hidden; `written()` waits for a write before the page reloads
   (a new language). A new game (`clear()`) keeps the language. A part that keeps one thing gets a `Slot`.
 - Game logic is imported only from `game/index.ts` (`'../../game'`); Oxlint rejects deep imports into `game/`.
@@ -63,7 +103,8 @@ paths:
 - The game's data texts (ship, gun, ammo, goods, outfit, quest and talent names and texts) are English in `game/` and
   translated where the client shows them, with the same dictionaries.
 - Texts are put together when the HUD is made, so `t()` is never called at module load, before `setLang`; a new
-  language reloads the page.
+  language reloads the page. The landing, read in a language (`/`, `/uk/`, `/ru/`), starts the game in it: its form
+  goes to `play/?lang=uk`, which `GameClient` keeps as picked and takes off the address.
 
 ## How it works
 
@@ -72,8 +113,10 @@ paths:
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
   The exceptions are things projected elsewhere: the sprites of ships, monsters and chests with their water masks,
   the port's pictures (`PortSprites`), the islands' paintings (`IslandSprites`), the fog puffs (`FogClouds`) and the sky's clouds and their shadows
-  (`SkyClouds`), all made for this camera; the four shader
-  meshes (`seaSurface.ts`, `fogOfWar.ts`, `Wake.ts`, the water round a wreck in `Sinking.ts`), whose vertices are
+  (`SkyClouds`), all made for this camera; the pillars of light and their motes (`Beacon`: the story's gold, a boss's and its shells' red; soft textures
+  made in a canvas, placed at projected points); the shader
+  meshes (`seaSurface.ts`, `fogOfWar.ts`, `Wake.ts`, the water round a wreck in `Sinking.ts`, the Seams' walls in
+  `SeamWalls.ts`), whose vertices are
   projected with `Camera3D` every frame; and what stays the same size at every zoom, drawn in screen pixels at a
   projected point: the units' hit point bars (`SceneView.drawHpBars`) and the damage numbers (`DamageNumbers`).
 - No perspective: sizes don't depend on distance, line widths are `width * camera.zoom`.
@@ -103,14 +146,19 @@ There is no z-buffer, so order is everything. In `SceneView.update`:
 2. Everything flat on the water (`z = 0`): wakes and the water round a wreck (shader meshes in layers of their own,
    under the islands' see-through shallows) → the painted islands' shallows (`IslandSprites.shallows`, sprites under
    `scene`) → the port's ground picture, once loaded (a sprite under `scene`, in place of its island's ground) → a
-   vector-drawn island's "ground" (shallows, sand, cliff shadows) → world border → range rings (the
+   vector-drawn island's "ground" (shallows, sand, cliff shadows) → the gates, till the sea's maps load (then each is
+   a whirlpool in the sea's shader) and the story's mark
+   (`storyMark3d.ts`: where the story sends the player, its buoy; its light in the water is the sea's shader's, the
+   pillar over it a `Beacon`'s, over the fog) → range rings (the
    picked weapon's shortest and longest reach, dashed, running round) → units' water (a serpent's body under the surface,
-   a turtle's) → bubbles over bots' wrecks → chests' foam rings → repair rings → the level-up's glow and rings → the
-   target lock ring, then the selection ring → shot ripples → a boss's barrage marks (`BarrageMarks`) → projectile
-   shadows → target marker (where the ship can see; beyond, it goes over the fog, see below).
+   a turtle's, a monster's; a gold ring round what the story asks the player to sink, `storyMark3d.ts`) → bubbles over
+   bots' wrecks → chests' foam rings → powder kegs' foam and the ring of their blast (`keg3d.ts`) → repair rings → the
+   level-up's glow and rings → a Royal standard's light round the ship (`standard3d.ts`) → the target lock ring, then
+   the selection ring → shot ripples → a boss's barrage marks and a player's bombardment's (`BarrageMarks`, red and
+   gold) → projectile shadows → target marker (where the ship can see; beyond, it goes over the fog, see below).
    There is no drawn ship shadow: it is baked into the sprite.
 3. Volumetric objects (islands' hills and palms, or the slices of their paintings (`IslandSprites`), bots' ships and
-   monsters, bots' wrecks going down, chests, the port's
+   monsters, bots' wrecks going down, chests, powder kegs afloat, the port's
    pictures' slices (`PortSprites`), or until they load its walls (in lengths of `WALL_STEP`), quay, houses,
    lighthouse and flag (`portPieces`), projectiles, and the player's ship) — `SceneObject`s (`sceneObjects.ts`) sorted
    by `painter.depth(...)` **from far to near**.
@@ -121,10 +169,17 @@ Add a new volumetric object to the `objects` array with `depth` and `draw(painte
 draw it separately after sorting.
 
 A sprite can't go inside a `Graphics`, so the scene is layers in `container`, bottom to top:
-sea surface mesh → wake mesh → wreck water mesh → `layers` → the sky clouds' shadows → fog of war mesh (haze and
-mist) → fog puffs → `markerLayer` (the target marker where the ship can't see) → the sky's clouds → `overlay` (the
+sea surface mesh → the Seams' walls the camera looks towards (`SeamWalls.back`: behind the sea) → wake mesh → wreck
+water mesh → the red `Beacon` round a boss that fights the player (under the ships, so its pillar rises behind
+the masts instead of washing the hull out) → the red `ShellBeacons` over the spots its shells are to land on (as many
+as the sea's shader lights, `SHELL_LIGHTS`) → `layers` → the Seams' walls between the camera and the sea (`SeamWalls.front`, a curtain seen through,
+clearer round the player's ship) → the sky clouds' shadows → fog of war mesh (haze and
+mist) → fog puffs → `markerLayer` (the target marker where the ship can't see) → the story's `Beacon` (the pillar of light
+over where the story sends the player, and its motes, over the port's pictures and the fog: seen from afar) → the sky's
+clouds → `overlay` (the
 navigation debug drawings) → `hpBars` (the units' hit point bars, with a red border on a bot hostile to the player) →
-the damage numbers, over everything.
+`arrows` (the story's painted gold arrows, `IconSprites`: round the ship towards where it sends the player off the
+screen, over what it asks them to sink) → the damage numbers, over everything.
 `layers` holds the painted islands' shallows and the port's ground picture (once loaded), then the sorted objects: `scene` (flat things and the objects
 farther than the first sprite), then for each sprite far to near its own layers (a ship: its sprite, its `waterMask`,
 its fire over it; a serpent: its pieces; a slice of the port's pictures or of an island's) and a `Graphics` segment of the vector-drawn
@@ -210,7 +265,21 @@ its `intact` atlas has loaded (the vector model stands in for a bot, a monster o
   the texture's pixels apart.
 - The sea's look is one set of numbers, `SEA_LOOK` in `seaLook.ts`: three wave layers over the `swell` and `ripples`
   maps, a `chop` where gusts blow with whitecaps frayed by the wakes' foam, two layers of `caustics` (light on the
-  floor of the shallows), and the broad `patches` of deeper and shallower water, cloud shadows and gusts. The fog starts at
+  floor of the shallows), and the broad `patches` of deeper and shallower water, cloud shadows and gusts; and its
+  `glass`, the Moon's light from below (docs/story.md: its shards glow on the seabed): made up in the shader with no
+  map, a shard in some cells of a grid, each its own size and breath, its light bent by the caustics, sparks over it.
+  A cell's shard is picked by its whole place in the world (`uGlassCell`), so it stays put as the camera moves. And its
+  `mark`, where the story sends the player (`Beacon.water`): a pool of gold light, rings of it spreading, bent by
+  the waves, the water turned gold rather than lightened (light added onto its blue whitens it); and its `boss`, the
+  same in red round a boss while it fights the player, pulsing faster, and on every spot its shells are to land on
+  (`ShellBeacons.water`, an array of `SHELL_LIGHTS` uniforms, `uShells`). Its `seam`, the storm
+  at the map's edges, where the Seams' walls stand (`SeamWalls.ts`, the sea's ripples running up their faces): a gust
+  everywhere and steeper waves, darker water, whitewater at the walls' foot. Its `vortex`, the gate nearest the
+  camera (one at a time: they stand at the map's far sides) as a whirlpool: the waves' slope turned round it and
+  tilted into its funnel, arms of foam along log spirals, the foam's lace laid along them in coordinates round it
+  (taken twice, its angle cut on either side, each used away from its cut: no seam where the angle wraps), its eye lit.
+  Pixi compiles a shader as GLSL ES 3.00 only when its source says `#version 300 es`, else as GLSL ES 1.00: these are
+  written for 1.00 (`texture`, `in`/`out` mapped by Pixi), so no `textureGrad`, `dFdx` or other 3.00-only call. The fog starts at
   `ship.viewRange`; hiding its layers in the HUD changes only the picture, never what the ship can see or shoot
   (`ship.canSee` in the game).
 
@@ -222,11 +291,12 @@ its `intact` atlas has loaded (the vector model stands in for a bot, a monster o
 - A shot flashes at every muzzle of the volley, `MAX_MUZZLES` at most. A bite throws up spray and splinters, and
   `lunge(id, time)` darts the monster's head forward; `shake(id, time)` rocks whatever was hit. The player's own ship
   going down is `Sinking`'s, not a splash here.
-- The `damage` and `repair` events are `DamageNumbers`': a number floating up over the unit, styled by how the volley
-  or bite went (full, a critical hit, the wrong weapon for the target, a miss), red when the player's own ship is hit,
-  green for a repair step (with its gold cost), gold for gold paid (a bounty over the wreck, a chest or a quest over
-  the ship); for the player's ship also the experience earned, a level reached, an ability used, goods hauled aboard
-  and a full hold. A fixed pool of `Text` objects reused round-robin. `LevelUpEffect` is the level's light round the
+- The `damage` and `repair` events are `DamageNumbers`': a number floating up over the unit, small and red (paler for
+  the wrong weapon for the target, a deeper red with a minus on the player's own ship, "Miss"; critical hits only in
+  the combat log), green for a repair step (with its gold cost), gold with its coin for gold paid (a bounty over the
+  wreck, a chest or a quest over the ship); for the player's ship also the experience earned with its star, a level reached, an
+  ability used, goods hauled aboard and a full hold. A newer number never hides under an older one: the older is
+  pushed up over it, never back down. A fixed pool of labels reused round-robin. `LevelUpEffect` is the level's light round the
   ship; `BarrageMarks` the spots a boss's shells will land on (`state.shells`), red rings filling in as they come down.
 
 ## Bots, wrecks and the repair (`effects/Wrecks.ts`, `effects/Trails.ts`, `effects/RepairEffect.ts`)

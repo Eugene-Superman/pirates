@@ -26,6 +26,7 @@ in vec2 aPosition;
 in vec2 aWorld;
 
 out vec2 vFromShip;
+out vec2 vWorld;
 out vec2 vMist1;
 out vec2 vMist2;
 
@@ -42,6 +43,7 @@ void main() {
   mat3 mvp = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix;
   gl_Position = vec4((mvp * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
   vFromShip = (aWorld - uShip) / uViewRange;
+  vWorld = aWorld;
   vMist1 = (aWorld - uMist1.xy) * uMist1.zw;
   vMist2 = (aWorld - uMist2.xy) * uMist2.zw;
 }
@@ -49,6 +51,7 @@ void main() {
 
 const FRAGMENT = /* glsl */ `
 in vec2 vFromShip;
+in vec2 vWorld;
 in vec2 vMist1;
 in vec2 vMist2;
 
@@ -58,9 +61,12 @@ uniform sampler2D uWisps;
 uniform vec4 uHaze;
 uniform vec2 uEdge;
 uniform vec2 uMistAlpha;
+uniform vec3 uSpot;
 
 void main() {
   float fog = smoothstep(uEdge.x, uEdge.y, length(vFromShip));
+  // The spot the crew watches far off (the story's spyglass) clears as the ship's own view does; none at radius 0
+  if (uSpot.z > 0.0) fog = min(fog, smoothstep(uEdge.x, uEdge.y, length(vWorld - uSpot.xy) / uSpot.z));
   vec4 far = texture(uWisps, vMist1) * uMistAlpha.x;
   vec4 near = texture(uWisps, vMist2) * uMistAlpha.y;
   // Premultiplied colors, layered "over" each other: haze, then the two layers of mist
@@ -77,6 +83,8 @@ function fogUniforms() {
   return new UniformGroup({
     uShip: { value: new Float32Array(2), type: 'vec2<f32>' },
     uViewRange: { value: 1, type: 'f32' },
+    // x, y and radius of the spot the crew watches far off (Ship.spotted); radius 0 for none
+    uSpot: { value: new Float32Array(3), type: 'vec3<f32>' },
     uMist1: { value: new Float32Array(4), type: 'vec4<f32>' },
     uMist2: { value: new Float32Array(4), type: 'vec4<f32>' },
     uHaze: { value: new Float32Array([r * HAZE_ALPHA, g * HAZE_ALPHA, b * HAZE_ALPHA, HAZE_ALPHA]), type: 'vec4<f32>' },
@@ -144,6 +152,8 @@ export function updateFogOfWar(
   const u = fog.uniforms;
   u.uShip.set([ship.x, ship.y]);
   u.uViewRange = ship.viewRange;
+  const { spotted } = ship;
+  u.uSpot.set(spotted ? [spotted.x, spotted.y, spotted.radius] : [0, 0, 0]);
   MIST_LAYERS.forEach((layer, i) => {
     // The texture's origin drifts with the wind. It is moved by whole tiles to near the ship, which keeps the
     // texture coordinates small: far from 0 a float loses the precision to tell the texture's pixels apart

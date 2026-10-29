@@ -3,6 +3,7 @@ import type { Point } from '../lib/geometry';
 import type { NavGrid } from '../navigation/NavGrid';
 import { routeClearance } from '../navigation/pilot';
 import type { Ship } from '../ships/Ship';
+import { nearStoryMark } from '../story/story';
 import { nearGate } from '../world/gates';
 import { nearHarbour } from '../world/port';
 import { BOT_KINDS, type BotKindId } from './botKinds';
@@ -43,6 +44,11 @@ export interface BotMind {
   leader: number | null;
   /** Part of a boss's escort: it doesn't come back on its own when sunk, the boss brings new ones */
   readonly escort: boolean;
+  /**
+   * The player's ship it was brought in for, the story's prey (bots/spawner.ts, stepPrey): weaker than its kind, never
+   * back once sunk. Null for the rest
+   */
+  readonly prey: number | null;
 }
 
 export function newBotMind(
@@ -51,6 +57,7 @@ export function newBotMind(
   circle: number,
   time: number,
   leader: number | null = null,
+  prey: number | null = null,
 ): BotMind {
   return {
     kind,
@@ -63,6 +70,7 @@ export function newBotMind(
     aimedAt: -Infinity,
     leader,
     escort: leader !== null,
+    prey,
   };
 }
 
@@ -139,12 +147,13 @@ function pickFoe(state: GameState, players: readonly Ship[], ship: Ship, mind: B
   }
   const kind = BOT_KINDS[mind.kind];
   if (mind.foe === null && kind.behaviour === 'aggressive') {
-    let nearest = kind.aggroRange;
+    let nearest = Infinity;
     for (const other of players) {
-      // In port, a player is out of the fight
-      if (other.isSinking || other.docked) continue;
+      // In port, a player is out of the fight; and left alone while their crew watches something (the story)
+      if (other.isSinking || other.docked || other.parley) continue;
       const distance = Math.hypot(other.x - ship.x, other.y - ship.y);
-      if (distance <= nearest) {
+      // A captain with the Ghost of the sea is noticed only nearer
+      if (distance <= kind.aggroRange * (1 - other.bonus.stealth) && distance <= nearest) {
         nearest = distance;
         engage(mind, other, time);
       }
@@ -153,7 +162,8 @@ function pickFoe(state: GameState, players: readonly Ship[], ship: Ship, mind: B
   if (mind.foe === null) return null;
 
   const foe = state.ships.find((s) => s.id === mind.foe);
-  if (!foe || foe.isSinking || foe.docked) {
+  // A foe whose crew watches something (the story) is left alone, unless it fires at this bot
+  if (!foe || foe.isSinking || foe.docked || (foe.parley && foe.attackTarget !== ship.id)) {
     calm(ship, mind, time);
     return null;
   }
@@ -218,8 +228,8 @@ function steerTo(ship: Ship, x: number, y: number) {
 }
 
 /**
- * Leg after leg to open water round its home (never into the harbour or by a gate), at cruising speed, with a pause in
- * between
+ * Leg after leg to open water round its home (never into the harbour, by a gate or by a story's mark), at cruising
+ * speed, with a pause in between
  */
 function wander(state: GameState, nav: NavGrid, ship: Ship, mind: BotMind, random: () => number) {
   const { time } = state;
@@ -239,7 +249,13 @@ function wander(state: GameState, nav: NavGrid, ship: Ship, mind: BotMind, rando
     mind.home.y + Math.sin(angle) * distance,
     routeClearance(ship),
   );
-  if (!spot || nearHarbour(state.world.port, spot.x, spot.y) || nearGate(state.world.gates, spot.x, spot.y)) {
+  const { port, gates, marks } = state.world;
+  if (
+    !spot ||
+    nearHarbour(port, spot.x, spot.y) ||
+    nearGate(gates, spot.x, spot.y) ||
+    nearStoryMark(marks, spot.x, spot.y)
+  ) {
     mind.nextLegAt = time + PAUSE[0];
     return;
   }

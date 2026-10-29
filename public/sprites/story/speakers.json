@@ -1,0 +1,22 @@
+{
+ "file": "speakers.webp",
+ "tile": 256,
+ "icons": {
+  "keeper": [
+   0,
+   0
+  ],
+  "bosun": [
+   1,
+   0
+  ],
+  "harbourMaster": [
+   2,
+   0
+  ],
+  "shard": [
+   3,
+   0
+  ]
+ }
+}

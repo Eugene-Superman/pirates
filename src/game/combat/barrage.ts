@@ -2,7 +2,8 @@ import type { GameState } from '../GameState';
 import { hullGap } from '../physics/hull';
 import type { DamageDie } from './arsenal';
 import { strikeOnce, type Point3 } from './combat';
-import { findUnit, isAfloat } from './units';
+import { shellBlast, type Charge } from './ordnance';
+import { findUnit, isAfloat, type UnitKind } from './units';
 
 /**
  * A boss's mortar (ShipClass.barrage): every `cooldown` seconds, at a foe within `range` it can see, it marks `shells`
@@ -20,6 +21,16 @@ export interface Barrage extends DamageDie {
   readonly bonus: number;
 }
 
+/**
+ * A ship's own shell (the Bombardment, combat/ordnance.ts): what it rolls, as a volley of all its cannons, times
+ * `boost`, and what fired it
+ */
+export interface ShellOrdnance {
+  readonly ownerKind: UnitKind;
+  readonly charge: Charge;
+  readonly boost: number;
+}
+
 /** A shell on its way: the spot it was aimed at, marked on the water till it lands */
 export interface Shell {
   readonly id: number;
@@ -30,11 +41,13 @@ export interface Shell {
   readonly radius: number;
   readonly firedAt: number;
   readonly landsAt: number;
+  /** A ship's own (a player's bombardment), striking the bots under it; null for a boss's, striking players' ships */
+  readonly ordnance: ShellOrdnance | null;
 }
 
 /**
  * Bosses fire their barrages at the foes they attack, and shells due land: a `shellLanded` event each, and damage to
- * every player's ship under it (`hurt`, as from a cannon). Stepped from Game.update right after combat; `random` is the
+ * every player's ship under a boss's (`hurt`, as from a cannon), to every bot under a player's bombardment's. Stepped from Game.update right after combat; `random` is the
  * game's dice
  */
 export function stepBarrages(state: GameState, random: () => number) {
@@ -63,6 +76,7 @@ export function stepBarrages(state: GameState, random: () => number) {
         radius: barrage.radius,
         firedAt: state.time,
         landsAt: state.time + barrage.delay,
+        ordnance: null,
       });
     }
     state.events.push({
@@ -79,6 +93,10 @@ export function stepBarrages(state: GameState, random: () => number) {
   for (const shell of landed) {
     const at: Point3 = { x: shell.x, y: shell.y, z: 0 };
     state.events.push({ type: 'shellLanded', ownerId: shell.ownerId, at });
+    if (shell.ordnance) {
+      shellBlast(state, { ...shell, ordnance: shell.ordnance }, random);
+      continue;
+    }
     const owner = findUnit(state, shell.ownerId);
     const barrage = owner?.shipClass.barrage;
     if (!owner || !barrage) continue;

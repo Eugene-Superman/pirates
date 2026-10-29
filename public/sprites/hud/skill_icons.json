@@ -6,12 +6,32 @@
    0,
    0
   ],
-  "fullSail": [
+  "locked": [
    1,
    0
   ],
-  "locked": [
+  "broadside": [
    2,
+   0
+  ],
+  "fullSail": [
+   3,
+   0
+  ],
+  "rocket": [
+   4,
+   0
+  ],
+  "powderKeg": [
+   5,
+   0
+  ],
+  "bombardment": [
+   6,
+   0
+  ],
+  "royalStandard": [
+   7,
    0
   ]
  }

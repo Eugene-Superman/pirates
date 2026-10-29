@@ -1,5 +1,6 @@
-import { Container, Graphics, Text, type FillGradient, type Rectangle, type TextStyleOptions } from 'pixi.js';
-import { t } from '../i18n/i18n';
+import { Container, Graphics, Rectangle, Sprite, Text, type FillGradient, type TextStyleOptions } from 'pixi.js';
+import { SYMBOL_ICONS, type SymbolId } from './iconAtlas';
+import { ScrollBar } from './ScrollPane';
 
 /** The HUD's colors, shared by its panels and bars */
 export const UI = {
@@ -71,6 +72,18 @@ export function clip(line: Text, width: number) {
   }
 }
 
+/**
+ * Cuts a wrapped text short with an ellipsis, a word at a time, to fit `lines` lines of `lineHeight` pixels (a card's
+ * two lines: its info window has all of it)
+ */
+export function clipLines(label: Text, lines: number, lineHeight: number) {
+  let shown = label.text;
+  while (label.height > (lines + 0.5) * lineHeight && shown.includes(' ')) {
+    shown = shown.slice(0, shown.lastIndexOf(' ')).replace(/[\s,.:;]+$/, '');
+    label.text = `${shown}…`;
+  }
+}
+
 /** How a tile looks: pressed (lit), disabled (dimmed, not clickable), and its border color */
 export interface TileLook {
   readonly pressed?: boolean;
@@ -92,6 +105,20 @@ export interface TileStyle {
   readonly pressedBorder: number;
   readonly bevel: boolean;
 }
+
+/** What a tile is doing, for a skin to draw it by; border: a colour its owner has lit its edge in */
+export interface TileState {
+  readonly hovered: boolean;
+  readonly pressed: boolean;
+  readonly disabled: boolean;
+  readonly border?: number;
+}
+
+/**
+ * A tile drawn its own way, in place of a style's fill and border: a theme's button. It draws into `g`, cleared, for a
+ * tile `width` × `height` pixels in its state, and may reach out past it (a glow), where the pointer doesn't find it
+ */
+export type TileSkin = (g: Graphics, width: number, height: number, state: TileState) => void;
 
 /** The HUD's own tiles: blue, lit gold when pressed */
 export const PLAIN: TileStyle = {
@@ -132,9 +159,15 @@ export class Tile {
   width: number;
   height: number;
   private readonly radius: number;
-  private readonly style: TileStyle;
+  private readonly style: TileStyle | TileSkin;
 
-  constructor(width: number, height: number, onTap: (() => void) | null, radius = 6, style: TileStyle = PLAIN) {
+  constructor(
+    width: number,
+    height: number,
+    onTap: (() => void) | null,
+    radius = 6,
+    style: TileStyle | TileSkin = PLAIN,
+  ) {
     this.width = width;
     this.height = height;
     this.radius = radius;
@@ -175,10 +208,23 @@ export class Tile {
   private paint() {
     const { style } = this;
     const { pressed = false, disabled = false } = this.look;
-    const border = this.look.border ?? (pressed ? style.pressedBorder : style.border);
+    const skinned = typeof style === 'function';
+    const border = this.look.border ?? (skinned ? undefined : pressed ? style.pressedBorder : style.border);
     const key = `${pressed}${disabled}${border}${this.hovered}${this.width}x${this.height}`;
     if (key === this.painted) return;
     this.painted = key;
+    this.content.alpha = disabled ? 0.45 : 1;
+    if (skinned) {
+      // A skin's glow reaches past the tile: only the tile itself is under the pointer
+      this.container.hitArea = new Rectangle(0, 0, this.width, this.height);
+      style(this.background.clear(), this.width, this.height, {
+        hovered: this.hovered && !disabled,
+        pressed,
+        disabled,
+        border,
+      });
+      return;
+    }
     const fill = pressed ? style.pressed : this.hovered && !disabled ? style.hover : style.idle;
     const alpha = disabled ? style.alpha * 0.55 : style.alpha;
     const { width, height, radius } = this;
@@ -192,65 +238,119 @@ export class Tile {
         .moveTo(radius, 1.5)
         .lineTo(width - radius, 1.5)
         .stroke({ width: 1, color: 0xffffff, alpha: pressed ? 0.35 : 0.1 });
-    this.content.alpha = disabled ? 0.45 : 1;
   }
 }
 
 const WINDOW_MARGIN = 20; // pixels between a window and the screen's edge, at least
-const GEAR_TEETH = 8;
+// A window's band that scrolls: pixels per unit of the mouse wheel; the least of it shown before the window is scaled
+// down after all (a screen too low for its fixed parts and this much); its bar, pixels: its right edge in from the
+// window's, and its thumb's least length
+const SCROLL = { speed: 0.6, least: 240, inset: 9, thumb: 40 } as const;
+const XP_STAR = 0xffcf3f; // the drawn experience star, until its painting loads
+const XP_STAR_SCALE = 1.3; // the painted star's size over a coin's of the same radius
 
-/** How a window looks: the panel under what it shows, its Close button, and how dark the game gets behind it */
+/**
+ * How a window looks: the panel under what it shows, its close button (`width` pixels wide, its top left corner at its
+ * place), and how dark the game gets behind it
+ */
 export interface WindowLook {
   readonly panel: (width: number, height: number) => Container;
-  readonly close: (label: string, onTap: () => void) => { readonly tile: Tile };
+  readonly close: (onTap: () => void) => { readonly container: Container; readonly width: number };
   readonly dim: number;
 }
 
 /**
+ * The part of a window that scrolls when the window is taller than the screen, in its pixels: from `top` down to
+ * `bottom` above its foot. What is above it stays (its title, Close), what is below moves up with its foot
+ */
+export interface ScrollBand {
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/** Pixels at the screen's top and bottom a window leaves clear */
+export interface ScreenEdges {
+  readonly top: number;
+  readonly bottom: number;
+}
+
+const NO_EDGES: ScreenEdges = { top: 0, bottom: 0 };
+
+/**
  * A window over the game (the loadout, the talents, the statistics, an item up close in port): its `panel` centred on
  * the screen and scaled down to fit, the game dimmed behind it, in the `look` it is given (the windows' theme is
- * theme.ts's THEMED_WINDOW). Clicks on it and round it never reach the stage, which would steer the ship. Close, a click
- * beside it and Escape call `onClose`. An Escape another window has taken is left alone: the windows listen in the
- * order the HUD makes them, the one on top first, so one press closes one window
+ * theme.ts's THEMED_WINDOW). A window with a `scroll` band isn't scaled down for the screen's height: it is cut to the
+ * screen and the band scrolls, with the mouse wheel or its bar. Clicks on it and round it never reach the stage, which
+ * would steer the ship. Its close button (the gold cross), a click beside it and Escape call `onClose`. An Escape
+ * another window has taken is left alone: the windows listen in the order the HUD makes them, the one on top first, so
+ * one press closes one window
  */
 export class HudWindow {
   readonly container = new Container();
   /** What the window shows, in pixels before scaling: the owner adds to it */
   readonly panel = new Container();
+  /**
+   * A window with a scroll band: the owner's parts in the band, laid out in the panel's pixels as if all of the window
+   * showed; moved up as the band scrolls, and cut to it
+   */
+  readonly body = new Container();
+  /** And its parts under the band: moved up with the window's foot when the window is cut short */
+  readonly foot = new Container();
   private readonly dim = new Graphics();
   private readonly dimAlpha: number;
   private readonly screen: Rectangle;
   private readonly look: WindowLook;
   private background: Container;
   private readonly width: number;
+  /** Pixels down all of the window, before it is cut short to scroll */
   private height: number;
-  /** Pixels at the bottom of the screen it leaves clear: what must show under it (the skill bar under the loadout) */
-  private readonly bottom: number;
+  /** Pixels down the panel as drawn: all of the window, or as much of it as the screen has room for */
+  private drawnHeight: number;
+  /** What it leaves clear at the screen's edges, asked as it is fitted: what must show by it (the skill bar by the loadout) */
+  private readonly clear: () => ScreenEdges;
+  private readonly band: ScrollBand | null;
+  private readonly clip = new Graphics();
+  private readonly bar = new ScrollBar(SCROLL.thumb, (y) => this.scrollTo(y));
+  /** Pixels of the band scrolled past, and the most it scrolls: as much of it as the screen has no room for */
+  private scroll = 0;
+  private hidden = 0;
   /** The screen size it was fitted to */
   private fittedTo = '';
 
   /**
-   * width, height: the panel's, in pixels; pad: from its top right corner to the Close button; bottom: pixels at the
-   * bottom of the screen it leaves clear (none by default)
+   * width, height: the panel's, in pixels; pad: from its top right corner to the Close button; clear: what it leaves
+   * clear at the screen's top and bottom, asked every frame (none by default); scroll: the band that scrolls when the
+   * window is taller than the screen (none: it is scaled down to fit)
    */
   constructor(
     screen: Rectangle,
-    size: { width: number; height: number; pad: number; bottom?: number },
+    size: { width: number; height: number; pad: number; clear?: () => ScreenEdges; scroll?: ScrollBand },
     onClose: () => void,
     look: WindowLook,
   ) {
     this.screen = screen;
     this.width = size.width;
     this.height = size.height;
-    this.bottom = size.bottom ?? 0;
+    this.drawnHeight = size.height;
+    this.clear = size.clear ?? (() => NO_EDGES);
+    this.band = size.scroll ?? null;
     this.dimAlpha = look.dim;
     this.look = look;
     this.container.visible = false;
     this.background = blocker(look.panel(size.width, size.height));
     blocker(this.dim).on('pointertap', onClose);
-    const close = look.close(t('Close'), onClose);
-    close.tile.container.position.set(size.width - size.pad - close.tile.width, size.pad);
-    this.panel.addChild(this.background, close.tile.container);
+    const close = look.close(onClose);
+    close.container.position.set(size.width - size.pad - close.width, size.pad);
+    this.panel.addChild(this.background, close.container);
+    // The stage takes the clicks on whatever in it takes none (a board, a line of text) as its own: the panel takes
+    // them first, or a click there would steer the ship
+    blocker(this.panel);
+    if (this.band) {
+      this.body.mask = this.clip;
+      this.panel.on('wheel', (e) => this.scrollTo(this.scroll + e.deltaY * SCROLL.speed));
+      this.bar.container.position.set(size.width - SCROLL.inset - ScrollBar.WIDTH, this.band.top);
+      this.panel.addChild(this.body, this.clip, this.foot, this.bar.container);
+    }
     this.container.addChild(this.dim, this.panel);
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape' || !this.isOpen || e.defaultPrevented) return;
@@ -264,28 +364,74 @@ export class HudWindow {
     return this.container.visible;
   }
 
+  /** Pixels of the scroll band scrolled past: the body's parts are that much higher in the panel */
+  get scrolled() {
+    return this.scroll;
+  }
+
+  /** Pixels down the panel as drawn: all of the window, or as much of it as the screen has room for */
+  get shownHeight() {
+    return this.drawnHeight;
+  }
+
   /** A window whose contents grow or shrink with what it shows: its panel made again at the new height */
   resize(height: number) {
     if (height === this.height) return;
     this.height = height;
+    this.paint(height);
+    this.fittedTo = '';
+  }
+
+  /**
+   * Every frame while open: the dim and the panel's place follow the screen's size. A window with a scroll band is
+   * scaled down only to the screen's width (and so far as its fixed parts and some of the band fit a low screen), and
+   * cut to the screen's height
+   */
+  fit() {
+    const { width, height } = this.screen;
+    const edges = this.clear();
+    const size = `${width}x${height}/${edges.top}/${edges.bottom}`;
+    if (size === this.fittedTo) return;
+    this.fittedTo = size;
+    this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: this.dimAlpha });
+    const free = height - edges.top - edges.bottom;
+    const room = free - WINDOW_MARGIN * 2;
+    const band = this.band;
+    const fixed = band ? band.top + band.bottom : 0;
+    const least = band ? fixed + Math.min(SCROLL.least, this.height - fixed) : this.height;
+    const scale = Math.min(1, (width - WINDOW_MARGIN * 2) / this.width, room / least);
+    const drawn = band ? Math.min(this.height, Math.floor(room / scale)) : this.height;
+    this.panel.scale.set(scale);
+    const top = edges.top + (free - drawn * scale) / 2;
+    this.panel.position.set(Math.round((width - this.width * scale) / 2), Math.round(top));
+    if (!band) return;
+    this.paint(drawn);
+    this.hidden = this.height - drawn;
+    this.foot.y = -this.hidden;
+    this.clip.clear().rect(0, band.top, this.width, this.view()).fill({ color: 0xffffff });
+    this.scrollTo(this.scroll);
+  }
+
+  /** The panel drawn `height` pixels down, under the rest */
+  private paint(height: number) {
+    if (height === this.drawnHeight) return;
+    this.drawnHeight = height;
     const background = blocker(this.look.panel(this.width, height));
     this.panel.addChildAt(background, 0);
     this.background.destroy({ children: true });
     this.background = background;
-    this.fittedTo = '';
   }
 
-  /** Every frame while open: the dim and the panel's place follow the screen's size */
-  fit() {
-    const { width, height } = this.screen;
-    const size = `${width}x${height}`;
-    if (size === this.fittedTo) return;
-    this.fittedTo = size;
-    this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: this.dimAlpha });
-    const free = height - this.bottom;
-    const scale = Math.min(1, (width - WINDOW_MARGIN * 2) / this.width, (free - WINDOW_MARGIN * 2) / this.height);
-    this.panel.scale.set(scale);
-    this.panel.position.set(Math.round((width - this.width * scale) / 2), Math.round((free - this.height * scale) / 2));
+  /** Pixels of the scroll band that show */
+  private view() {
+    return this.band ? this.drawnHeight - this.band.top - this.band.bottom : 0;
+  }
+
+  /** The band scrolled to `y` pixels past its top, as far as it goes; its bar drawn for it */
+  private scrollTo(y: number) {
+    this.scroll = Math.max(0, Math.min(this.hidden, y));
+    this.body.y = -this.scroll;
+    this.bar.draw(this.view(), this.hidden, this.scroll);
   }
 }
 
@@ -327,14 +473,73 @@ export function drawHarpoon(g: Graphics, size: number, tier: number) {
     .stroke({ width: 1.5, color: tierColor(tier) });
 }
 
-/** A gold coin round (0, 0): the player's gold */
+/** A harpoon pointing up and right, all in `color`, `size` pixels across: a sign, as on a branch's emblem */
+export function drawHarpoonSign(g: Graphics, size: number, color: number) {
+  const h = size / 2;
+  g.moveTo(-h, h)
+    .lineTo(h * 0.45, -h * 0.45)
+    .stroke({ width: size * 0.12, color, cap: 'round' });
+  g.poly([h, -h, h * 0.1, -h * 0.6, h * 0.6, -h * 0.1]).fill({ color });
+}
+
+/** A gold coin drawn round (0, 0): the painted one's stand-in (`goldCoin`), and a coin as an emblem */
 export function drawCoin(g: Graphics, radius: number) {
   g.circle(0, 0, radius).fill({ color: 0xe8b52e }).stroke({ width: 1, color: 0x7a5410 });
   g.circle(0, 0, radius * 0.62).stroke({ width: 1, color: 0xfff0a8, alpha: 0.8 });
 }
 
-/** A doubloon round (0, 0): a redder gold than the gold coin, with a cross struck on it */
-export function drawDoubloon(g: Graphics, radius: number) {
+/** The gold coin round (0, 0), `radius` pixels: wherever the HUD shows gold, in place of the word */
+export function goldCoin(radius: number) {
+  return symbol('gold', radius, (g) => drawCoin(g, radius));
+}
+
+/** The doubloon round (0, 0), `radius` pixels: wherever the HUD shows doubloons, in place of the word */
+export function doubloon(radius: number) {
+  return symbol('doubloon', radius, (g) => drawDoubloon(g, radius));
+}
+
+/** The currencies the HUD has a coin for: an amount of one is its coin and the number */
+export type CoinId = 'gold' | 'doubloons';
+
+/** The coin of `currency` round (0, 0), `radius` pixels */
+export function coinOf(currency: CoinId, radius: number) {
+  return currency === 'gold' ? goldCoin(radius) : doubloon(radius);
+}
+
+/** The experience star round (0, 0), `radius` pixels: wherever the HUD shows experience, in place of "XP" */
+export function xpStar(radius: number) {
+  // Its painting has sparkles round the star: drawn larger, the star itself is as big as a coin. Inside a container
+  // of its own, so whoever scales the star (the floating numbers) keeps this
+  const sign = symbol('xp', radius, (g) => drawStar(g, radius, XP_STAR));
+  sign.scale.set(XP_STAR_SCALE);
+  const star = new Container();
+  star.addChild(sign);
+  return star;
+}
+
+/** A painted sign (SYMBOL_ICONS) once its picture has loaded, drawn by `stand` till then or if it isn't painted */
+function symbol(id: SymbolId, radius: number, stand: (g: Graphics) => void) {
+  const sign = new Container();
+  const drawn = new Graphics();
+  stand(drawn);
+  sign.addChild(drawn);
+  const paint = () => {
+    const texture = SYMBOL_ICONS.get(id);
+    if (!texture || sign.destroyed) return;
+    const sprite = new Sprite(texture);
+    sprite.anchor.set(0.5);
+    sprite.setSize(radius * 2);
+    drawn.visible = false;
+    sign.addChild(sprite);
+  };
+  if (SYMBOL_ICONS.get(id)) paint();
+  else SYMBOL_ICONS.load(paint);
+  return sign;
+}
+
+/** A doubloon round (0, 0), the painted one's stand-in (`doubloon`): a redder gold than the gold coin, with a cross
+ * struck on it */
+function drawDoubloon(g: Graphics, radius: number) {
   g.circle(0, 0, radius).fill({ color: 0xd9822b }).stroke({ width: 1, color: 0x6b360b });
   g.circle(0, 0, radius * 0.72).stroke({ width: 1, color: 0xffd39a, alpha: 0.75 });
   const arm = radius * 0.4;
@@ -353,55 +558,6 @@ export function drawCrate(g: Graphics, size: number) {
   g.moveTo(-h + 1.5, h - 1.5)
     .lineTo(h - 1.5, -h + 1.5)
     .stroke({ width: 1.6, color: 0x5c3816 });
-}
-
-/** A gear wheel round (0, 0), `size` pixels across, a hole through its middle: the settings */
-export function drawGear(g: Graphics, size: number, color: number) {
-  const outer = size / 2;
-  const inner = outer * 0.72;
-  const half = Math.PI / GEAR_TEETH;
-  const points: number[] = [];
-  for (let i = 0; i < GEAR_TEETH; i++) {
-    const at = i * half * 2;
-    // A tooth: up from the rim at one side, across its top, down at the other
-    for (const [r, da] of [
-      [inner, -half * 0.95],
-      [outer, -half * 0.5],
-      [outer, half * 0.5],
-      [inner, half * 0.95],
-    ] as const) {
-      points.push(Math.cos(at + da) * r, Math.sin(at + da) * r);
-    }
-  }
-  g.poly(points)
-    .fill({ color })
-    .circle(0, 0, outer * 0.34)
-    .cut();
-}
-
-/**
- * Four corners of a square round (0, 0), `size` pixels across: pointing out to fill the screen, or in (`exit`) to
- * leave it
- */
-export function drawFullscreen(g: Graphics, size: number, color: number, exit: boolean) {
-  const h = size / 2;
-  const arm = size * 0.36;
-  for (const [sx, sy] of [
-    [-1, -1],
-    [1, -1],
-    [1, 1],
-    [-1, 1],
-  ] as const) {
-    // The corner's point: on the square's corner going out, a little inside it coming back
-    const cx = exit ? sx * (h - arm) : sx * h;
-    const cy = exit ? sy * (h - arm) : sy * h;
-    const dx = exit ? sx * arm : -sx * arm;
-    const dy = exit ? sy * arm : -sy * arm;
-    g.moveTo(cx + dx, cy)
-      .lineTo(cx, cy)
-      .lineTo(cx, cy + dy)
-      .stroke({ width: 2.5, color, cap: 'round', join: 'round' });
-  }
 }
 
 /** A sail on its mast, filled by the wind: the Full sail ability. `size` is the icon's height in pixels */

@@ -8,20 +8,29 @@ import { newPilotMemory, type Helm } from '../navigation/pilot';
 import { hullReach, type Body, type Hull } from '../physics/hull';
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../world/World';
 import type { ZoneId } from '../world/zones';
+import { NO_BONUS, addBonuses, addEffects, type ShipBonus } from './bonus';
 import { MAX_HEALTH, damageStage, damagedSpeed, type DamageStage } from './damage';
 import {
   OUTFITS,
   addShares,
   fittedPieces,
   grownStats,
-  scaledBonus,
   type OutfitBonus,
   type OutfitId,
   type OutfitSlot,
   type ShipStats,
 } from './outfit';
 import { COMBAT_TIME } from './repair';
-import { PERKS, TALENTS, levelOf, reloadShare, talentBlock, type TalentId } from './talents';
+import {
+  ABILITY_LEVELS,
+  levelOf,
+  reloadShare,
+  talentBlock,
+  talentOf,
+  talentTree,
+  type SignatureId,
+  type TalentId,
+} from './talents';
 import type { ShipClass } from './shipClasses';
 import { newStats, type Stats } from '../records/stats';
 
@@ -65,19 +74,39 @@ export class Ship implements Body {
   xp = 0;
   /** The talents taken, with their ranks (ships/talents.ts). Only players' ships earn any */
   private readonly ranks = new Map<TalentId, number>();
-  /** Game time its ability (a level 5 talent) can be used again */
-  abilityReadyAt = 0;
+  /**
+   * What its player's captain's mastery gives it (account/mastery.ts), on every ship they sail: set by setCaptain.
+   * None for a bot's
+   */
+  private given: ShipBonus = NO_BONUS;
+  /** What its talents give it, their ranks added up: worked out again whenever one is taken or forgotten */
+  private talented: ShipBonus = NO_BONUS;
+  /** Both together */
+  private both: ShipBonus = NO_BONUS;
+  /** Game time each of its abilities (ships/talents.ts, ABILITY_LEVELS: F, G, …) can be used again */
+  readonly abilityReadyAt = [0, 0, 0];
+  /** A rocket asked for at this unit (the level 25 ability): fired at the next update (combat/ordnance.ts) */
+  rocketAt: number | null = null;
   /** Broadside was used: the next volley does more damage */
   broadsideArmed = false;
-  /** Game times Full sail ends, and a chain shot's slowing */
+  /** Game time a Royal standard flies till: more damage done, less taken */
+  standardUntil = 0;
+  /** Game times Full sail ends, a chain shot's or a barbed harpoon's slowing, and a Battle cry */
   fullSailUntil = 0;
   slowedUntil = 0;
-  /** Second wind has mended the hull in this fight already */
+  battleCryUntil = 0;
+  /** Share of its top speed it is left while slowed */
+  slowedTo = 1;
+  /** Second wind has mended the hull in this fight already; Iron keel has kept it afloat */
   secondWindUsed = false;
+  ironKeelUsed = false;
   /** Hull points Damage control has mended short of a whole one */
   patchDue = 0;
-  /** Relentless: the target of its last volleys, and how many in a row */
-  relentless: { target: number | null; volleys: number } = { target: null, volleys: 0 };
+  /**
+   * Relentless: the target of its last volleys, and how many in a row before this one; and the cannons' of them, this
+   * one too (a Rolling thunder's every third)
+   */
+  relentless: { target: number | null; volleys: number; cannons: number } = { target: null, volleys: 0, cannons: 0 };
   /** Game time Unsinkable is ready again */
   unsinkableReadyAt = 0;
   /** Share of its top speed it has this update: Full sail, a chain shot (stepTalents sets it) */
@@ -149,6 +178,13 @@ export class Ship implements Body {
   power = 1;
   /** The gate (world/gates.ts) it is in now, if any: a gate tells why it is closed once a time it is sailed into */
   gate: ZoneId | null = null;
+  /**
+   * A spot the crew watches beyond its view range (the story's spyglass, story/story.ts): what is within `radius` of it
+   * is in sight too. Null for none
+   */
+  spotted: { readonly x: number; readonly y: number; readonly radius: number } | null = null;
+  /** Meanwhile no bot starts a fight with it, and those fighting it leave it, but for one it fires at (bots/brain.ts) */
+  parley = false;
 
   constructor(shipClass: ShipClass, id: number) {
     this.id = id;
@@ -191,8 +227,10 @@ export class Ship implements Body {
     return this.bot !== null;
   }
 
-  /** Whether a point is close enough to be seen, not hidden in the fog of war */
+  /** Whether a point is close enough to be seen, or by the spot the crew watches: not hidden in the fog of war */
   canSee(x: number, y: number) {
+    const { spotted } = this;
+    if (spotted && Math.hypot(x - spotted.x, y - spotted.y) <= spotted.radius) return true;
     return Math.hypot(x - this.x, y - this.y) <= this.viewRange;
   }
 
@@ -230,9 +268,43 @@ export class Ship implements Body {
     return this.figures.maxHp;
   }
 
-  /** Places in the hold for goods: the class's, more with Quartermaster */
+  /** Places in the hold for goods: the class's, more with its talents and the captain's mastery */
   get holdSize() {
-    return Math.round(this.shipClass.hold * (1 + PERKS.hold * this.rank('quartermaster')));
+    return Math.round(this.shipClass.hold * (1 + this.bonus.hold));
+  }
+
+  /** What its player's captain's mastery gives it: NO_BONUS for a bot's */
+  get captain() {
+    return this.given;
+  }
+
+  /** What its talents give it */
+  get talentBonus() {
+    return this.talented;
+  }
+
+  /** What its talents and the captain's mastery give it together: what the game reads */
+  get bonus() {
+    return this.both;
+  }
+
+  /** Its class's talent tree (ships/talentTrees.ts) */
+  get tree() {
+    return talentTree(this.shipClass.id);
+  }
+
+  /** Sails with what its player's captain's mastery gives: its figures change at once */
+  setCaptain(captain: ShipBonus) {
+    this.given = captain;
+    this.retally();
+  }
+
+  /** Its talents' ranks added up again, and with the captain's mastery; then its figures */
+  private retally() {
+    // A branch talent's effects a rank; a signature's (rank 1), the passives' that are only that (Master gunner)
+    this.talented = addEffects([...this.ranks].map(([id, rank]) => [talentOf(id).effects, rank] as const));
+    this.both = addBonuses(this.given, this.talented);
+    this.refit();
   }
 
   /**
@@ -273,13 +345,11 @@ export class Ship implements Body {
     return this.grown({ ...this.outfit, [slot]: id });
   }
 
-  /** Its class's figures (as tuned) grown by an outfit and the talents taken */
+  /** Its class's figures (as tuned) grown by an outfit, the talents taken and the captain's mastery */
   private grown(outfit: Readonly<Record<OutfitSlot, OutfitId | null>>) {
     const bonuses: OutfitBonus[] = fittedPieces(outfit).map(({ bonus }) => bonus);
-    for (const [id, rank] of this.ranks) {
-      const { bonus } = TALENTS[id];
-      if (bonus) bonuses.push(scaledBonus(bonus, rank));
-    }
+    const { speed, holedSpeed, acceleration, turn, hull, sight } = this.bonus;
+    bonuses.push({ speed, holedSpeed, acceleration, turn, hull, sight });
     return grownStats(this.tuned, addShares(bonuses));
   }
 
@@ -347,8 +417,8 @@ export class Ship implements Body {
 
   /** It fired, or was fired at: in combat for COMBAT_TIME from now, and any repair stops */
   enterCombat(time: number) {
-    // Bilge pumps: the crew gets to the repair sooner
-    const length = COMBAT_TIME - PERKS.combatTime * this.rank('bilgePumps');
+    // Bilge pumps and the captain's Slip away: the crew gets to the repair sooner
+    const length = COMBAT_TIME - this.bonus.combatTime;
     this.combatUntil = Math.max(this.combatUntil, time + length);
     this.repairing = false;
   }
@@ -420,9 +490,9 @@ export class Ship implements Body {
     return guns.length === 0 ? 0 : Math.min(...guns.map(({ gun }) => this.reach(gun)));
   }
 
-  /** How far a gun of this ship reaches, world units: the gun's own reach, more with Long guns */
+  /** How far a gun of this ship reaches, world units: the gun's own reach, more with its talents and the captain's mastery */
   reach(gun: Gun) {
-    return gun.range * (1 + PERKS.range * this.rank('longGuns'));
+    return gun.range * (1 + (gun.weapon === 'cannon' ? this.bonus.cannonRange : this.bonus.harpoonRange));
   }
 
   /** The ship's level from its XP, 1 to its class's `maxLevel` */
@@ -444,11 +514,15 @@ export class Ship implements Body {
     return this.ranks;
   }
 
-  /** Its ability: the level 5 signature talent picked, used with a key; null without one */
-  get ability(): TalentId | null {
+  /**
+   * Its ability in a slot (0 the first, F; 1 the second, G): the active signature talent picked at the slot's level
+   * (ABILITY_LEVELS), used with its key; null without one
+   */
+  abilityIn(slot: number): SignatureId | null {
+    const level = ABILITY_LEVELS[slot];
     for (const id of this.ranks.keys()) {
-      const talent = TALENTS[id];
-      if (talent.kind === 'signature' && talent.active) return id;
+      const talent = talentOf(id);
+      if (talent.kind === 'signature' && talent.active && talent.level === level) return talent.id;
     }
     return null;
   }
@@ -460,7 +534,7 @@ export class Ship implements Body {
   learnTalent(id: TalentId) {
     if (talentBlock(this, id) !== null) return false;
     this.ranks.set(id, this.rank(id) + 1);
-    this.refit();
+    this.retally();
     return true;
   }
 
@@ -468,10 +542,12 @@ export class Ship implements Body {
   forgetTalents() {
     this.ranks.clear();
     this.broadsideArmed = false;
+    this.rocketAt = null;
     this.fullSailUntil = 0;
+    this.standardUntil = 0;
     this.patchDue = 0;
-    this.relentless = { target: null, volleys: 0 };
-    this.refit();
+    this.relentless = { target: null, volleys: 0, cannons: 0 };
+    this.retally();
   }
 
   /** Picks the ammo its weapon fires from now on */
@@ -579,10 +655,13 @@ export class Ship implements Body {
     this.docked = false;
     this.mayDock = true;
     this.fullSailUntil = 0;
+    this.standardUntil = 0;
     this.slowedUntil = 0;
+    this.battleCryUntil = 0;
     this.secondWindUsed = false;
+    this.ironKeelUsed = false;
     this.patchDue = 0;
-    this.relentless = { target: null, volleys: 0 };
+    this.relentless = { target: null, volleys: 0, cannons: 0 };
   }
 
   /** Turns towards the helm's heading no faster than turnSpeed, speeds up or slows down towards its speed, and moves */

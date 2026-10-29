@@ -61,7 +61,9 @@ const HARPOON_FLASH_TIME = 0.12;
 const FLAME_LENGTH = 8; // world units, the tongue of fire out of the muzzle
 const FLAME_WIDTH = 2.2;
 const FLASH_CORE = 3.2; // world units, the radius of the bright ball at the muzzle
-const TRAIL_INTERVAL = 0.035; // seconds between the puffs a cannonball leaves behind
+const TRAIL_INTERVAL = 0.035; // seconds between the puffs a cannonball leaves behind, two for a rocket
+// A powder keg blowing up, for a blast of radius PERKS.powderKeg.blast: fire, sparks, smoke and water thrown up
+const BLAST = { fire: 34, sparks: 26, smoke: 22, spray: 30 } as const;
 const LUNGE_TIME = 0.45; // seconds a monster's head stays darted forward after a bite
 
 const COLORS = {
@@ -147,7 +149,8 @@ export class ShotEffects {
       for (const projectile of state.projectiles) {
         if (projectile.weapon !== 'cannon') continue;
         const at = projectilePosition(projectile);
-        this.burst([at.x, at.y, at.z], 1, trail);
+        if (projectile.kind === 'rocket') this.burst([at.x, at.y, at.z], 2, rocketTrail);
+        else this.burst([at.x, at.y, at.z], 1, trail);
       }
     }
 
@@ -226,6 +229,23 @@ export class ShotEffects {
       this.burst(at, 10, (p) => spark(p, 0, 0));
       return;
     }
+    // A rocket off a deck: fire and smoke where it leaves
+    if (event.type === 'rocket') {
+      const at: Vec3 = [event.at.x, event.at.y, event.at.z];
+      this.flash(at, event.dirX, event.dirY, 'cannon');
+      this.burst(at, 10, (p) => smoke(p, -event.dirX, -event.dirY));
+      this.burst(at, 8, (p) => spark(p, -event.dirX, -event.dirY));
+      return;
+    }
+    if (event.type === 'kegDropped') {
+      this.burst([event.at.x, event.at.y, 0], 8, (p) => spray(p, 0.5));
+      this.ripple(event.at.x, event.at.y, 2, 9, 1, 0.6, 0);
+      return;
+    }
+    if (event.type === 'kegBlast') {
+      this.blast(event.at.x, event.at.y, event.radius);
+      return;
+    }
     if (event.type === 'shellLanded') {
       const { x, y } = event.at;
       this.burst([x, y, 0], 26, (p) => spray(p, 1.3));
@@ -279,6 +299,11 @@ export class ShotEffects {
     this.burst([x, y, 0], cannon ? 10 : 5, (p) => spray(p, cannon ? 0.7 : 0.45));
     this.flash(at, dirX, dirY, cannon ? 'cannon' : 'harpoon');
     if (cannon) this.burst(at, 6, (p) => smoke(p, -dirX, -dirY));
+    // A rocket bursts into flame on the hull
+    if (event.kind === 'rocket') {
+      this.burst(at, 14, (p) => fire(p, 0.6));
+      this.burst(at, 10, (p) => spark(p, between(-1, 1), between(-1, 1)));
+    }
     this.ripple(x, y, 2, cannon ? 9 : 6, 1.2, 0.6, 0);
   }
 
@@ -288,6 +313,25 @@ export class ShotEffects {
     this.burst([x, y, 0], 12, (p) => spray(p, 0.8));
     this.burst([x, y, 3], 10, (p) => splinter(p, -towardsX / d, -towardsY / d));
     this.ripple(x, y, 3, 12, 1.2, 0.6, 0);
+  }
+
+  /**
+   * A powder keg blowing up: a flash and a ball of fire, sparks every way, smoke rising, a column of water and rings
+   * spreading as far as the blast reached
+   */
+  private blast(x: number, y: number, radius: number) {
+    const scale = radius / 80;
+    this.flash([x, y, 2], 0, 0, 'cannon');
+    this.burst([x, y, 2], BLAST.fire, (p) => fire(p, scale));
+    this.burst([x, y, 2], BLAST.sparks, (p) => {
+      const angle = Math.random() * Math.PI * 2;
+      spark(p, Math.cos(angle), Math.sin(angle));
+      p.vz = between(8, 22);
+    });
+    this.burst([x, y, 3], BLAST.smoke, (p) => smoke(p, between(-1, 1), between(-1, 1)));
+    this.burst([x, y, 0], BLAST.spray, (p) => spray(p, 1.6));
+    this.ripple(x, y, 6, radius, 1.6, 0.8, 0);
+    this.ripple(x, y, 4, radius * 0.7, 1.3, 0.6, 0.2);
   }
 
   /** A target's hit points ran out: a big splash where it was, wood flying from a hull, and rings spreading wide */
@@ -362,6 +406,36 @@ function trail(p: Particle) {
   p.from = COLORS.smokeLight;
   p.to = COLORS.smokeDark;
   p.alpha = 0.4;
+}
+
+/** A rocket's trail: fire out of its tail cooling to smoke */
+function rocketTrail(p: Particle) {
+  trail(p);
+  p.x += between(-0.4, 0.4);
+  p.y += between(-0.4, 0.4);
+  p.maxLife = 0.8;
+  p.size = 0.9;
+  p.growth = 2.8;
+  p.from = COLORS.flame;
+  p.alpha = 0.6;
+}
+
+/** scale: 1 for a keg's blast of 80 world units. Fire that swells, rises and cools to smoke */
+function fire(p: Particle, scale: number) {
+  const angle = Math.random() * Math.PI * 2;
+  const out = between(4, 22) * scale;
+  p.vx = Math.cos(angle) * out;
+  p.vy = Math.sin(angle) * out;
+  p.vz = between(6, 18) * scale;
+  p.gravity = -4;
+  p.drag = 2.2;
+  p.wind = 0.5;
+  p.maxLife = between(0.5, 0.9);
+  p.size = between(1.6, 2.8) * scale;
+  p.growth = 2.4;
+  p.from = COLORS.flameInner;
+  p.to = COLORS.smokeDark;
+  p.alpha = 0.9;
 }
 
 function spark(p: Particle, dirX: number, dirY: number) {

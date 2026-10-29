@@ -4,13 +4,17 @@ import {
   WORLD_WIDTH,
   ZONES,
   ZONE_IDS,
+  seaOpenTo,
   zoneKinds,
   type BotKind,
   type GameState,
   type Zone,
   type ZoneId,
 } from '../../game';
-import { THEME, THEMED_WINDOW, TITLE_STYLE, brassButton, drawDivider, subheading } from './theme';
+import { arrowBob } from './chart';
+import { ARROWS, IconSprites } from './iconAtlas';
+import { THEME, THEMED_WINDOW, TITLE_STYLE, drawDivider, subheading } from './theme';
+import { moonButton } from './nightTheme';
 import { HudWindow, Tile, text, tierColor } from './ui';
 import { t } from '../i18n/i18n';
 
@@ -31,6 +35,9 @@ const PICKED = 0x7fe3ff; // the sea the details tell of
 const BOSS_COLOR = 0xff7a6a;
 const CLOSED_ALPHA = 0.45; // a sea's name and levels, when the ship's tier is too low for it
 const BUTTON = { width: 220, height: 34 } as const;
+// Pixels: the arrows over the sea the player is in (gold) and the next one their ship may sail to (ivory), and how far
+// over its tile each hangs
+const ARROW = { size: 34, gap: 2 } as const;
 // For now the details' button takes the player to the sea picked, wherever they are: for the developer. Later the seas
 // are reached only through their gates
 const JUMP = true;
@@ -44,7 +51,8 @@ interface Node {
 /**
  * The world chart (N, or its button in the HUD or on the sea chart): every sea, a column a tier of ship from the
  * starting waters on the left to tier 6 on the right, linked by the gates between them, the sea the player is in lit
- * and the ones their ship's tier is too low for dimmed. On the right, what the sea picked (or under the pointer) is:
+ * and the ones their ship's tier is too low for dimmed, a gold arrow over it and an ivory one over the next sea along
+ * the gates if the ship's tier is high enough for it. On the right, what the sea picked (or under the pointer) is:
  * its tier and levels, what it is like, its gates, what sails it and its boss. For now (JUMP) a button takes the
  * player to the sea picked at once, for the developer; later the seas are reached only through their gates
  */
@@ -53,7 +61,9 @@ export class WorldChart {
   private readonly window: HudWindow;
   private readonly nodes: Node[] = [];
   private readonly details = new Container();
-  private readonly jump: ReturnType<typeof brassButton>;
+  private readonly jump: ReturnType<typeof moonButton>;
+  /** Over the sea the player is in and the next one open to their ship, bobbing */
+  private readonly arrows = new IconSprites(ARROWS);
   private hovered: Zone | null = null;
   /** The sea the details tell of when the pointer is on none: the one clicked, or the one the player is in */
   private picked: Zone | null = null;
@@ -119,7 +129,7 @@ export class WorldChart {
       .rect(right - GAP / 2, DIVIDER + 12, 1, HEIGHT - DIVIDER - PAD * 2 - HINT - 4)
       .fill({ color: THEME.brass, alpha: 0.3 });
     this.details.position.set(right, DIVIDER + 12);
-    this.jump = brassButton(BUTTON.width, BUTTON.height, t('Sail there (developer)'), () => {
+    this.jump = moonButton(BUTTON.width, BUTTON.height, t('Sail there (developer)'), () => {
       if (this.picked) travel(this.picked.id);
     });
     this.jump.tile.container.position.set(right, HEIGHT - PAD - HINT - BUTTON.height - 8);
@@ -127,7 +137,7 @@ export class WorldChart {
     const hint = text(t('Click a sea to read about it; sail into its gates to go there'), 12, THEME.dim);
     hint.position.set(PAD, HEIGHT - PAD - HINT + 8);
     drawDivider(links, PAD, HEIGHT - PAD - HINT, WIDTH - PAD * 2);
-    this.window.panel.addChild(rule, this.details, this.jump.tile.container, hint);
+    this.window.panel.addChild(rule, this.details, this.jump.tile.container, hint, this.arrows.container);
   }
 
   get isOpen() {
@@ -149,6 +159,7 @@ export class WorldChart {
     this.window.fit();
     const tier = state.ship.shipClass.tier;
     const here = ZONES[state.world.zone];
+    this.pointArrows(here, tier);
     const told = this.hovered ?? this.picked ?? here;
     const key = `${told.id}:${here.id}:${tier}:${this.picked?.id ?? ''}`;
     if (key === this.shown) return;
@@ -158,11 +169,30 @@ export class WorldChart {
       frame.clear();
       if (lit !== null) frame.roundRect(-3, -3, NODE.width + 6, NODE.height + 6, 10).stroke({ width: 2.5, color: lit });
       tile.setLook({ pressed: zone === here });
-      tile.content.alpha = zone.tier > tier ? CLOSED_ALPHA : 1;
+      tile.content.alpha = seaOpenTo(zone.id, tier) ? 1 : CLOSED_ALPHA;
     }
     // The jump goes to the sea clicked
     this.jump.tile.setLook({ disabled: (this.picked ?? here) === here });
     this.describe(told, here, tier);
+  }
+
+  /**
+   * The arrows over the tiles, bobbing: the gold one over the sea the player is in, the ivory one over the next sea
+   * along the gates, when a ship of `tier` may sail there
+   */
+  private pointArrows(here: Zone, tier: number) {
+    const nextId = ZONE_IDS[ZONE_IDS.indexOf(here.id) + 1];
+    const next = nextId ? ZONES[nextId] : null;
+    const bob = arrowBob(performance.now() / 1000);
+    const arrows = this.arrows;
+    arrows.begin();
+    for (const { zone, tile } of this.nodes) {
+      const id = zone === here ? 'downGold' : zone === next && seaOpenTo(zone.id, tier) ? 'downIvory' : null;
+      if (!id) continue;
+      const { x, y } = tile.container;
+      arrows.put(id, x + NODE.width / 2, y - ARROW.gap - ARROW.size / 2 - bob, ARROW.size);
+    }
+    arrows.end();
   }
 
   /** The details of a sea, down the column on the right */
@@ -181,13 +211,14 @@ export class WorldChart {
         ? t('The starting waters, levels {from}–{to}', { from, to })
         : t('A tier {tier} sea, levels {from}–{to}', { tier: zone.tier, from, to });
     add(text(kind, 13, tierColor(Math.max(1, zone.tier)), { fontWeight: 'bold' }), 2);
+    const open = seaOpenTo(zone.id, tier);
     const status =
       zone === here
         ? t('You are here')
-        : zone.tier > tier
-          ? t('Needs a ship of tier {tier}', { tier: zone.tier })
-          : t('Open to your ship');
-    add(text(status, 12, zone === here ? HERE : zone.tier > tier ? THEME.dim : THEME.text), 10);
+        : open
+          ? t('Open to your ship')
+          : t('Needs a ship of tier {tier}', { tier: zone.tier });
+    add(text(status, 12, zone === here ? HERE : open ? THEME.text : THEME.dim), 10);
     add(text(t(zone.about), 13, THEME.text, { wordWrap: true, wordWrapWidth: DETAILS, lineHeight: 18 }), 12);
 
     add(subheading(t('Gates'), 15), 4);

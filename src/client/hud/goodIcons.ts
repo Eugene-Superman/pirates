@@ -1,16 +1,19 @@
 import { Container, Graphics } from 'pixi.js';
 import { GOODS, type GoodId } from '../../game';
 import { t } from '../i18n/i18n';
-import { THEME, brassButton, drawCard, iconSlot } from './theme';
-import { text } from './ui';
+import { THEME, iconSlot } from './theme';
+import { drawNightCard, moonButton } from './nightTheme';
+import { goldCoin, text, whole } from './ui';
 
 /**
  * The goods' list in the hold and at the market, pixels: the board with the places taken and its meter, the heading
  * over the goods, a good's row and its slot, between two rows, and the board saying the hold is empty
  */
 export const GOODS_LIST = { board: 66, meter: 14, heading: 30, row: 60, slot: 46, gap: 8, empty: 64 } as const;
-const BUTTON = { width: 104, height: 30, gap: 8 } as const; // pixels: a row's buttons, at its right end
+// Pixels: a row's buttons, at its right end, wide enough for "Выбросить всё" between the stars on their points
+const BUTTON = { width: 132, height: 30, gap: 8 } as const;
 const GOLD = 0xffcf3f; // what the goods fetch
+const COIN = 7; // pixels: the radius of the coin before it
 
 /** Each good's colour: its slot's glow and the stripe down its row, in the hold and at the market */
 export const GOOD_COLORS: Readonly<Record<GoodId, number>> = {
@@ -21,12 +24,14 @@ export const GOOD_COLORS: Readonly<Record<GoodId, number>> = {
   contraband: 0xa3ab72,
   turtleShell: 0x8fc25c,
   serpentScale: 0x45c4ab,
+  moonGlass: 0x9fe8ff,
   baronsStrongbox: 0xffd34d,
 };
 
 /**
  * A good's picture round (0, 0), `size` pixels across, until the goods have painted icons: a fish, folded cloth, a
- * sack of spices, a bottle of rum, a roped bundle under a seal, a turtle's shell, a serpent's scales, a strongbox
+ * sack of spices, a bottle of rum, a roped bundle under a seal, a turtle's shell, a serpent's scales, a glowing shard
+ * of moon glass, a strongbox
  */
 export function drawGood(g: Graphics, good: GoodId, size: number) {
   const k = size / 32;
@@ -113,6 +118,19 @@ export function drawGood(g: Graphics, good: GoodId, size: number) {
         }
       }
       break;
+    case 'moonGlass':
+      // A shard of the Moon in its own light
+      g.circle(0, 0, 13 * k).fill({ color: 0x9fe8ff, alpha: 0.18 });
+      g.poly([-2 * k, -13 * k, 7 * k, -4 * k, 4 * k, 11 * k, -6 * k, 8 * k, -8 * k, -3 * k])
+        .fill({ color: 0xc8f4ff })
+        .stroke({ width: k, color: 0x3d7f99 });
+      g.poly([-2 * k, -13 * k, 1 * k, -2 * k, -8 * k, -3 * k]).fill({ color: 0xffffff, alpha: 0.7 });
+      g.moveTo(1 * k, -2 * k)
+        .lineTo(4 * k, 11 * k)
+        .moveTo(1 * k, -2 * k)
+        .lineTo(7 * k, -4 * k)
+        .stroke({ width: k, color: 0x5fb6d4, alpha: 0.8 });
+      break;
     case 'baronsStrongbox':
       g.roundRect(-13 * k, -2 * k, 26 * k, 13 * k, 2 * k)
         .fill({ color: 0x7a4a22 })
@@ -133,17 +151,20 @@ export function drawGood(g: Graphics, good: GoodId, size: number) {
 
 /**
  * A good's row, `width` pixels wide, in the hold or at the market: its picture with how many there are, its name,
- * what they fetch, and its buttons at the right end, in the order given
+ * what they fetch (at `share` of their price: the captain's mastery), and its buttons at the right end, in the order
+ * given, on a board of blue glass
  */
 export function goodRow(
   id: GoodId,
   count: number,
   width: number,
   buttons: readonly { readonly label: string; readonly onTap: () => void }[],
+  share = 1,
 ) {
   const { row: height, slot: size } = GOODS_LIST;
   const row = new Container();
-  const { name, price } = GOODS[id];
+  const { name } = GOODS[id];
+  const price = Math.round(GOODS[id].price * share);
   const slot = iconSlot(size, GOOD_COLORS[id], `${count}`, false);
   const glyph = drawGood(new Graphics(), id, size - 14);
   glyph.position.set(size / 2, size / 2);
@@ -151,13 +172,17 @@ export function goodRow(
   slot.container.position.set(12, (height - size) / 2);
   const title = text(t(name), 15, THEME.text, { fontWeight: 'bold' });
   title.position.set(12 + size + 14, 11);
-  const worth = text(`${t('{n} gold each', { n: price })} · ${t('{n} gold', { n: price * count })}`, 12, GOLD, {
+  // What they fetch, a coin before it for the word
+  const coin = goldCoin(COIN);
+  coin.position.set(title.x + COIN, 33 + COIN);
+  const worth = text(t('{n} each · {total}', { n: whole(price), total: whole(price * count) }), 12, GOLD, {
     fontWeight: 'bold',
   });
-  worth.position.set(title.x, 33);
-  row.addChild(drawCard(new Graphics(), width, height, GOOD_COLORS[id]), slot.container, title, worth);
+  worth.position.set(title.x + COIN * 2 + 5, 33);
+  const card = drawNightCard(new Graphics(), width, height, undefined, GOOD_COLORS[id]);
+  row.addChild(card, slot.container, title, coin, worth);
   buttons.forEach(({ label, onTap }, i) => {
-    const button = brassButton(BUTTON.width, BUTTON.height, label, onTap, 13);
+    const button = moonButton(BUTTON.width, BUTTON.height, label, onTap, 13);
     const fromEnd = buttons.length - i;
     const x = width - 12 - fromEnd * BUTTON.width - (fromEnd - 1) * BUTTON.gap;
     button.tile.container.position.set(x, (height - BUTTON.height) / 2);

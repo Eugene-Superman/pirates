@@ -1,9 +1,10 @@
 import { WAKE_RANGE, isAwake, nearPlayers, thinkBots } from './bots/brain';
-import { populate, stepSpawns } from './bots/spawner';
+import { populate, stepPrey, stepSpawns } from './bots/spawner';
 import { stepBarrages } from './combat/barrage';
 import { stepCombat } from './combat/combat';
+import { stepOrdnance } from './combat/ordnance';
 import { stepChests, stepLoot } from './economy/loot';
-import { newPlayer } from './economy/player';
+import { STARTING_HOLD, newPlayer } from './economy/player';
 import type { GameState } from './GameState';
 import { createRandom, streamSeed } from './lib/random';
 import { NavGrid } from './navigation/NavGrid';
@@ -15,6 +16,7 @@ import { Ship } from './ships/Ship';
 import { SHIP_CLASSES, STARTER_SHIP } from './ships/shipClasses';
 import { stepTalents } from './ships/talents';
 import { stepStats } from './records/tally';
+import { placeStoryMarks, stepStory } from './story/story';
 import { placeGates, stepGates } from './world/gates';
 import { stepDocking } from './world/port';
 import { START, createWorld } from './world/World';
@@ -65,6 +67,7 @@ export class Game {
     const world = createWorld(ZONES[zone]);
     this.nav = new NavGrid(world);
     world.gates = placeGates(ZONES[zone], this.nav);
+    world.marks = placeStoryMarks(zone, this.nav);
     let nextId = 1;
     const ship = new Ship(SHIP_CLASSES[STARTER_SHIP], nextId++);
     ship.x = START.x;
@@ -77,6 +80,7 @@ export class Game {
       chests: [],
       projectiles: [],
       shells: [],
+      kegs: [],
       events: [],
       respawns: [],
       nextId,
@@ -99,9 +103,18 @@ export class Game {
     return { ...saveGame(this.state), zone: to, arrival: this.state.world.zone };
   }
 
-  /** Puts a kept progress back: right after the game is made. Anything not valid in it is left as new */
+  /**
+   * Puts a kept progress back: right after the game is made. Anything not valid in it is left as new. With none, a new
+   * player: their ship lies in port with its guns in the hold, where the story starts (story/story.ts)
+   */
   load(data: unknown): boolean {
-    return loadGame(this.state, this.nav, data);
+    if (loadGame(this.state, this.nav, data)) return true;
+    const { ship, world, player } = this.state;
+    Object.assign(player.hold, STARTING_HOLD);
+    ship.x = world.port.mooring.x;
+    ship.y = world.port.mooring.y;
+    ship.dock(world.port.mooring);
+    return false;
   }
 
   /** dt in seconds */
@@ -137,6 +150,8 @@ export class Game {
         collideShip(ship, obstacles);
       }
     }
+    // Rockets asked for fly with the volleys; powder kegs a foe has come near blow up
+    stepOrdnance(state, this.random);
     stepCombat(state, dt, this.random);
     stepBarrages(state, this.random);
     stepLoot(state, this.lootRandom);
@@ -146,6 +161,10 @@ export class Game {
     stepDocking(state);
     stepGates(state);
     this.bringBackWrecks();
+    // With every event of the update in but its own, which the stats count too
+    stepStory(state);
+    // The bots the story asks the player to sink, near them: after the story has counted this update's kills
+    stepPrey(state, this.nav, this.botRandom);
     // Last, with every event of the update in
     stepStats(state, dt);
     this.eventsRead = state.events.length;

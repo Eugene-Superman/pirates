@@ -1,3 +1,4 @@
+// The game's name before it was Moonwreck: kept, or the progress players have saved would be lost
 const DB_NAME = 'pirate-game';
 const DB_VERSION = 1;
 const TABLE = 'kv';
@@ -5,8 +6,8 @@ const LOCAL_PREFIX = 'pirate-game.'; // localStorage keys: the fallback, and whe
 const FLUSH_DELAY = 400; // milliseconds: writes within this are sent to the database together
 
 /** What the browser keeps for us, by key */
-export type StoreKey = 'save' | 'hud' | 'tracker' | 'sound' | 'view' | 'log' | 'lang';
-const KEYS: readonly StoreKey[] = ['save', 'hud', 'tracker', 'sound', 'view', 'log', 'lang'];
+export type StoreKey = 'save' | 'hud' | 'layout' | 'tracker' | 'tips' | 'sound' | 'view' | 'log' | 'lang';
+const KEYS: readonly StoreKey[] = ['save', 'hud', 'layout', 'tracker', 'tips', 'sound', 'view', 'log', 'lang'];
 
 function request<T>(req: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {

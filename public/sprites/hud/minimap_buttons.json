@@ -17,6 +17,30 @@
   "mastery": [
    3,
    0
+  ],
+  "settings": [
+   0,
+   1
+  ],
+  "fullscreen": [
+   1,
+   1
+  ],
+  "feats": [
+   2,
+   1
+  ],
+  "bestiary": [
+   3,
+   1
+  ],
+  "world": [
+   4,
+   1
+  ],
+  "logout": [
+   5,
+   1
   ]
  }
 }

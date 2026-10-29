@@ -2,7 +2,7 @@ import type { Ship } from '../ships/Ship';
 
 /** Goods a bot's wreck leaves floating, hauled aboard into the hold and sold at the port's market */
 export type GoodId =
-  'fish' | 'cloth' | 'spices' | 'rum' | 'contraband' | 'turtleShell' | 'serpentScale' | 'baronsStrongbox';
+  'fish' | 'cloth' | 'spices' | 'rum' | 'contraband' | 'turtleShell' | 'serpentScale' | 'moonGlass' | 'baronsStrongbox';
 
 export interface Good {
   readonly id: GoodId;
@@ -24,6 +24,8 @@ export const GOODS: Readonly<Record<GoodId, Good>> = {
   contraband: { id: 'contraband', name: 'Contraband', price: 5 },
   turtleShell: { id: 'turtleShell', name: 'Turtle shell', price: 3 },
   serpentScale: { id: 'serpentScale', name: 'Serpent scales', price: 4 },
+  // The Moon's shards (docs/story.md): what the starting waters' story is about
+  moonGlass: { id: 'moonGlass', name: 'Moon glass', price: 10 },
   baronsStrongbox: { id: 'baronsStrongbox', name: "Baron's strongbox", price: 50 },
 };
 
@@ -35,6 +37,7 @@ export const GOOD_IDS: readonly GoodId[] = [
   'contraband',
   'turtleShell',
   'serpentScale',
+  'moonGlass',
   'baronsStrongbox',
 ];
 
@@ -97,17 +100,21 @@ export function haulAboard(ship: Ship, goods: Cargo): Cargo {
  */
 export function throwOverboard(ship: Ship, good: GoodId, count: number) {
   const n = Math.min(Math.floor(count), ship.cargo[good] ?? 0);
-  if (n <= 0) return false;
+  // Not a number (online, a player's) would leave a hold of NaN
+  if (!(n > 0)) return false;
   ship.cargo[good] = (ship.cargo[good] ?? 0) - n;
   if (ship.cargo[good] === 0) delete ship.cargo[good];
   return true;
 }
 
-/** The goods a wreck leaves, rolled with the loot generator */
-export function rollCargo(drops: readonly CargoDrop[], random: () => number): Cargo {
+/**
+ * The goods a wreck leaves, rolled with the loot generator; each good `often` times as likely (its sinker's Wreck
+ * diver)
+ */
+export function rollCargo(drops: readonly CargoDrop[], random: () => number, often = 1): Cargo {
   const cargo: Cargo = {};
   for (const { good, count, chance } of drops) {
-    if (random() >= chance) continue;
+    if (random() >= chance * often) continue;
     const n = count[0] + Math.floor(random() * (count[1] - count[0] + 1));
     if (n > 0) cargo[good] = (cargo[good] ?? 0) + n;
   }

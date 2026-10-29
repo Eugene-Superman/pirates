@@ -1,20 +1,26 @@
-import { AMMO, AMMO_IDS, GUNS, type AmmoId, type GunId } from './combat/arsenal';
+import { captainBonus, isPassive, retakeMastery } from './account/mastery';
+import { choosePortrait } from './account/portrait';
+import type { ShipBonus } from './ships/bonus';
+import { AMMO, AMMO_IDS, GUNS, GUN_IDS, type AmmoId, type GunId } from './combat/arsenal';
 import { WEAPON_IDS, type WeaponId } from './combat/weapons';
-import type { Player } from './economy/player';
-import { MAX_QUESTS, QUESTS, QUEST_IDS, type QuestId } from './economy/quests';
+import { STARTING_HOLD, type Player } from './economy/player';
+import { QUESTS, QUEST_IDS, questLimit, type QuestId } from './economy/quests';
 import type { GameState } from './GameState';
 import type { NavGrid } from './navigation/NavGrid';
 import { routeClearance } from './navigation/pilot';
 import { OUTFITS, OUTFIT_SLOTS, isOutfit, type OutfitId, type OutfitSlot } from './ships/outfit';
 import { isTalent, learnTalents, xpForLevel, type TalentId } from './ships/talents';
 import { GOOD_IDS, cargoCount, type Cargo } from './economy/cargo';
-import { isSailable, type PathStepId } from './economy/shipyard';
+import { isItem, type ItemId } from './items/items';
+import { QUICK_SLOTS, setQuickSlot } from './items/quickSlots';
+import { isSailable } from './economy/shipyard';
 import { Ship } from './ships/Ship';
 import { SHIP_CLASSES, type ShipClassId } from './ships/shipClasses';
 import { arrivalPoint } from './world/gates';
 import { START } from './world/World';
 import { START_ZONE, isZone, type ZoneId } from './world/zones';
 import { GOLD_REASONS, STAT_COUNTS, copyStats, type Stats } from './records/stats';
+import { STORY, finishedStory, newStory, objectiveNeed, type StoryStepId } from './story/story';
 
 /**
  * Bumped when the save's shape changes: an older save is read field by field, whatever still fits.
@@ -25,11 +31,18 @@ save starts them at 0, but for the quests turned in, which the Captain's path co
 Coastal Bark (`coastalBark`), the first of the European line. 8: gold earned at the arsenal in the stats (an older
 save starts it at 0). 9: each ship's ammo at hand on the skill bar, two kinds a weapon (an older save's ship takes the
 one loaded and the next it carries). 10: the sea the player is in, and the one their ship sailed in from (an older
-save is in the starting waters); the holds made smaller
+save is in the starting waters); the holds made smaller. 11: the captain's mastery, the passives taken (an older save
+has none). 12: the doubloons in the purse (an older save has none). 13: each quest the ship's that took it (an older
+save's are the ship sailed's). 14: the captain's portrait (an older save has the first). 15: the items bought for
+doubloons and the skill bar's quick slots (an older save has none). 16: the story, how far along it the player is (an
+older save's is told to its end if the player was past the starting waters' first steps, else it starts, the prologue
+seen); the Captain's path's steps marked once gone with it
  */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 16;
 /** The first version whose talents fit the tree of now */
 const RANKED_TALENTS = 4;
+/** The first version whose quests are each their ship's */
+const SHIP_QUESTS = 13;
 /**
  * The first version with the holds of now: an older save's cargo, from a bigger hold, comes back whole, the hold
  * over-full (nothing more hauled aboard) till it is sold or thrown overboard
@@ -39,8 +52,10 @@ const SMALL_HOLDS = 10;
 const RENAMED_CLASSES: readonly { readonly before: number; readonly from: string; readonly to: ShipClassId }[] = [
   { before: 7, from: 'corsair', to: 'coastalBark' },
 ];
-/** Steps of the Captain's path marked once and kept (the rest are counted from the player and ship) */
-const MARKED_STEPS: readonly PathStepId[] = ['sink', 'talent', 'repair', 'sell', 'baron'];
+/** The first version that keeps the story */
+const STORY_SAVED = 16;
+/** Tavern quests the Captain's path asked of an older save for the ship after the starter sloop */
+const OLD_PATH_QUESTS = 5;
 
 /** A ship as plain data: its class, where it is, its hull, guns, ammo and outfit, its experience, talents and cargo */
 export interface SavedShip {
@@ -78,12 +93,28 @@ export interface SaveData {
   readonly arrival: ZoneId | null;
   readonly player: {
     readonly gold: number;
+    readonly doubloons: number;
     readonly hold: Partial<Record<GunId, number>>;
     readonly outfits: Partial<Record<OutfitId, number>>;
-    readonly quests: readonly { readonly id: QuestId; readonly kills: number }[];
-    readonly progress: { readonly steps: readonly PathStepId[]; readonly questsDone: number };
+    /** The items bought for doubloons, by kind, and what is in each of the skill bar's quick slots */
+    readonly items: Partial<Record<ItemId, number>>;
+    readonly quickSlots: readonly (ItemId | null)[];
+    readonly quests: readonly { readonly id: QuestId; readonly ship: ShipClassId; readonly kills: number }[];
+    readonly progress: { readonly questsDone: number };
+    /** How far along the story: the step on (`done` once all is told) by its id, so a step added doesn't move it */
+    readonly story: {
+      readonly prologue: boolean;
+      readonly step: StoryStepId | 'done';
+      readonly told: boolean;
+      readonly counts: readonly number[];
+      readonly closing: StoryStepId | null;
+    };
     readonly fleet: readonly SavedShip[];
     readonly stats: Stats;
+    /** The captain's mastery: the passives taken, in the order taken */
+    readonly mastery: readonly string[];
+    /** The captain's portrait, by its number */
+    readonly portrait: number;
   };
   readonly ship: SavedShip;
 }
@@ -119,12 +150,24 @@ export function saveGame(state: GameState): SaveData {
     arrival: null,
     player: {
       gold: player.gold,
+      doubloons: player.doubloons,
       hold: { ...player.hold },
       outfits: { ...player.outfits },
-      quests: player.quests.map((q) => ({ id: q.id, kills: q.kills })),
-      progress: { steps: [...player.progress.steps], questsDone: player.progress.questsDone },
+      items: { ...player.items },
+      quickSlots: [...player.quickSlots],
+      quests: player.quests.map((q) => ({ id: q.id, ship: q.ship, kills: q.kills })),
+      progress: { questsDone: player.progress.questsDone },
+      story: {
+        prologue: player.story.prologue,
+        step: STORY[player.story.step]?.id ?? 'done',
+        told: player.story.told,
+        counts: [...player.story.counts],
+        closing: player.story.closing === null ? null : STORY[player.story.closing].id,
+      },
       fleet: [...player.fleet],
       stats: copyStats(player.stats),
+      mastery: [...player.mastery],
+      portrait: player.portrait,
     },
     ship: saveShip(ship),
   };
@@ -185,10 +228,6 @@ function sailable(value: unknown, version: number): ShipClassId | null {
   return isSailable(id) ? id : null;
 }
 
-function isMarkedStep(value: unknown): value is PathStepId {
-  return MARKED_STEPS.some((id) => id === value);
-}
-
 function isQuest(value: unknown): value is QuestId {
   return typeof value === 'string' && (QUEST_IDS as readonly string[]).includes(value);
 }
@@ -203,58 +242,151 @@ export function savedZone(data: unknown): ZoneId {
  * Puts a saved player's progress back into a new game (made for its sea, savedZone): what is valid of it, field by
  * field; the rest stays as a new player's. A ship that has just sailed in from another sea comes in off the gate back
  * to it. A ship saved on land or off the map comes back at START, a sunk one whole at START, a docked one in port.
- * Returns whether there was a save to load
+ * The captain's mastery is taken again once the ships are in (their levels pay for it), the quests after it (it may
+ * allow one more). Returns whether there was a save to load
  */
 export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean {
   const save = record(data);
   if (!save || typeof save.version !== 'number') return false;
   const { player } = state;
-
   const purse = record(save.player);
-  if (purse) {
-    player.gold = count(purse.gold) ?? player.gold;
-    const hold = record(purse.hold);
-    if (hold) {
-      for (const [gun, n] of Object.entries(hold)) {
-        const stock = count(n);
-        if (isGun(gun) && stock !== null && stock > 0) player.hold[gun] = stock;
-      }
-    }
-    const outfits = record(purse.outfits);
-    if (outfits) {
-      for (const [id, n] of Object.entries(outfits)) {
-        const stock = count(n);
-        if (isOutfit(id) && stock !== null && stock > 0) player.outfits[id] = stock;
-      }
-    }
-    if (Array.isArray(purse.quests)) {
-      player.quests = [];
-      for (const item of purse.quests) {
-        const quest = record(item);
-        if (!quest || !isQuest(quest.id) || player.quests.length >= MAX_QUESTS) continue;
-        if (player.quests.some((q) => q.id === quest.id)) continue;
-        const kills = Math.min(count(quest.kills) ?? 0, QUESTS[quest.id].count);
-        player.quests.push({ id: quest.id, kills });
-      }
-    }
-    const progress = record(purse.progress);
-    if (progress) {
-      player.progress.questsDone = count(progress.questsDone) ?? 0;
-      if (Array.isArray(progress.steps)) {
-        for (const step of progress.steps) {
-          if (isMarkedStep(step) && !player.progress.steps.includes(step)) player.progress.steps.push(step);
-        }
-      }
-    }
-    readStats(purse.stats, player.stats);
-    // Kept before the stats were: the quests turned in, at least, are known
-    player.stats.questsDone = Math.max(player.stats.questsDone, player.progress.questsDone);
-  }
+  if (purse) loadPurse(player, purse);
+  // The ships load with the passives as saved, so a talent point the mastery gives keeps its talent; the passives are
+  // then checked against what the ships pay
+  const taken = purse?.mastery;
+  const mastery = Array.isArray(taken) ? taken.filter(isPassive) : [];
+  loadShips(state, nav, save, save.version, captainBonus(mastery));
+  retakeMastery(state, player, mastery);
+  if (purse) loadQuests(state, player, purse.quests, save.version);
+  loadStory(state, purse, save.version);
+  return true;
+}
 
-  // The ship sailed: a class no player can sail (a later version's) and only the purse is kept
+/**
+ * The purse of a save: gold and doubloons, the hold of guns, outfit and items, the quick slots, the Captain's path, the
+ * stats, the portrait
+ */
+function loadPurse(player: Player, purse: Fields) {
+  player.gold = count(purse.gold) ?? player.gold;
+  player.doubloons = count(purse.doubloons) ?? player.doubloons;
+  choosePortrait(player, count(purse.portrait) ?? player.portrait);
+  const hold = record(purse.hold);
+  if (hold) {
+    for (const [gun, n] of Object.entries(hold)) {
+      const stock = count(n);
+      if (isGun(gun) && stock !== null && stock > 0) player.hold[gun] = stock;
+    }
+  }
+  const outfits = record(purse.outfits);
+  if (outfits) {
+    for (const [id, n] of Object.entries(outfits)) {
+      const stock = count(n);
+      if (isOutfit(id) && stock !== null && stock > 0) player.outfits[id] = stock;
+    }
+  }
+  const items = record(purse.items);
+  if (items) {
+    for (const [id, n] of Object.entries(items)) {
+      const stock = count(n);
+      if (isItem(id) && stock !== null && stock > 0) player.items[id] = stock;
+    }
+  }
+  // After the items: a slot keeps only one the hold has, each in one slot at most
+  const slots = purse.quickSlots;
+  if (Array.isArray(slots)) {
+    slots.slice(0, QUICK_SLOTS).forEach((id: unknown, slot) => {
+      if (isItem(id) && !player.quickSlots.includes(id)) setQuickSlot(player, slot, id);
+    });
+  }
+  const progress = record(purse.progress);
+  if (progress) player.progress.questsDone = count(progress.questsDone) ?? 0;
+  readStats(purse.stats, player.stats);
+  // Kept before the stats were: the quests turned in, at least, are known
+  player.stats.questsDone = Math.max(player.stats.questsDone, player.progress.questsDone);
+}
+
+/**
+ * How far along the story: as saved, each count no more than its objective needs. An older save's, from before the
+ * story, is told to its end if the player was past the starting waters' first steps (a ship of tier 1, the quests the
+ * Captain's path asked, the Baron sunk), so it doesn't teach them again what they know; else it starts, the prologue
+ * seen, the guns its first step asks for in the hold. After the ships: they tell how far the player had got
+ */
+function loadStory(state: GameState, purse: Fields | null, version: number) {
+  const { player } = state;
+  if (version < STORY_SAVED) {
+    const steps: unknown = record(purse?.progress)?.steps;
+    const baron = Array.isArray(steps) && steps.includes('baron');
+    const ships = [state.ship.shipClass.id, ...player.fleet.map((kept) => kept.shipClass)];
+    const ahead = ships.some((id) => SHIP_CLASSES[id].tier >= 1) || player.progress.questsDone >= OLD_PATH_QUESTS;
+    if (ahead || baron) {
+      player.story = finishedStory();
+      return;
+    }
+    player.story = { ...newStory(), prologue: true };
+    // The story's first step asks for the sloop's four cannons and four harpoon guns fitted, and an older sloop came
+    // with two of each fitted: the rest go into the hold, as a new player's do
+    for (const weapon of WEAPON_IDS) {
+      const guns = GUN_IDS[weapon];
+      const given = guns.find((gun) => (STARTING_HOLD[gun] ?? 0) > 0);
+      if (!given) continue;
+      const aboard = guns.reduce((sum, gun) => sum + (player.hold[gun] ?? 0), 0);
+      const missing = (STARTING_HOLD[given] ?? 0) - state.ship.fittedGuns(weapon).length - aboard;
+      if (missing > 0) player.hold[given] = (player.hold[given] ?? 0) + missing;
+    }
+    return;
+  }
+  const saved = record(purse?.story);
+  if (!saved) return;
+  const story = newStory();
+  story.prologue = saved.prologue === true;
+  const at = saved.step === 'done' ? STORY.length : STORY.findIndex((step) => step.id === saved.step);
+  // A step a later version added: the story from its start
+  if (at < 0) return;
+  story.step = at;
+  const step = STORY[at];
+  const counts: unknown = saved.counts;
+  if (step && saved.told === true) {
+    story.told = true;
+    story.counts = step.objectives.map((objective, i) =>
+      Math.min(Array.isArray(counts) ? (count(counts[i]) ?? 0) : 0, objectiveNeed(objective)),
+    );
+  }
+  const closing = STORY.findIndex((done) => done.id === saved.closing);
+  story.closing = closing >= 0 && closing < at ? closing : null;
+  player.story = story;
+}
+
+/**
+ * The quests of a save, each its ship's: one the player has (an older save's, the ship sailed), with as many as a ship
+ * may have at once
+ */
+function loadQuests(state: GameState, player: Player, quests: unknown, version: number) {
+  if (!Array.isArray(quests)) return;
+  player.quests = [];
+  const limit = questLimit(state, player);
+  const owned = new Set([state.ship.shipClass.id, ...player.fleet.map((kept) => kept.shipClass)]);
+  for (const item of quests) {
+    const quest = record(item);
+    if (!quest || !isQuest(quest.id)) continue;
+    const ship = version < SHIP_QUESTS ? state.ship.shipClass.id : sailable(quest.ship, version);
+    if (!ship || !owned.has(ship)) continue;
+    const its = player.quests.filter((q) => q.ship === ship);
+    if (its.length >= limit || its.some((q) => q.id === quest.id)) continue;
+    const kills = Math.min(count(quest.kills) ?? 0, QUESTS[quest.id].count);
+    player.quests.push({ id: quest.id, ship, kills });
+  }
+}
+
+/**
+ * The ship sailed, where it is, and the ships laid up in port, each with the captain's mastery as saved. A class no
+ * player can sail (a later version's) and only the purse is kept
+ */
+function loadShips(state: GameState, nav: NavGrid, save: Fields, version: number, captain: ShipBonus) {
+  const { player } = state;
+  const purse = record(save.player);
   const saved = record(save.ship);
-  const sailedClass = saved && sailable(saved.shipClass, save.version);
-  if (!saved || !sailedClass) return true;
+  const sailedClass = saved && sailable(saved.shipClass, version);
+  if (!saved || !sailedClass) return;
   let ship = state.ship;
   if (sailedClass !== ship.shipClass.id) {
     const sailed = new Ship(SHIP_CLASSES[sailedClass], ship.id);
@@ -262,7 +394,8 @@ export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean
     state.ship = sailed;
     ship = sailed;
   }
-  stow(player, loadShip(ship, saved, save.version));
+  ship.setCaptain(captain);
+  stow(player, loadShip(ship, saved, version));
 
   const hp = count(saved.hp);
   const x = finite(saved.x);
@@ -273,7 +406,8 @@ export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean
     ship.x = spot.x;
     ship.y = spot.y;
     ship.rotation = Math.atan2(state.world.port.island.y - spot.y, state.world.port.island.x - spot.x);
-    return loadFleet(state, purse, save.version);
+    loadFleet(state, purse, version, captain);
+    return;
   }
   const open = x !== null && y !== null && nav.clearanceAt(x, y) >= routeClearance(ship);
   if (afloat && open) {
@@ -290,27 +424,27 @@ export function loadGame(state: GameState, nav: NavGrid, data: unknown): boolean
     ship.y = mooring.y;
     ship.dock(mooring);
   }
-  return loadFleet(state, purse, save.version);
+  loadFleet(state, purse, version, captain);
 }
 
 /**
- * The ships laid up in port: one of each class, none of the sailed one's; each put through a ship of its class, so
- * what is kept is valid. True: there was a save
+ * The ships laid up in port: one of each class, none of the sailed one's; each put through a ship of its class (with
+ * the captain's mastery, for its talents), so what is kept is valid
  */
-function loadFleet(state: GameState, purse: Fields | null, version: number) {
+function loadFleet(state: GameState, purse: Fields | null, version: number, captain: ShipBonus) {
   const { player, ship } = state;
   const fleet = purse?.fleet;
-  if (!Array.isArray(fleet)) return true;
+  if (!Array.isArray(fleet)) return;
   for (const item of fleet) {
     const laidUp = record(item);
     const id = laidUp && sailable(laidUp.shipClass, version);
     if (!laidUp || !id || id === ship.shipClass.id) continue;
     if (player.fleet.some((kept) => kept.shipClass === id)) continue;
     const kept = new Ship(SHIP_CLASSES[id], ship.id);
+    kept.setCaptain(captain);
     stow(player, loadShip(kept, laidUp, version));
     player.fleet.push({ ...saveShip(kept), docked: true });
   }
-  return true;
 }
 
 /** Guns a saved ship can't carry any more, into the player's hold */
@@ -377,7 +511,7 @@ export function loadShip(ship: Ship, data: unknown, version: number): GunId[] {
         .map((id) => [id, count(talents[id]) ?? 0] as const),
     );
   }
-  // After the talents: Quartermaster makes the hold bigger
+  // After the talents: a talent may make the hold bigger (the treasure's Deep hold)
   const cargo = record(saved.cargo);
   const room = version < SMALL_HOLDS ? Infinity : ship.holdSize;
   for (const id of GOOD_IDS) {

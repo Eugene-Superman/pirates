@@ -212,7 +212,7 @@ export const SHIPYARD_LINES: readonly PlayerLineId[] = [
 // The planned ships' provisional figures. The European line, all built, is the yardstick (shipClasses.ts says how its
 // ladder grows: each tier beats two of the tier below), and the masterworks built in its manner keep to it. The other
 // lines are still on the ladder it had before, to be balanced against it as each is built:
-// the Coastal Bark's figures of then at tier 1 (800 hull, 12.5 knots, 8 + 8 guns, a hold of 60), about 1.5 times the
+// the Royal Herald's figures of then at tier 1 (800 hull, 12.5 knots, 8 + 8 guns, a hold of 60), about 1.5 times the
 // hull and the guns a tier, the hold and the sight growing slower, the turn slower, each line leaning its own way.
 // Guns: the East 15% fewer guns, a little more than half of them harpoon guns; the pirates a tenth more, about two
 // cannons to each harpoon gun; the North about two harpoon guns to each cannon; the Forbidden Fleets a twentieth more,
@@ -332,12 +332,12 @@ const OBTAIN: Partial<Readonly<Record<LineShipId, ShipTerms>>> = {
 /** What each ship is for, in a few words: the shipyard's card */
 const ROLES: Readonly<Record<LineShipId, string>> = {
   sloop: 'Small and light: a ship to learn the sea on',
-  coastalBark: 'A sturdy all-rounder of the coastal patrols',
-  corsair: 'A royal raider, quick for its guns',
-  frigate: "Fast and far-sighted: the navy's eyes",
-  royalGalleon: 'Treasure and guns in one deep hull',
-  admiral: 'A flagship that leads a squadron',
-  shipOfTheLine: 'Three gun decks of royal thunder',
+  coastalBark: "The crown's herald, a sturdy all-rounder",
+  corsair: 'A royal raider under sails of flame',
+  frigate: "The fleet's falcon: fast and keen-eyed",
+  royalGalleon: "Treasure and guns under the king's crown",
+  admiral: "The black flagship of the crown's squadrons",
+  shipOfTheLine: 'A golden three-decker that rules the sea',
   riverJunk: 'Nimble in shallows and along the coast',
   seaMerchant: 'A trader with the deepest hold of its line',
   dragonSentinel: 'Guards the straits: tough for its line',

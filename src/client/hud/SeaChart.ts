@@ -6,8 +6,10 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
   ZONES,
-  islandOutline,
+  isAfloat,
+  seaOpenTo,
   signedDistanceToPolygon,
+  storyGoal,
   zoneBoss,
   type GameState,
   type GatePlace,
@@ -18,14 +20,24 @@ import {
 import {
   CHART,
   MapProjection,
+  arrowBob,
   bossLair,
+  bossMarker,
+  bountyWaiting,
   columnName,
   drawGates,
+  drawGoalGlow,
+  drawStoryMark,
+  goalMarker,
+  drawIslands,
   drawLostCargo,
   drawShipArrow,
   type MapAxes,
 } from './chart';
-import { THEME, TITLE_STYLE, brassButton, subheading } from './theme';
+import { ARROWS, IconSprites, MAP_MARKERS } from './iconAtlas';
+import { ornament } from './ornaments';
+import { THEME, TITLE_STYLE, subheading } from './theme';
+import { moonButton } from './nightTheme';
 import { Tooltip, type TooltipText } from './Tooltip';
 import { playTap, show } from './ui';
 import { t } from '../i18n/i18n';
@@ -51,14 +63,6 @@ const COLORS = {
   sea: 0x154768,
   seaEdge: 0x0b2943, // and at its tips, under the frame
   edgeShade: 0x02070d, // the frame's shadow along the opening's edges
-  shallow: 0x6fd0e0,
-  waterline: 0xd2f0f8, // the lines round a coast, as on an old chart
-  sand: 0xe8d18f,
-  coast: 0x6b5a2e,
-  land: 0x5c9440,
-  hill: 0x467d31,
-  hillTop: 0x6aa84c,
-  palm: 0x24561d,
   course: 0xf1e3bf, // the ship's way on, pencilled in
   bossDisc: 0x3c0b08,
   bossRing: 0x8a1c14,
@@ -69,23 +73,12 @@ const COLORS = {
 const MARGIN = 16; // pixels from the screen's edges to the frame
 const UNDER_RIM = 3; // pixels the chart reaches under the opening's brass edge, so its own edge shows no gap
 const CLOSE_RIM = 12; // the frame's pixels of the slot's brass rim round its inside: a click on it closes too
-const CROSS = 0.55; // the close button's cross, in its slot's inside
+const CROSS = 0.62; // the close button's gold cross, across its slot's inside
+const CROSS_HOVER = 1.12; // the cross grows by this under the pointer
+const CROSS_PAINTED = 64; // pixels the cross is laid at, scaled with the frame from there
 const DIM_ALPHA = 0.55;
 // The frame's shadow along the opening's edges: strokes over the edge, each `width` pixels wider than the last
 const EDGE_SHADE = { steps: 4, width: 9, alpha: 0.1 } as const;
-const SHALLOWS = 5; // pixels of shallow water round a coast
-// The lines round a coast: pixels out from it, how bright
-const WATERLINES = [
-  { offset: 3.5, alpha: 0.42 },
-  { offset: 7.5, alpha: 0.24 },
-  { offset: 12, alpha: 0.12 },
-] as const;
-const ISLAND_SHADOW = { x: 1.5, y: 2, alpha: 0.35 } as const; // pixels down and right of an island, as carved
-// An island's land inside its beach, its hill's foot and its top, as shares of its coast's radius (the 3D island's)
-const LAND = 0.72;
-const HILL = [0.42, 0.22] as const;
-const HILL_MIN = 7; // pixels: a smaller island shows no hill
-const PALM_RADIUS = 1.3; // pixels
 const GRID_ALPHA = 0.3;
 const LABEL = { size: 13, inset: 15, alpha: 0.9 } as const; // the squares' letters and numbers inside the edges, pixels
 const SQUARE_SIZE = 16; // pixels: the name of the square under the pointer, in its middle
@@ -97,6 +90,11 @@ const COURSE = { dash: 7, gap: 5, width: 1.5, end: 3.5 } as const; // pixels: th
 const BOSS = { radius: 13, period: 2.4, rings: 2, hover: 1.4 } as const;
 const PORT_HOVER = 4; // pixels off the port's coast the pointer still tells of it
 const GATE = { size: 6, hover: 16 } as const; // pixels: a gate's mark, and how far round it the pointer tells of it
+// The painted markers, pixels across: the boss's lair, the harbour, the prey the story brought in for the player, and
+// where it sends them
+const MARKER = { boss: 34, home: 24, prey: 20, goal: 28 } as const;
+// Pixels: the gold arrow over where the story sends the player, and how far over its marker's top it hangs
+const GOAL_ARROW = { size: 30, gap: 2 } as const;
 // The world chart's button in the frame's bottom left corner: its size and its inset from the frame's edges, pixels
 const WORLD_BUTTON = { width: 170, height: 30, inset: 22 } as const;
 
@@ -166,7 +164,9 @@ function drawCourse(g: Graphics, ship: Ship, map: MapProjection) {
  * letters west to east along its north edge, the numbers north to south along its east edge), in the diamond opening
  * of a painted frame and nothing else. Painted to go with the frame: deep water darkening to its edges, the islands as
  * in the game (shallows and lines round their coasts, beach, land, hills, palms), the brass lines of the squares; the
- * boss's lair a medallion, its name under the pointer, as is the port's. The square
+ * boss's lair under its crown (a medallion till the markers load), its name under the pointer, as is the port's; the
+ * harbour's lighthouse (silver while a bounty waits there), and where the story sends the player in breathing gold
+ * under a gold arrow, with every one of the prey it brought in for them. The square
  * under the pointer lights up with its name. Opened by the minimap or M, closed by M, Escape, the button in the frame's
  * top right corner or a click beside it. Until the frame's picture has loaded the opening has a thin rim of its own.
  * The chart is drawn once for a screen size; only the ship, the boss's rings and the square under the pointer move
@@ -179,8 +179,12 @@ export class SeaChart {
   /** Under the boss's medallion: the square under the pointer, the rings spreading from the lair, the ship's way on */
   private readonly under = new Graphics();
   private readonly lair = new Graphics();
-  /** Over it: the lost cargo and the ship */
+  /** Over it: the lost cargo; the painted markers; over them the ship */
   private readonly marks = new Graphics();
+  private readonly markers = new IconSprites(MAP_MARKERS);
+  /** The gold arrow over where the story sends the player, bobbing */
+  private readonly arrows = new IconSprites(ARROWS);
+  private readonly top = new Graphics();
   /** The name of the square under the pointer */
   private readonly square = subheading('', SQUARE_SIZE);
   private readonly rim = new Graphics();
@@ -188,7 +192,8 @@ export class SeaChart {
   /** Over the frame and the chart: where the pointer is, and clicks kept from the stage */
   private readonly board = new Container();
   private readonly close = new Container();
-  private readonly cross = new Graphics();
+  /** The painted gold cross every window closes with, in a holder scaled with the frame */
+  private readonly cross = new Container();
   private readonly tooltip = new Tooltip();
   private readonly bossText: TooltipText;
   private readonly portText: TooltipText;
@@ -218,7 +223,7 @@ export class SeaChart {
   /** The sea's gates, as last laid out */
   private gates: readonly GatePlace[] = [];
   /** Opens the world chart: every sea */
-  private readonly world: ReturnType<typeof brassButton>;
+  private readonly world: ReturnType<typeof moonButton>;
   private closeHovered = false;
   /** Screen pixels per pixel of the frame's picture, as last laid out */
   private frameScale = 0;
@@ -237,7 +242,7 @@ export class SeaChart {
       color: CHART.boss,
       lines: [t('Lv {level}', { level: boss?.level ?? 1 }), t("A boss's lair")],
     };
-    this.world = brassButton(WORLD_BUTTON.width, WORLD_BUTTON.height, t('World chart (N)'), () => {
+    this.world = moonButton(WORLD_BUTTON.width, WORLD_BUTTON.height, t('World chart (N)'), () => {
       this.hide();
       openWorld();
     });
@@ -260,6 +265,7 @@ export class SeaChart {
     });
     this.close.on('pointerover', () => this.paintCross(true));
     this.close.on('pointerout', () => this.paintCross(false));
+    this.cross.addChild(ornament('cross', { height: CROSS_PAINTED }));
     this.close.addChild(this.cross);
     for (let i = 0; i < MAP_SQUARES; i++) {
       for (const name of [columnName(i), `${i + 1}`]) {
@@ -290,6 +296,9 @@ export class SeaChart {
       this.under,
       this.lair,
       this.marks,
+      this.markers.container,
+      this.arrows.container,
+      this.top,
       this.square,
       this.rim,
       this.frame,
@@ -367,8 +376,42 @@ export class SeaChart {
     });
     const g = this.marks.clear();
     drawLostCargo(g, state, map, LANDMARK_SIZE);
-    drawGates(g, map, this.gates, GATE.size);
-    drawShipArrow(g, ship, map, ME_SIZE);
+    const markers = this.markers;
+    markers.begin();
+    drawGates(g, markers, map, this.gates, GATE.size, ship.shipClass.tier);
+    const boss = zoneBoss(state.world.zone);
+    const lair = boss && markers.put(bossMarker(SHIP_CLASSES[boss.shipClass]), this.lair.x, this.lair.y, MARKER.boss);
+    // The medallion stands in till the markers load
+    this.lair.visible = this.lairAt !== null && !lair;
+    const goal = storyGoal(state, state.player);
+    if (goal?.kind !== 'port') {
+      const { mooring } = state.world.port;
+      markers.put(
+        bountyWaiting(state) ? 'questHome' : 'port',
+        map.x(mooring.x, mooring.y),
+        map.y(mooring.x, mooring.y),
+        MARKER.home,
+      );
+    }
+    // The story's prey, wherever they are: brought in for the player, they are theirs to find
+    for (const unit of state.ships) {
+      if (unit.bot?.prey !== ship.id || !isAfloat(unit)) continue;
+      markers.put('storyPrey', map.x(unit.x, unit.y), map.y(unit.x, unit.y), MARKER.prey);
+    }
+    const arrows = this.arrows;
+    arrows.begin();
+    if (goal) {
+      const x = map.x(goal.x, goal.y);
+      const y = map.y(goal.x, goal.y);
+      const time = performance.now() / 1000;
+      drawGoalGlow(g, x, y, MARKER.goal, time);
+      if (!markers.put(goalMarker(goal), x, y, MARKER.goal)) drawStoryMark(g, map, state, GATE.size);
+      const over = y - MARKER.goal / 2 - GOAL_ARROW.gap - GOAL_ARROW.size / 2 - arrowBob(time);
+      arrows.put('downGold', x, over, GOAL_ARROW.size);
+    }
+    markers.end();
+    arrows.end();
+    drawShipArrow(this.top.clear(), ship, map, ME_SIZE);
 
     const { pointing } = this;
     if (pointing === 'boss') {
@@ -453,7 +496,7 @@ export class SeaChart {
       g.moveTo(map.x(at, 0), map.y(at, 0)).lineTo(map.x(at, WORLD_HEIGHT), map.y(at, WORLD_HEIGHT)).stroke(lines);
       g.moveTo(map.x(0, at), map.y(0, at)).lineTo(map.x(WORLD_WIDTH, at), map.y(WORLD_WIDTH, at)).stroke(lines);
     }
-    this.drawIslands(g, islands);
+    drawIslands(g, islands, map);
     for (let i = EDGE_SHADE.steps; i >= 1; i--) {
       // Beveled: a mitred corner would reach out past the frame's spikes
       g.poly(outline).stroke({
@@ -473,49 +516,11 @@ export class SeaChart {
     }
   }
 
-  /** The islands as in the game, seen from above: shallows and lines round the coast, beach, land, hill and palms */
-  private drawIslands(g: Graphics, islands: readonly Island[]) {
-    const map = this.map;
-    const screen = (points: readonly { x: number; y: number }[], dx = 0, dy = 0) =>
-      points.flatMap((p) => [map.x(p.x, p.y) + dx, map.y(p.x, p.y) + dy]);
-    for (const island of islands) {
-      const size = island.radius * map.scale;
-      g.poly(screen(islandOutline(island, 1 + SHALLOWS / size))).fill({ color: COLORS.shallow, alpha: 0.2 });
-      for (const { offset, alpha } of WATERLINES) {
-        g.poly(screen(islandOutline(island, 1 + offset / size))).stroke({ width: 1, color: COLORS.waterline, alpha });
-      }
-    }
-    for (const island of islands) {
-      g.poly(screen(island.coast, ISLAND_SHADOW.x, ISLAND_SHADOW.y)).fill({
-        color: 0x000000,
-        alpha: ISLAND_SHADOW.alpha,
-      });
-    }
-    for (const island of islands) {
-      // Every point: the port's walls are a few points of its coast
-      g.poly(screen(island.coast)).fill({ color: COLORS.sand }).stroke({ width: 1, color: COLORS.coast, alpha: 0.9 });
-      g.poly(screen(islandOutline(island, LAND))).fill({ color: COLORS.land });
-      if (island.hillHeight > 0 && island.radius * map.scale >= HILL_MIN) {
-        g.poly(screen(islandOutline(island, HILL[0]))).fill({ color: COLORS.hill });
-        g.poly(screen(islandOutline(island, HILL[1]))).fill({ color: COLORS.hillTop });
-      }
-      for (const palm of island.palms) {
-        g.circle(map.x(palm.x, palm.y), map.y(palm.x, palm.y), PALM_RADIUS).fill({ color: COLORS.palm });
-      }
-    }
-  }
-
   /** The close button's cross in its slot: brass, lit under the pointer */
   private paintCross(hovered: boolean) {
     this.closeHovered = hovered;
-    const arm = FRAME.close.half * CROSS * this.frameScale;
-    this.cross
-      .clear()
-      .moveTo(-arm, -arm)
-      .lineTo(arm, arm)
-      .moveTo(arm, -arm)
-      .lineTo(-arm, arm)
-      .stroke({ width: Math.max(2, arm * 0.35), color: hovered ? THEME.brassLight : THEME.brass, cap: 'round' });
+    const size = FRAME.close.half * 2 * CROSS * this.frameScale;
+    this.cross.scale.set((size / CROSS_PAINTED) * (hovered ? CROSS_HOVER : 1));
   }
 
   /** Picks out the square under the pointer, and the boss's lair or the port if it is on them */
@@ -541,7 +546,7 @@ export class SeaChart {
 function gateText(gate: GatePlace, ship: Ship): TooltipText {
   const zone = ZONES[gate.to];
   const [from, to] = zone.levels;
-  const open = zone.tier <= ship.shipClass.tier;
+  const open = seaOpenTo(gate.to, ship.shipClass.tier);
   return {
     title: t(zone.name),
     color: CHART.gate,

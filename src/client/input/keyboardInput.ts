@@ -18,8 +18,10 @@ export interface KeyboardActions {
   toggleMastery: () => void;
   /** Opens or closes the world chart: every sea */
   toggleWorld: () => void;
-  /** Uses the ship's ability */
-  useAbility: () => void;
+  /** Opens or closes the bestiary: every kind of bot */
+  toggleBestiary: () => void;
+  /** Uses the ship's ability in a slot: 0 the first (F), 1 the second (G), 2 the third (T) */
+  useAbility: (slot: number) => void;
   /** Orders the crew to repair, for gold */
   repair: () => void;
 }
@@ -27,9 +29,9 @@ export interface KeyboardActions {
 // Keys, by their place on the keyboard (`code`), so they work in any layout, Ukrainian too:
 // Space fires at the unit picked out; Escape stops firing, or if the ship isn't firing lets go of the unit picked out
 // (unless it closed a window first); Q picks the cannons, E the harpoons; Z and X load the picked weapon's two kinds of
-// ammo at hand (1…0 are left to the skill bar's quick slots, for what the hold will carry); R orders the repair; F uses
-// the ship's ability; L opens the loadout; K the talents; J the combat log; M the sea chart; N the world chart (every
-// sea); I the statistics; H the hold; P the captain's mastery
+// ammo at hand (1…0 are left to the skill bar's quick slots, the items there: using them comes later); R orders the repair; F uses
+// the ship's ability, G its second, T its third; L opens the loadout; K the talents; J the combat log; M the sea chart; N the world chart (every
+// sea); B the bestiary (every kind of bot); I the statistics; H the hold; P the captain's mastery
 export function bindKeyboardInput(ship: Ship, selection: Selection, actions: KeyboardActions) {
   window.addEventListener('keydown', (e) => {
     if (e.defaultPrevented) return;
@@ -62,7 +64,13 @@ export function bindKeyboardInput(ship: Ship, selection: Selection, actions: Key
         actions.repair();
         break;
       case 'KeyF':
-        actions.useAbility();
+        actions.useAbility(0);
+        break;
+      case 'KeyT':
+        actions.useAbility(2);
+        break;
+      case 'KeyG':
+        actions.useAbility(1);
         break;
       case 'KeyL':
         actions.toggleLoadout();
@@ -78,6 +86,9 @@ export function bindKeyboardInput(ship: Ship, selection: Selection, actions: Key
         break;
       case 'KeyN':
         actions.toggleWorld();
+        break;
+      case 'KeyB':
+        actions.toggleBestiary();
         break;
       case 'KeyI':
         actions.toggleStats();

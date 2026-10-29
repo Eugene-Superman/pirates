@@ -1,5 +1,17 @@
-import { Container, FillGradient, Graphics, Sprite, Text, Texture, TilingSprite, type TextStyleOptions } from 'pixi.js';
-import { Tile, type TileStyle, type WindowLook } from './ui';
+import {
+  Container,
+  FillGradient,
+  Graphics,
+  Rectangle,
+  Sprite,
+  Text,
+  Texture,
+  TilingSprite,
+  type FillInput,
+  type TextStyleOptions,
+} from 'pixi.js';
+import { ornament } from './ornaments';
+import { playTap, type TileStyle, type WindowLook } from './ui';
 
 /**
  * The windows' look: a captain's cabin at night. Dark wood with its grain under a brass frame (corner brackets and
@@ -21,7 +33,7 @@ export const THEME = {
   darkText: 0x22160a,
   button: 0x2b2017,
   buttonHover: 0x3d2d1f,
-  well: 0x0c2233, // a well sunk into the wood, deep blue as the skill bar's painted ones
+  well: 0x0c2233, // a medallion's well, deep blue as the skill bar's painted ones
 } as const;
 
 const SERIF = 'Georgia, "Times New Roman", serif';
@@ -29,10 +41,12 @@ const RIM = 3; // pixels of brass round the panel
 const GAP = 2; // pixels of dark between the brass and the wood
 const BRACKET = { arm: 44, width: 9, rivet: 4.5 } as const; // pixels: the brass corner brackets
 const SHADOW = { steps: 4, spread: 4, drop: 8, alpha: 0.1 } as const; // the panel's soft shadow under it
-const WINDOW_CLOSE = { width: 96, height: 28 } as const; // pixels: a window's Close button
+const WINDOW_CLOSE = 34; // pixels: a window's close button, the gold cross, square
+const CLOSE_IN = 18; // pixels the cross stands further in from a window's corner, clear of its corner piece
+const CROSS_HOVER = 1.12; // the cross grows by this under the pointer
+const CROSS_GLOW = 0.8; // the gold light behind the cross under the pointer, its radius in the button's size
 const WINDOW_DIM = 0.55; // how dark the game gets behind a window
 const METER_NOTCH = 6; // pixels: the closest a meter's notches come
-const MEDALLION_WELL = 0.74; // a medallion's blue well, in its radii: the rest is its brass ring
 // An icon's slot: its glow (how bright in its middle and halfway out, and how far below the slot's middle its brightest
 // point sits, a share of the slot), and the chip in its corner (pixels)
 const SLOT = { glow: { middle: 0.42, half: 0.16, drop: 0.04 }, chip: { width: 26, height: 15, size: 10 } } as const;
@@ -118,18 +132,18 @@ const PRESSED_FILL = vertical([
   [0.5, 0xd9a94c],
   [1, 0x9c6f26],
 ]);
-// The shade the wood's edge casts down into a well, fading out
-const WELL_SHADE = new FillGradient({
+// A divider's gold line, fading out at both ends: one gradient for every divider
+const DIVIDER_FADE = new FillGradient({
   type: 'linear',
   start: { x: 0, y: 0 },
-  end: { x: 0, y: 1 },
+  end: { x: 1, y: 0 },
   colorStops: [
-    { offset: 0, color: 'rgba(0,0,0,0.55)' },
-    { offset: 1, color: 'rgba(0,0,0,0)' },
+    { offset: 0, color: 'rgba(201,154,69,0)' },
+    { offset: 0.5, color: 'rgba(243,213,138,0.85)' },
+    { offset: 1, color: 'rgba(201,154,69,0)' },
   ],
   textureSpace: 'local',
 });
-const WELL_SHADE_HEIGHT = 10; // pixels
 
 /** Brass-edged buttons and tabs, lit gold when pressed (their labels then THEME.darkText) */
 export const BRASS: TileStyle = {
@@ -144,20 +158,34 @@ export const BRASS: TileStyle = {
 };
 
 /**
- * A button in the theme: a brass-edged tile with its label in the middle. size: the label's, in pixels; onTap null:
- * one that does nothing yet, shown disabled
+ * A window's close button, `size` pixels square, its top left corner at its place: the painted gold cross, growing a
+ * little with a soft gold light behind it under the pointer. Every window's, whatever its look. Clicks on it never
+ * reach the stage, which would steer the ship
  */
-export function brassButton(width: number, height: number, label: string, onTap: (() => void) | null, size = 12) {
-  const tile = new Tile(width, height, onTap, 5, BRASS);
-  const caption = new Text({
-    text: label,
-    style: { fontFamily: 'Arial', fontSize: size, fill: THEME.text, fontWeight: 'bold' },
+export function crossButton(size: number, onTap: () => void) {
+  const container = new Container();
+  const glow = new Graphics().circle(0, 0, size * CROSS_GLOW).fill(glowFill(THEME.brassLight));
+  glow.visible = false;
+  // The cross in a holder: the piece's own scale is set once its picture has loaded
+  const holder = new Container();
+  holder.addChild(ornament('cross', { height: size }));
+  for (const part of [glow, holder]) part.position.set(size / 2, size / 2);
+  container.addChild(glow, holder);
+  container.eventMode = 'static';
+  container.cursor = 'pointer';
+  container.hitArea = new Rectangle(0, 0, size, size);
+  container.on('pointerdown', (e) => e.stopPropagation());
+  container.on('pointertap', () => {
+    playTap();
+    onTap();
   });
-  caption.anchor.set(0.5);
-  caption.position.set(width / 2, height / 2);
-  tile.content.addChild(caption);
-  if (!onTap) tile.setLook({ disabled: true });
-  return { tile, text: caption };
+  const hover = (on: boolean) => {
+    glow.visible = on;
+    holder.scale.set(on ? CROSS_HOVER : 1);
+  };
+  container.on('pointerover', () => hover(true));
+  container.on('pointerout', () => hover(false));
+  return { container, width: size };
 }
 
 let grainTexture: Texture | null = null;
@@ -237,14 +265,10 @@ function grain() {
   return grainTexture;
 }
 
-/**
- * A brass bracket over a corner of the frame, its arms along the two edges, a rivet where they meet; `k` times
- * BRACKET's size
- */
-function bracket(g: Graphics, x: number, y: number, sx: number, sy: number, k: number) {
-  const arm = BRACKET.arm * k;
-  const width = BRACKET.width * k;
-  const bevel = 4 * k;
+/** A brass bracket over a corner of the frame, its arms along the two edges, a rivet where they meet */
+function bracket(g: Graphics, x: number, y: number, sx: number, sy: number) {
+  const { arm, width, rivet } = BRACKET;
+  const bevel = 4;
   // The corner's L, drawn for the top left corner and mirrored by sx, sy
   const p = (dx: number, dy: number) => [x + dx * sx, y + dy * sy];
   g.poly([
@@ -257,10 +281,9 @@ function bracket(g: Graphics, x: number, y: number, sx: number, sy: number, k: n
   ])
     .fill(BRASS_FILL)
     .stroke({ width: 1, color: THEME.brassDark, alpha: 0.9 });
-  const [cx, cy] = p(width / 2 + 2 * k, width / 2 + 2 * k);
-  const rivet = BRACKET.rivet * k;
+  const [cx, cy] = p(width / 2 + 2, width / 2 + 2);
   g.circle(cx, cy, rivet).fill({ color: THEME.brassDark }).stroke({ width: 1, color: THEME.brassLight, alpha: 0.8 });
-  g.circle(cx - k, cy - k, rivet * 0.35).fill({ color: THEME.brassLight, alpha: 0.9 });
+  g.circle(cx - 1, cy - 1, rivet * 0.35).fill({ color: THEME.brassLight, alpha: 0.9 });
 }
 
 /**
@@ -274,37 +297,48 @@ export function drawHairline(g: Graphics, width: number, height: number, color: 
     .stroke({ width: alpha < 0.5 ? 1 : 1.5, color, alpha });
 }
 
+/** Pixels from a panel's edge in to what fills it: the brass rim and the dark gap inside it */
+export const PANEL_INSET = RIM + GAP;
+
 /**
- * A window's panel, `width` × `height` pixels: its shadow, the brass rim, the wood with its grain, a gold hairline
- * inside, brackets on its corners and a stud at the middle of its top edge. Put it first, under the window's content.
- * brackets: their size, BRACKET's times this (a HUD plate's are smaller: a window's would meet on its short sides)
+ * A window's frame, `width` × `height` pixels: its soft shadow, the brass rim and the dark gap inside it, and `inside`
+ * filling the rest, PANEL_INSET in from its edges (the wood, or another look's)
  */
-export function themedPanel(width: number, height: number, brackets = 1) {
-  const panel = new Container();
-  const under = new Graphics();
+export function panelFrame(width: number, height: number, inside: FillInput) {
+  const g = new Graphics();
   for (let k = SHADOW.steps; k > 0; k--) {
     const s = k * SHADOW.spread;
-    under.roundRect(-s, -s + SHADOW.drop, width + s * 2, height + s * 2, 14 + s).fill({
+    g.roundRect(-s, -s + SHADOW.drop, width + s * 2, height + s * 2, 14 + s).fill({
       color: 0x000000,
       alpha: SHADOW.alpha,
     });
   }
-  const inset = RIM + GAP;
-  under
+  const inset = PANEL_INSET;
+  return g
     .roundRect(0, 0, width, height, 14)
     .fill(BRASS_FILL)
     .roundRect(RIM, RIM, width - RIM * 2, height - RIM * 2, 12)
     .fill({ color: THEME.gap })
     .roundRect(inset, inset, width - inset * 2, height - inset * 2, 10)
-    .fill(WOOD_FILL);
+    .fill(inside);
+}
+
+/**
+ * A window's panel, `width` × `height` pixels: its shadow, the brass rim, the wood with its grain, a gold hairline
+ * inside, brackets on its corners and a stud at the middle of its top edge. Put it first, under the window's content
+ */
+function themedPanel(width: number, height: number) {
+  const panel = new Container();
+  const under = panelFrame(width, height, WOOD_FILL);
+  const inset = PANEL_INSET;
   // The grain over the wood (its square corners are under the brackets)
   const wood = new TilingSprite({ texture: grain(), width: width - inset * 2, height: height - inset * 2 });
   wood.position.set(inset, inset);
   const over = drawHairline(new Graphics(), width, height);
-  bracket(over, 0, 0, 1, 1, brackets);
-  bracket(over, width, 0, -1, 1, brackets);
-  bracket(over, 0, height, 1, -1, brackets);
-  bracket(over, width, height, -1, -1, brackets);
+  bracket(over, 0, 0, 1, 1);
+  bracket(over, width, 0, -1, 1);
+  bracket(over, 0, height, 1, -1);
+  bracket(over, width, height, -1, -1);
   diamond(over, width / 2, RIM / 2, 9);
   panel.addChild(under, wood, over);
   return panel;
@@ -313,23 +347,10 @@ export function themedPanel(width: number, height: number, brackets = 1) {
 /** A HudWindow in the theme: the wooden panel and a brass Close button, the game a little darker behind it */
 export const THEMED_WINDOW: WindowLook = {
   panel: themedPanel,
-  close: (label, onTap) => brassButton(WINDOW_CLOSE.width, WINDOW_CLOSE.height, label, onTap, 13),
+  // The room it takes reaches CLOSE_IN past the cross on its right: the window sets the cross that much further in
+  close: (onTap) => ({ container: crossButton(WINDOW_CLOSE, onTap).container, width: WINDOW_CLOSE + CLOSE_IN }),
   dim: WINDOW_DIM,
 };
-
-/**
- * A round brass button of `radius` pixels round (0, 0), deep blue inside like the painted slots on the minimap's
- * frame: what it does is drawn over it, in THEME.brassLight
- */
-export function drawMedallion(g: Graphics, radius: number) {
-  g.circle(0, 1.5, radius + 1).fill({ color: 0x000000, alpha: 0.45 });
-  g.circle(0, 0, radius).fill(BRASS_FILL).stroke({ width: 1, color: THEME.brassDark });
-  const well = radius * MEDALLION_WELL;
-  g.circle(0, 0, well).fill({ color: THEME.well }).stroke({ width: 1.5, color: THEME.brassDark });
-  // The light on the well's upper left edge
-  g.arc(0, 0, well - 1.5, Math.PI * 1.05, Math.PI * 1.55).stroke({ width: 1, color: 0xffffff, alpha: 0.18 });
-  return g;
-}
 
 /** A chevron round (0, 0), `size` pixels wide, pointing down (a section unfolded) or right (folded) */
 export function drawChevron(g: Graphics, size: number, open: boolean, color: number = THEME.brassLight) {
@@ -348,51 +369,19 @@ function diamond(g: Graphics, x: number, y: number, size: number) {
 
 /** A gold line across the header, fading out at both ends, a diamond in its middle */
 export function drawDivider(g: Graphics, x: number, y: number, width: number) {
-  const fade = new FillGradient({
-    type: 'linear',
-    start: { x: 0, y: 0 },
-    end: { x: 1, y: 0 },
-    colorStops: [
-      { offset: 0, color: 'rgba(201,154,69,0)' },
-      { offset: 0.5, color: 'rgba(243,213,138,0.85)' },
-      { offset: 1, color: 'rgba(201,154,69,0)' },
-    ],
-    textureSpace: 'local',
-  });
-  g.rect(x, y - 0.75, width, 1.5).fill(fade);
+  g.rect(x, y - 0.75, width, 1.5).fill(DIVIDER_FADE);
   diamond(g, x + width / 2, y, 10);
   return g;
 }
 
-/**
- * A row's board, `width` × `height` pixels: a darker plank under the wood, a faint brass edge (or a bright one,
- * `outline`: the row picked, fitted or done), and a stripe of `accent` down its left edge (a tier's colour)
- */
-export function drawCard(g: Graphics, width: number, height: number, accent?: number, outline?: number) {
+/** A row's board, `width` × `height` pixels: a darker plank under the wood, under a faint brass edge */
+export function drawCard(g: Graphics, width: number, height: number) {
   g.roundRect(0, 0, width, height, 6)
     .fill({ fill: CARD_FILL, alpha: 0.92 })
-    .stroke(
-      outline === undefined
-        ? { width: 1, color: THEME.brass, alpha: 0.22 }
-        : { width: 1.5, color: outline, alpha: 0.95 },
-    );
+    .stroke({ width: 1, color: THEME.brass, alpha: 0.22 });
   g.moveTo(6, 1.5)
     .lineTo(width - 6, 1.5)
     .stroke({ width: 1, color: 0xffffff, alpha: 0.05 });
-  if (accent !== undefined) g.roundRect(0, 3, 3, height - 6, 1.5).fill({ color: accent });
-  return g;
-}
-
-/**
- * A well sunk into the wood, `width` × `height` pixels at (x, y), as the skill bar's painted ones: deep blue in a
- * brass edge, a dark line round it and the wood's shade down its top. What it holds (lines of text) reads light on it
- */
-export function drawWell(g: Graphics, x: number, y: number, width: number, height: number) {
-  g.roundRect(x - 1.5, y - 1.5, width + 3, height + 3, 7.5).stroke({ width: 1, color: 0x000000, alpha: 0.55 });
-  g.roundRect(x, y, width, height, 6)
-    .fill({ color: THEME.well, alpha: 0.97 })
-    .stroke({ width: 1.5, color: THEME.brass, alpha: 0.85 });
-  g.rect(x + 4, y + 1.5, width - 8, Math.min(WELL_SHADE_HEIGHT, height / 2)).fill(WELL_SHADE);
   return g;
 }
 
@@ -419,9 +408,9 @@ export function drawMeter(g: Graphics, width: number, height: number, share: num
 
 /**
  * A framed slot for an icon, `size` pixels square: a brass frame round a dark well lit from within in `glow` (a tier's
- * colour), and a chip with `chip` in its bottom right corner (the tier). It shows a picture (`show`), or the chip's
- * text in big letters in its middle while there is none (an icon still loading, or a gun without one); without
- * `letters` the well stays empty instead (a ship, whose picture is to come)
+ * colour), and a chip with `chip` in its bottom right corner (the tier; none for '', an item of the market's). It shows
+ * a picture (`show`), or the chip's text in big letters in its middle while there is none (an icon still loading, or a
+ * gun without one); without `letters` the well stays empty instead (a ship, whose picture is to come)
  */
 export function iconSlot(size: number, glow: number, chip: string, letters = true) {
   const container = new Container();
@@ -454,6 +443,7 @@ export function iconSlot(size: number, glow: number, chip: string, letters = tru
   });
   tagText.anchor.set(0.5);
   tagText.position.set(size - width / 2 - 3, size - height / 2 - 3);
+  tag.visible = tagText.visible = chip !== '';
   container.addChild(frame, picture, big, tag, tagText);
   const show = (texture: Texture | null) => {
     picture.visible = texture !== null;

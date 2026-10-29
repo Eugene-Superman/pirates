@@ -1,0 +1,594 @@
+{
+ "file": "mastery.webp",
+ "tile": 64,
+ "icons": {
+  "economy.trunk": [
+   0,
+   0
+  ],
+  "economy.bounty.1": [
+   1,
+   0
+  ],
+  "economy.bounty.2": [
+   2,
+   0
+  ],
+  "economy.bounty.3": [
+   3,
+   0
+  ],
+  "economy.bounty.4": [
+   4,
+   0
+  ],
+  "economy.bounty.5": [
+   5,
+   0
+  ],
+  "economy.prizeMoney": [
+   6,
+   0
+  ],
+  "economy.trader.1": [
+   7,
+   0
+  ],
+  "economy.trader.2": [
+   8,
+   0
+  ],
+  "economy.trader.3": [
+   9,
+   0
+  ],
+  "economy.trader.4": [
+   10,
+   0
+  ],
+  "economy.trader.5": [
+   11,
+   0
+  ],
+  "economy.smugglersHold": [
+   0,
+   1
+  ],
+  "economy.thrift.1": [
+   1,
+   1
+  ],
+  "economy.thrift.2": [
+   2,
+   1
+  ],
+  "economy.thrift.3": [
+   3,
+   1
+  ],
+  "economy.thrift.4": [
+   4,
+   1
+  ],
+  "economy.thrift.5": [
+   5,
+   1
+  ],
+  "economy.insuredCargo": [
+   6,
+   1
+  ],
+  "exploration.trunk": [
+   7,
+   1
+  ],
+  "exploration.lookout.1": [
+   8,
+   1
+  ],
+  "exploration.lookout.2": [
+   9,
+   1
+  ],
+  "exploration.lookout.3": [
+   10,
+   1
+  ],
+  "exploration.lookout.4": [
+   11,
+   1
+  ],
+  "exploration.lookout.5": [
+   0,
+   2
+  ],
+  "exploration.hawkeye": [
+   1,
+   2
+  ],
+  "exploration.treasure.1": [
+   2,
+   2
+  ],
+  "exploration.treasure.2": [
+   3,
+   2
+  ],
+  "exploration.treasure.3": [
+   4,
+   2
+  ],
+  "exploration.treasure.4": [
+   5,
+   2
+  ],
+  "exploration.treasure.5": [
+   6,
+   2
+  ],
+  "exploration.luckyFind": [
+   7,
+   2
+  ],
+  "exploration.salvage.1": [
+   8,
+   2
+  ],
+  "exploration.salvage.2": [
+   9,
+   2
+  ],
+  "exploration.salvage.3": [
+   10,
+   2
+  ],
+  "exploration.salvage.4": [
+   11,
+   2
+  ],
+  "exploration.salvage.5": [
+   0,
+   3
+  ],
+  "exploration.wreckDiver": [
+   1,
+   3
+  ],
+  "navigation.trunk": [
+   2,
+   3
+  ],
+  "navigation.winds.1": [
+   3,
+   3
+  ],
+  "navigation.winds.2": [
+   4,
+   3
+  ],
+  "navigation.winds.3": [
+   5,
+   3
+  ],
+  "navigation.winds.4": [
+   6,
+   3
+  ],
+  "navigation.winds.5": [
+   7,
+   3
+  ],
+  "navigation.runningFree": [
+   8,
+   3
+  ],
+  "navigation.helm.1": [
+   9,
+   3
+  ],
+  "navigation.helm.2": [
+   10,
+   3
+  ],
+  "navigation.helm.3": [
+   11,
+   3
+  ],
+  "navigation.helm.4": [
+   0,
+   4
+  ],
+  "navigation.helm.5": [
+   1,
+   4
+  ],
+  "navigation.quickHelm": [
+   2,
+   4
+  ],
+  "navigation.storm.1": [
+   3,
+   4
+  ],
+  "navigation.storm.2": [
+   4,
+   4
+  ],
+  "navigation.storm.3": [
+   5,
+   4
+  ],
+  "navigation.storm.4": [
+   6,
+   4
+  ],
+  "navigation.storm.5": [
+   7,
+   4
+  ],
+  "navigation.slipAway": [
+   8,
+   4
+  ],
+  "artillery.trunk": [
+   9,
+   4
+  ],
+  "artillery.gunner.1": [
+   10,
+   4
+  ],
+  "artillery.gunner.2": [
+   11,
+   4
+  ],
+  "artillery.gunner.3": [
+   0,
+   5
+  ],
+  "artillery.gunner.4": [
+   1,
+   5
+  ],
+  "artillery.gunner.5": [
+   2,
+   5
+  ],
+  "artillery.rollingThunder": [
+   3,
+   5
+  ],
+  "artillery.crews.1": [
+   4,
+   5
+  ],
+  "artillery.crews.2": [
+   5,
+   5
+  ],
+  "artillery.crews.3": [
+   6,
+   5
+  ],
+  "artillery.crews.4": [
+   7,
+   5
+  ],
+  "artillery.crews.5": [
+   8,
+   5
+  ],
+  "artillery.hotBarrels": [
+   9,
+   5
+  ],
+  "artillery.reach.1": [
+   10,
+   5
+  ],
+  "artillery.reach.2": [
+   11,
+   5
+  ],
+  "artillery.reach.3": [
+   0,
+   6
+  ],
+  "artillery.reach.4": [
+   1,
+   6
+  ],
+  "artillery.reach.5": [
+   2,
+   6
+  ],
+  "artillery.marksman": [
+   3,
+   6
+  ],
+  "survival.trunk": [
+   4,
+   6
+  ],
+  "survival.hull.1": [
+   5,
+   6
+  ],
+  "survival.hull.2": [
+   6,
+   6
+  ],
+  "survival.hull.3": [
+   7,
+   6
+  ],
+  "survival.hull.4": [
+   8,
+   6
+  ],
+  "survival.hull.5": [
+   9,
+   6
+  ],
+  "survival.oakAndIron": [
+   10,
+   6
+  ],
+  "survival.carpenters.1": [
+   11,
+   6
+  ],
+  "survival.carpenters.2": [
+   0,
+   7
+  ],
+  "survival.carpenters.3": [
+   1,
+   7
+  ],
+  "survival.carpenters.4": [
+   2,
+   7
+  ],
+  "survival.carpenters.5": [
+   3,
+   7
+  ],
+  "survival.patchUnderFire": [
+   4,
+   7
+  ],
+  "survival.armour.1": [
+   5,
+   7
+  ],
+  "survival.armour.2": [
+   6,
+   7
+  ],
+  "survival.armour.3": [
+   7,
+   7
+  ],
+  "survival.armour.4": [
+   8,
+   7
+  ],
+  "survival.armour.5": [
+   9,
+   7
+  ],
+  "survival.ironKeel": [
+   10,
+   7
+  ],
+  "hunting.trunk": [
+   11,
+   7
+  ],
+  "hunting.harpooner.1": [
+   0,
+   8
+  ],
+  "hunting.harpooner.2": [
+   1,
+   8
+  ],
+  "hunting.harpooner.3": [
+   2,
+   8
+  ],
+  "hunting.harpooner.4": [
+   3,
+   8
+  ],
+  "hunting.harpooner.5": [
+   4,
+   8
+  ],
+  "hunting.barbedHeads": [
+   5,
+   8
+  ],
+  "hunting.winch.1": [
+   6,
+   8
+  ],
+  "hunting.winch.2": [
+   7,
+   8
+  ],
+  "hunting.winch.3": [
+   8,
+   8
+  ],
+  "hunting.winch.4": [
+   9,
+   8
+  ],
+  "hunting.winch.5": [
+   10,
+   8
+  ],
+  "hunting.feedingFrenzy": [
+   11,
+   8
+  ],
+  "hunting.lore.1": [
+   0,
+   9
+  ],
+  "hunting.lore.2": [
+   1,
+   9
+  ],
+  "hunting.lore.3": [
+   2,
+   9
+  ],
+  "hunting.lore.4": [
+   3,
+   9
+  ],
+  "hunting.lore.5": [
+   4,
+   9
+  ],
+  "hunting.leviathanHunter": [
+   5,
+   9
+  ],
+  "command.trunk": [
+   6,
+   9
+  ],
+  "command.veterans.1": [
+   7,
+   9
+  ],
+  "command.veterans.2": [
+   8,
+   9
+  ],
+  "command.veterans.3": [
+   9,
+   9
+  ],
+  "command.veterans.4": [
+   10,
+   9
+  ],
+  "command.veterans.5": [
+   11,
+   9
+  ],
+  "command.fieldPromotions": [
+   0,
+   10
+  ],
+  "command.drill.1": [
+   1,
+   10
+  ],
+  "command.drill.2": [
+   2,
+   10
+  ],
+  "command.drill.3": [
+   3,
+   10
+  ],
+  "command.drill.4": [
+   4,
+   10
+  ],
+  "command.drill.5": [
+   5,
+   10
+  ],
+  "command.battleCry": [
+   6,
+   10
+  ],
+  "command.patrons.1": [
+   7,
+   10
+  ],
+  "command.patrons.2": [
+   8,
+   10
+  ],
+  "command.patrons.3": [
+   9,
+   10
+  ],
+  "command.patrons.4": [
+   10,
+   10
+  ],
+  "command.patrons.5": [
+   11,
+   10
+  ],
+  "command.busyCaptain": [
+   0,
+   11
+  ],
+  "economy.merchantPrince": [
+   1,
+   11
+  ],
+  "economy.quartermasterGeneral": [
+   2,
+   11
+  ],
+  "exploration.seaOracle": [
+   3,
+   11
+  ],
+  "exploration.fortunesFavourite": [
+   4,
+   11
+  ],
+  "navigation.windrunner": [
+   5,
+   11
+  ],
+  "navigation.ghostOfTheSea": [
+   6,
+   11
+  ],
+  "artillery.ironRain": [
+   7,
+   11
+  ],
+  "artillery.thunderOfTheLine": [
+   8,
+   11
+  ],
+  "survival.unbreakable": [
+   9,
+   11
+  ],
+  "survival.lastBastion": [
+   10,
+   11
+  ],
+  "hunting.krakensBane": [
+   11,
+   11
+  ],
+  "hunting.apexPredator": [
+   0,
+   12
+  ],
+  "command.legendOfTheSeas": [
+   1,
+   12
+  ],
+  "command.fleetAdmiral": [
+   2,
+   12
+  ]
+ }
+}

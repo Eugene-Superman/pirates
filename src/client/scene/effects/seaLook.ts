@@ -78,6 +78,120 @@ export interface SurfaceLook {
   readonly caustics: readonly [PatchLayer, PatchLayer];
   readonly causticColor: number;
   readonly causticAmount: number;
+  /** The Moon's light from below: the moon glass on the seabed glowing up through the water */
+  readonly glass: GlassLook;
+  /** Where the story sends the player: a gold light in the water */
+  readonly mark: MarkLook;
+  /** Round a boss that fights the player: a red light in the water, pulsing faster */
+  readonly boss: MarkLook;
+  /** The Seam's storm at the map's edges, and a gate's whirlpool */
+  readonly seam: SeamLook;
+  readonly vortex: VortexLook;
+}
+
+/**
+ * Moon glass on the seabed (docs/story.md: the Moon fell into the sea, and its shards glow there): a shard in some of
+ * the cells of a grid over the water, each its own size and breath, its light spread round it and sparks over it
+ */
+export interface GlassLook {
+  /** World units a side of a cell: a shard keeps to its middle half, its light to half of it */
+  readonly cell: number;
+  /** The share of cells with a shard */
+  readonly share: number;
+  /** How far a shard's light reaches, in cells (half a cell at most) */
+  readonly reach: number;
+  /** How bright it is, and how much of it is left where the sea is deepest (0..1) */
+  readonly amount: number;
+  readonly deep: number;
+  /** A shard's own light, and the light it spreads through the water round it */
+  readonly color: number;
+  readonly halo: number;
+  /** Radians a second: how fast a shard breathes, and the sparks over it twinkle */
+  readonly breath: number;
+  readonly twinkle: number;
+  /** The sparks: how bright, the share of the fine cells that have one, and fine cells a side of a cell */
+  readonly sparks: number;
+  readonly sparkShare: number;
+  readonly sparkCells: number;
+}
+
+/**
+ * A light in the water, the story's mark's (storyMark3d.ts) or a boss's: a pool of it, breathing, and rings of it
+ * spreading out of its middle one after another, all bent by the waves over it, glints on the ripples; its pillar of
+ * light is drawn over the sea (Beacon). Distances in its radii
+ */
+export interface MarkLook {
+  readonly color: number;
+  /** How much it turns the water its colour, and how much it lightens it over the sky the water reflects (which hides
+   * the most of what is under it) */
+  readonly under: number;
+  readonly over: number;
+  /** How far the waves bend it: radii a unit of their slope */
+  readonly bend: number;
+  /** How tight the pool is: its light falls off as e^(-pool · r²) */
+  readonly pool: number;
+  /** A ring's width, how far it spreads, and seconds it takes to */
+  readonly ringWidth: number;
+  readonly ringReach: number;
+  readonly ringPeriod: number;
+  /** Radians a second the pool breathes at */
+  readonly breath: number;
+  /** The glints on the ripples over the pool: brightness and sharpness, as the sun's glitter */
+  readonly glints: number;
+  readonly glintSharpness: number;
+}
+
+/**
+ * The Seam (docs/story.md: the walls of storm between the seas) at the sea's map's edges, its foot in the water: the
+ * waves rougher and darker towards it, whitewater churning where its wall stands (SeamWalls.ts), broken foam beyond.
+ * World units
+ */
+export interface SeamLook {
+  /** How far in from the edge the storm reaches, and how wide the whitewater at the wall's foot is */
+  readonly reach: number;
+  readonly foot: number;
+  /** How much steeper the waves are at the edge (1: twice) */
+  readonly rough: number;
+  /** The storm's water, and how much of it there is at the edge */
+  readonly color: number;
+  readonly dark: number;
+  /** The whitewater: its foam, world units a copy of the foam spans, and world units a second it churns along */
+  readonly foam: number;
+  readonly foamTile: number;
+  readonly churn: number;
+}
+
+/**
+ * A gate to another sea (world/gates.ts) in the water: a whirlpool, its arms of foam winding in to a dark funnel, the
+ * waves curling round it, its eye lit with the Seam's light. Distances in the gate's radii
+ */
+export interface VortexLook {
+  /** How far out it turns the water, and how far its funnel reaches */
+  readonly reach: number;
+  readonly funnel: number;
+  /** How much darker the funnel's water is, and how steep it looks: slope units at its middle */
+  readonly dark: number;
+  readonly slope: number;
+  /** Radians the waves curl round it at its edge (three times that at its middle) */
+  readonly curl: number;
+  /** Its arms of foam: how many (whole), how tightly they wind (radians an e-fold of the radius), radians a second they
+   * turn, and e-folds of the radius a second their foam draws in by */
+  readonly arms: number;
+  readonly twist: number;
+  readonly spin: number;
+  readonly flow: number;
+  /** Copies of the foam's lace an arm's turn round it (whole), and an e-fold of the radius; how much foam */
+  readonly laceRound: number;
+  readonly laceIn: number;
+  readonly foam: number;
+  /** The eye's light: an open gate's, one shut to the ship's tier; its size (radii), brightness, how much of it
+   * breathes and radians a second it does */
+  readonly glow: number;
+  readonly shut: number;
+  readonly eye: number;
+  readonly bright: number;
+  readonly breathe: number;
+  readonly breath: number;
 }
 
 /** Flat color of the sea: the screen behind the scene, seen until the wave maps have loaded */
@@ -87,7 +201,8 @@ export const SEA_COLOR = 0x1e6a8c;
  * The sea's look, picked from the ten that were tried ("Glassy calm"): calm water, a long swell under fine ripples,
  * mirroring the sky strongly, with small sharp sun glitter. Livened up since: ripples running two ways, deeper and
  * shallower patches, cloud shadows drifting over it, gusts of rougher water with whitecaps, a soft sheen on the calm
- * and light playing on the floor of the shallows
+ * and light playing on the floor of the shallows; and, for the story's sea, the Moon's light coming up from its glass
+ * on the seabed, cold silver among the warm blues
  */
 export const SEA_LOOK: SurfaceLook = {
   layers: [
@@ -127,4 +242,74 @@ export const SEA_LOOK: SurfaceLook = {
   ],
   causticColor: 0x9fe8e0,
   causticAmount: 0.14,
+  glass: {
+    cell: 520,
+    share: 0.4,
+    reach: 0.5,
+    amount: 0.65,
+    deep: 0.4,
+    color: 0xeaf6ff,
+    halo: 0x9cc4ff,
+    breath: 0.9,
+    twinkle: 2.4,
+    sparks: 0.8,
+    sparkShare: 0.07,
+    sparkCells: 22,
+  },
+  mark: {
+    color: 0xffb547,
+    under: 0.7,
+    over: 0.25,
+    bend: 0.14,
+    pool: 4,
+    ringWidth: 0.07,
+    ringReach: 1.1,
+    ringPeriod: 3.4,
+    breath: 2.2,
+    glints: 1.6,
+    glintSharpness: 260,
+  },
+  boss: {
+    color: 0xff3b2e,
+    under: 0.6,
+    over: 0.3,
+    bend: 0.14,
+    pool: 4,
+    ringWidth: 0.07,
+    ringReach: 1.1,
+    ringPeriod: 2.2,
+    breath: 3.4,
+    glints: 1.6,
+    glintSharpness: 260,
+  },
+  seam: {
+    reach: 520,
+    foot: 28,
+    rough: 1.6,
+    color: 0x0b3047,
+    dark: 0.55,
+    foam: 0.9,
+    foamTile: 70,
+    churn: 18,
+  },
+  vortex: {
+    reach: 1.8,
+    funnel: 0.85,
+    dark: 0.72,
+    slope: 0.55,
+    curl: 1.2,
+    arms: 5,
+    twist: 3,
+    spin: 0.9,
+    flow: 0.25,
+    laceRound: 2,
+    laceIn: 1.2,
+    foam: 0.85,
+    glow: 0xa66bff,
+    shut: 0xff7055,
+    eye: 0.17,
+    bright: 0.55,
+    breathe: 0.25,
+    breath: 2,
+  },
 };

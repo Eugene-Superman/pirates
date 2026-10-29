@@ -1,6 +1,22 @@
-import { Assets, Container, Graphics, Rectangle, Sprite, Text, Texture, type TextStyleOptions } from 'pixi.js';
-import { UI, drawCoin, playTap, show } from './ui';
+import {
+  Assets,
+  CanvasTextMetrics,
+  Container,
+  Graphics,
+  Rectangle,
+  Sprite,
+  Text,
+  TextStyle,
+  Texture,
+  type TextStyleOptions,
+} from 'pixi.js';
+import { MINIMAP_BUTTONS } from './iconAtlas';
+import { NIGHT, moonButton, moonLabel, nightPanel, nightPlaque, nightWindowCorners } from './nightTheme';
+import type { GuideTarget } from './StoryGuide';
+import { THEME, TITLE_STYLE } from './theme';
+import { UI, goldCoin, playTap, show, whole } from './ui';
 import { t } from '../i18n/i18n';
+import type { CursorId } from '../input/cursor';
 
 // The port from its roadstead, and the medallions: made by blender-assets/port/build_harbour_art.py from painted art (or
 // rendered in Blender by build_harbour.py from the port's scene)
@@ -14,17 +30,39 @@ export interface Building {
   readonly name: string;
   /** What it is for, in a few words: under its name when the pointer is over it, and in its window */
   readonly about: string;
+  /** The pointer over its medallion: what is done there; a closed one's, a button's */
+  readonly cursor: CursorId | 'pointer';
 }
 
 export const BUILDINGS: readonly Building[] = [
-  { id: 'tavern', name: 'Tavern', about: 'Bounties: sink what they ask and come back for the gold' },
-  { id: 'market', name: 'Market', about: 'Buys the goods in your hold' },
-  { id: 'workshop', name: 'Workshop', about: 'Sails, planking, rudders and lookouts for your ship, and hull repairs' },
-  { id: 'shipyard', name: 'Shipyard', about: 'New ships, and your ships laid up in port' },
-  { id: 'arsenal', name: 'Arsenal', about: 'Cannons, harpoon guns and their ammo' },
-  { id: 'guild', name: 'Guild hall', about: 'Where captains band together' },
-  { id: 'auction', name: 'Auction house', about: 'Where captains trade with one another' },
+  { id: 'tavern', name: 'Tavern', about: 'Bounties: sink what they ask and come back for the gold', cursor: 'seal' },
+  {
+    id: 'market',
+    name: 'Market',
+    about: 'Buys the goods in your hold, and sells items for doubloons',
+    cursor: 'exchange',
+  },
+  {
+    id: 'workshop',
+    name: 'Workshop',
+    about: 'Sails, planking, rudders and lookouts for your ship, and hull repairs',
+    cursor: 'hammer',
+  },
+  { id: 'shipyard', name: 'Shipyard', about: 'New ships, and your ships laid up in port', cursor: 'wheel' },
+  { id: 'arsenal', name: 'Arsenal', about: 'Cannons, harpoon guns and their ammo', cursor: 'sabres' },
+  { id: 'guild', name: 'Guild hall', about: 'Where captains band together', cursor: 'pointer' },
+  { id: 'auction', name: 'Auction house', about: 'Where captains trade with one another', cursor: 'pointer' },
 ];
+
+/** The player's ship at the quay: its medallion opens the loadout */
+const SHIP: Pick<Building, 'name' | 'about' | 'cursor'> = {
+  name: 'Your ship',
+  about: 'The loadout: fit the guns from the hold, put ammo at hand (L)',
+  cursor: 'pointer',
+};
+// Where the ship's medallion stands on the picture (shares of its width and height): over the masts of the sloop at
+// the quay by the eastern wall, clear of the conversation box under it
+const SHIP_SPOT = [0.77, 0.5] as const;
 
 /** harbour.json, written by the script that made the picture */
 interface HarbourArt {
@@ -77,30 +115,37 @@ const FALLBACK: Readonly<Record<BuildingId, readonly [number, number]>> = {
 };
 const MARGIN = 14; // screen pixels between the frame and the screen's edge, at least
 const MAX_SCALE = 1.25; // the picture isn't blown up more than this on a big screen
-const FRAME = { wood: 16, gold: 3, outer: 2 }; // picture pixels: the frame's wooden border and gold lines
+// The frame, a window's in the night look: its band round the picture and the gold line along the picture's edge
+// (picture pixels), and how many picture pixels a pixel of the window's rim, sky and corner pieces takes: drawn
+// larger, they read as a window's do on a screen the picture is shrunk to
+const FRAME = { band: 28, edge: 3, scale: 1.6 } as const;
 const COLORS = {
   sea: 0x123f57, // behind the picture until it loads
-  wood: 0x3a2412,
   gold: 0xd9a441,
-  goldDark: 0x7a5a22,
-  plaque: 0xf1e2bd,
-  plaqueText: 0x3a2412,
   label: 0xffc54d,
   labelHover: 0xfff2c4,
   labelStroke: 0x1d1206,
-  sail: 0x2e7d3a,
-  sailHover: 0x3a9a48,
   badge: 0xd8402b,
 };
 const MEDALLION = 124; // picture pixels across
 const HOVER_SCALE = 1.12;
 const EASE = 14; // how fast a medallion grows and shrinks under the pointer, per second
 const GLOW = { alpha: 0.32, pulse: 0.1, speed: 2.4 }; // the light behind a medallion: under the pointer, and breathing
+// A medallion that calls the player to it (the ship's, while the guns wait in the hold): its light brighter, breathing
+// faster, and the medallion with it
+const CALL = { pulse: 0.55, speed: 4.2, grow: 0.08 } as const;
+// The note over Set sail while the story keeps the ship in port: its letters (picture pixels), how far over the
+// button's middle, its pill's padding; and how long it flashes after Set sail was refused (seconds)
+const HELD = { size: 26, above: 74, pad: 22, flash: 1.2 } as const;
 const LABEL_SIZE = 27; // picture pixels
 const ABOUT = { size: 19, width: 380, pad: 10 }; // picture pixels: what a building is for, under its name
-const PLAQUE = { width: 520, height: 70, size: 34 };
-const SAIL = { width: 330, height: 70, size: 28 };
-const GOLD_PILL = { height: 50, size: 26, pad: 18 };
+// The port's name on its plaque, picture pixels: its least width, its height, its letters, and the room round them
+// for the stars at its ends
+const PLAQUE = { width: 520, height: 70, size: 34, room: 170 };
+const SAIL = { width: 330, height: 70, size: 28, room: 110 }; // room: picture pixels round its label, the points' included
+// The player's gold in the picture's top right corner, picture pixels; `right`: its right end in from the picture's,
+// clear of the frame's corner piece
+const GOLD_PILL = { height: 50, size: 26, pad: 18, coin: 18, right: 120, top: 34 };
 
 const LABEL_STYLE: TextStyleOptions = {
   fontFamily: 'Georgia, "Times New Roman", serif',
@@ -125,14 +170,16 @@ class Medallion {
   private readonly badgeText: Text;
   private grow = 0;
   hovered = false;
+  /** Calling the player to it: brighter and breathing */
+  calling = false;
 
-  constructor(building: Building, onTap: () => void) {
+  constructor(building: Pick<Building, 'name' | 'about' | 'cursor'>, onTap: () => void) {
     const r = MEDALLION / 2;
     this.glow.circle(0, 0, r * 1.32).fill({ color: COLORS.gold });
     this.glow.alpha = 0;
     const shadow = new Graphics().circle(3, 6, r * 1.02).fill({ color: 0x000000, alpha: 0.4 });
     // Until the medallions' picture loads: a plain one, so the building can be opened all the same
-    this.fallback.circle(0, 0, r).fill({ color: UI.panel }).stroke({ width: 6, color: COLORS.gold });
+    this.fallback.circle(0, 0, r).fill({ color: NIGHT.well }).stroke({ width: 6, color: COLORS.gold });
     this.sprite.anchor.set(0.5);
     this.sprite.visible = false;
     // A count or a mark on the top right: something waits there (a bounty to turn in, a ship to buy)
@@ -164,7 +211,8 @@ class Medallion {
     about.anchor.set(0.5, 0);
     const box = new Graphics()
       .roundRect(-about.width / 2 - ABOUT.pad, -ABOUT.pad / 2, about.width + ABOUT.pad * 2, about.height + ABOUT.pad, 8)
-      .fill({ color: 0x000000, alpha: 0.72 });
+      .fill({ color: NIGHT.bottom, alpha: 0.9 })
+      .stroke({ width: 2, color: THEME.brass, alpha: 0.7 });
     this.about.addChild(box, about);
     this.about.position.set(0, this.label.y + this.label.height + 6);
     this.about.visible = false;
@@ -174,7 +222,7 @@ class Medallion {
     const half = Math.max(r, this.label.width / 2);
     this.container.hitArea = new Rectangle(-half, -r, half * 2, r * 2 + this.label.height + 4);
     this.container.eventMode = 'static';
-    this.container.cursor = 'pointer';
+    this.container.cursor = building.cursor;
     this.container.on('pointerdown', (e) => e.stopPropagation());
     this.container.on('pointertap', () => {
       playTap();
@@ -199,9 +247,11 @@ class Medallion {
 
   update(dt: number, time: number) {
     this.grow += ((this.hovered ? 1 : 0) - this.grow) * Math.min(1, dt * EASE);
-    this.face.scale.set(1 + (HOVER_SCALE - 1) * this.grow);
     // Breathing faintly, so the eye finds them; lit under the pointer
-    this.glow.alpha = GLOW.alpha * this.grow + GLOW.pulse * (0.5 + 0.5 * Math.sin(time * GLOW.speed));
+    const breath = 0.5 + 0.5 * Math.sin(time * (this.calling ? CALL.speed : GLOW.speed));
+    const call = this.calling ? CALL.grow * breath : 0;
+    this.face.scale.set(1 + (HOVER_SCALE - 1) * this.grow + call);
+    this.glow.alpha = GLOW.alpha * this.grow + (this.calling ? CALL.pulse : GLOW.pulse) * breath;
     const fill = this.hovered ? COLORS.labelHover : COLORS.label;
     if (this.label.style.fill !== fill) this.label.style.fill = fill;
     this.about.visible = this.hovered;
@@ -209,10 +259,12 @@ class Medallion {
 }
 
 /**
- * The port seen from its roadstead, in a frame over the game while the ship is in port: a picture of the harbour with a
- * medallion over each building (opening its window), the port's name on a plaque, the player's gold
- * and Set sail. The picture loads the first time the ship comes into port; until then (or if it fails) the
- * medallions stand on the sea's colour
+ * The port seen from its roadstead, in a frame over the game while the ship is in port, a window's in the night look: a
+ * picture of the harbour with a medallion over each building (opening its window), the port's name on a plaque, the
+ * player's gold and Set sail; a medallion over the sloop at the quay is the player's ship, opening the loadout. While
+ * the story keeps the ship in port (its guns in the hold) Set sail is dimmed under a note saying why, and the ship's
+ * medallion calls the player to it. The picture loads the first time the ship comes into port; until then (or if it
+ * fails) the medallions stand on the sea's colour
  */
 export class HarbourView {
   readonly container = new Container();
@@ -220,14 +272,25 @@ export class HarbourView {
   private readonly frame = new Container();
   private readonly picture = new Sprite();
   private readonly backdrop = new Graphics();
+  /** The frame: the window's panel under the picture, its corner pieces and the gold line round the picture over it */
+  private frameBack = new Container();
+  private frameFront = new Container();
   private readonly frameLines = new Graphics();
   /** The medallions, in a layer of their own: the one under the pointer is raised over the others */
   private readonly spots = new Container();
   private readonly medallions = new Map<BuildingId, Medallion>();
+  /** The player's ship at the quay: opens the loadout */
+  private readonly ship: Medallion;
+  /** Over Set sail while the story keeps the ship in port: why */
+  private readonly held = new Container();
+  /** Seconds left of the note's flash, after Set sail was refused */
+  private flash = 0;
   private readonly gold: Text;
-  private readonly coin = new Graphics();
+  private readonly coin = goldCoin(GOLD_PILL.coin);
   private readonly goldPill = new Container();
   private readonly goldBack = new Graphics();
+  /** The gold and the picture's width the pill was laid out for, to lay it out again only when either changes */
+  private goldDrawn = '';
   private readonly plaque: Container;
   private readonly sail: Container;
   private readonly screen: Rectangle;
@@ -238,7 +301,14 @@ export class HarbourView {
   private fittedTo = '';
   private time = 0;
 
-  constructor(screen: Rectangle, portName: string, onEnter: (id: BuildingId) => void, onSetSail: () => void) {
+  /** onShip: the ship's medallion clicked, the loadout to open */
+  constructor(
+    screen: Rectangle,
+    portName: string,
+    onEnter: (id: BuildingId) => void,
+    onSetSail: () => void,
+    onShip: () => void,
+  ) {
     this.screen = screen;
     // Clicks round the picture must not reach the stage, which would steer the ship
     this.dim.eventMode = 'static';
@@ -250,21 +320,32 @@ export class HarbourView {
       this.medallions.set(building.id, medallion);
       this.spots.addChild(medallion.container);
     }
+    this.ship = new Medallion(SHIP, onShip);
+    this.spots.addChild(this.ship.container);
+    // The loadout's painted medallion, the minimap's button's
+    const paintShip = () => {
+      const texture = MINIMAP_BUTTONS.get('loadout');
+      if (texture) this.ship.setTexture(texture);
+    };
+    MINIMAP_BUTTONS.load(paintShip);
+    paintShip();
+    this.makeHeldNote();
     this.gold = new Text({ text: '', style: { ...LABEL_STYLE, fontSize: GOLD_PILL.size, fill: 0xffd75a } });
     this.gold.anchor.set(1, 0.5);
-    drawCoin(this.coin, 14);
-    this.coin.scale.set(1.3);
     this.goldPill.addChild(this.goldBack, this.coin, this.gold);
     this.plaque = this.makePlaque(t(portName));
     this.sail = this.sailButton(onSetSail);
     this.frame.addChild(
+      this.frameBack,
       this.backdrop,
       this.picture,
       this.frameLines,
+      this.frameFront,
       this.spots,
       this.goldPill,
       this.plaque,
       this.sail,
+      this.held,
     );
     this.container.addChild(this.dim, this.frame);
     this.container.visible = false;
@@ -295,8 +376,27 @@ export class HarbourView {
     return this.textures.get(id) ?? null;
   }
 
-  /** Every frame while open. badges: a mark over a building's medallion (a count, "!"), none if missing */
-  update(dt: number, gold: number, badges: Partial<Record<BuildingId, string>>) {
+  /**
+   * For the story's guide to point at: a building's medallion (its round face, not its name under it), the ship's,
+   * or Set sail
+   */
+  target(id: BuildingId | 'ship' | 'sail'): GuideTarget | null {
+    if (id === 'sail') return { container: this.sail };
+    const medallion = id === 'ship' ? this.ship : this.medallions.get(id);
+    const r = MEDALLION / 2;
+    return medallion ? { container: medallion.container, box: { x: -r, y: -r, width: r * 2, height: r * 2 } } : null;
+  }
+
+  /** Set sail was refused (the story keeps the ship in port): the note over it flashes, the ship's medallion calls */
+  refused() {
+    this.flash = HELD.flash;
+  }
+
+  /**
+   * Every frame while open. badges: a mark over a building's medallion (a count, "!"), none if missing; held: whether the
+   * story keeps the ship in port, its guns in the hold
+   */
+  update(dt: number, gold: number, badges: Partial<Record<BuildingId, string>>, held: boolean) {
     if (!this.isOpen) return;
     this.time += dt;
     const { width, height } = this.screen;
@@ -305,7 +405,7 @@ export class HarbourView {
       this.fittedTo = fit;
       this.fit(width, height);
     }
-    show(this.gold, t('{n} gold', { n: gold }));
+    show(this.gold, whole(gold));
     this.layoutGold();
     for (const [id, medallion] of this.medallions) {
       medallion.setBadge(badges[id] ?? '');
@@ -315,6 +415,15 @@ export class HarbourView {
       if (medallion.hovered && this.spots.getChildIndex(medallion.container) !== top)
         this.spots.setChildIndex(medallion.container, top);
     }
+    this.ship.calling = held;
+    this.ship.setBadge(held ? '!' : '');
+    this.ship.update(dt, this.time);
+    this.sail.alpha = held ? 0.45 : 1;
+    this.held.visible = held;
+    this.flash = Math.max(0, this.flash - dt);
+    // A flash: brighter and bigger for a moment, then back
+    const flash = this.flash / HELD.flash;
+    this.held.scale.set(1 + 0.12 * flash * Math.abs(Math.sin(this.flash * 9)));
   }
 
   private async load() {
@@ -346,9 +455,14 @@ export class HarbourView {
     this.drawFrame();
     this.plaque.position.set(width / 2, 0);
     this.sail.position.set(width / 2, height);
+    this.held.position.set(width / 2, height - HELD.above);
+    const r = MEDALLION / 2;
+    this.ship.container.position.set(
+      SHIP_SPOT[0] * width,
+      Math.min(SHIP_SPOT[1] * height, height - r - LABEL_SIZE * 2),
+    );
     this.picture.width = width;
     this.picture.height = height;
-    const r = MEDALLION / 2;
     for (const [id, medallion] of this.medallions) {
       const [sx, sy] = art?.buildings[id]?.at ?? FALLBACK[id];
       const x = Math.min(Math.max(sx * width, r + 20), width - r - 20);
@@ -359,9 +473,9 @@ export class HarbourView {
   }
 
   private fit(width: number, height: number) {
-    const w = this.size.width + (FRAME.wood + FRAME.outer) * 2;
+    const w = this.size.width + FRAME.band * 2;
     // The plaque and Set sail stand out of the frame by half their height, above and below
-    const h = this.size.height + (FRAME.wood + FRAME.outer) * 2 + (PLAQUE.height + SAIL.height) / 2;
+    const h = this.size.height + FRAME.band * 2 + (PLAQUE.height + SAIL.height) / 2;
     const scale = Math.min(MAX_SCALE, (width - MARGIN * 2) / w, (height - MARGIN * 2) / h);
     this.frame.scale.set(scale);
     this.frame.position.set(
@@ -371,82 +485,91 @@ export class HarbourView {
     this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: 0.55 });
   }
 
-  /** The gold in the top right corner of the picture, its pill as wide as the number */
+  /** The gold in the top right corner of the picture, its pill of the night's blue as wide as the number */
   private layoutGold() {
+    const key = `${this.gold.text}:${this.size.width}`;
+    if (key === this.goldDrawn) return;
+    this.goldDrawn = key;
     const w = this.gold.width + GOLD_PILL.pad * 3 + 36;
     this.goldBack
       .clear()
       .roundRect(-w, -GOLD_PILL.height / 2, w, GOLD_PILL.height, GOLD_PILL.height / 2)
-      .fill({ color: 0x000000, alpha: 0.55 })
-      .stroke({ width: 2, color: COLORS.gold, alpha: 0.8 });
+      .fill({ color: NIGHT.bottom, alpha: 0.88 })
+      .stroke({ width: 2.5, color: THEME.brass, alpha: 0.9 });
     this.gold.position.set(-GOLD_PILL.pad, 0);
     this.coin.position.set(-w + GOLD_PILL.pad + 18, 0);
-    this.goldPill.position.set(this.size.width - 26, 26 + GOLD_PILL.height / 2);
+    this.goldPill.position.set(this.size.width - GOLD_PILL.right, GOLD_PILL.top + GOLD_PILL.height / 2);
   }
 
-  /** The frame round the picture: a dark wooden border between two gold lines */
+  /**
+   * The frame round the picture, a window's in the night look: its panel (the brass rim, the deep blue and the sky)
+   * showing in a band round the picture, a gold line along the picture's edge, the window's corner pieces over its
+   * corners
+   */
   private drawFrame() {
-    const g = this.frameLines.clear();
     const { width, height } = this.size;
-    const wood = FRAME.wood;
-    g.rect(-wood / 2, -wood / 2, width + wood, height + wood).stroke({ width: wood, color: COLORS.wood });
-    g.rect(-FRAME.gold / 2, -FRAME.gold / 2, width + FRAME.gold, height + FRAME.gold).stroke({
-      width: FRAME.gold,
-      color: COLORS.gold,
-    });
-    g.rect(-wood, -wood, width + wood * 2, height + wood * 2).stroke({ width: FRAME.outer, color: COLORS.goldDark });
+    const { band, edge, scale } = FRAME;
+    const panelWidth = (width + band * 2) / scale;
+    const panelHeight = (height + band * 2) / scale;
+    const back = nightPanel(panelWidth, panelHeight);
+    const front = nightWindowCorners(panelWidth, panelHeight);
+    for (const part of [back, front]) {
+      part.scale.set(scale);
+      part.position.set(-band, -band);
+    }
+    this.frame.addChildAt(back, this.frame.getChildIndex(this.frameBack));
+    this.frame.addChildAt(front, this.frame.getChildIndex(this.frameFront));
+    this.frameBack.destroy({ children: true });
+    this.frameFront.destroy({ children: true });
+    this.frameBack = back;
+    this.frameFront = front;
+    this.frameLines
+      .clear()
+      .rect(-edge / 2, -edge / 2, width + edge, height + edge)
+      .stroke({ width: edge, color: THEME.brass });
   }
 
-  /** The port's name on a parchment plaque, over the frame's top edge */
+  /** The port's name on a plaque of the night, over the frame's top edge */
   private makePlaque(name: string) {
     const plaque = new Container();
-    const label = new Text({
-      text: name,
-      style: { fontFamily: LABEL_STYLE.fontFamily, fontWeight: 'bold', fontSize: PLAQUE.size, fill: COLORS.plaqueText },
-    });
+    const label = new Text({ text: name, style: { ...TITLE_STYLE, fontSize: PLAQUE.size } });
     label.anchor.set(0.5);
-    const width = Math.max(PLAQUE.width, label.width + 90);
-    const back = new Graphics()
-      .roundRect(-width / 2 + 4, -PLAQUE.height / 2 + 6, width, PLAQUE.height, PLAQUE.height / 2)
-      .fill({ color: 0x000000, alpha: 0.4 })
-      .roundRect(-width / 2, -PLAQUE.height / 2, width, PLAQUE.height, PLAQUE.height / 2)
-      .fill({ color: COLORS.plaque })
-      .stroke({ width: 5, color: COLORS.gold })
-      .roundRect(-width / 2 + 9, -PLAQUE.height / 2 + 9, width - 18, PLAQUE.height - 18, (PLAQUE.height - 18) / 2)
-      .stroke({ width: 1.5, color: COLORS.goldDark, alpha: 0.7 });
+    const width = Math.max(PLAQUE.width, label.width + PLAQUE.room);
+    // Drawn as large as the frame's rim, so the two match
+    const back = nightPlaque(width / FRAME.scale, PLAQUE.height / FRAME.scale);
+    back.scale.set(FRAME.scale);
+    back.position.set(-width / 2, -PLAQUE.height / 2);
     plaque.addChild(back, label);
     return plaque;
   }
 
-  /** Set sail: leaves port. Green, over the frame's bottom edge */
+  /** The note over Set sail while the story keeps the ship in port, on a pill of the night: placed by its middle */
+  private makeHeldNote() {
+    const note = new Text({
+      text: t('Fit the guns before you sail: click your ship'),
+      style: { ...LABEL_STYLE, fontSize: HELD.size },
+    });
+    note.anchor.set(0.5);
+    const w = note.width + HELD.pad * 2;
+    const h = note.height + HELD.pad;
+    const back = new Graphics()
+      .roundRect(-w / 2, -h / 2, w, h, h / 2)
+      .fill({ color: NIGHT.bottom, alpha: 0.9 })
+      .stroke({ width: 2.5, color: THEME.brass, alpha: 0.9 });
+    this.held.addChild(back, note);
+    this.held.visible = false;
+  }
+
+  /** Set sail: leaves port. The night look's button, the one the harbour wants, over the frame's bottom edge */
   private sailButton(onSetSail: () => void) {
-    const button = new Container();
-    const back = new Graphics();
-    const label = new Text({
-      text: t('Set sail  (Esc)'),
-      style: { ...LABEL_STYLE, fontSize: SAIL.size, fill: UI.text },
-    });
-    label.anchor.set(0.5);
-    const width = Math.max(SAIL.width, label.width + 70);
-    const paint = (hovered: boolean) =>
-      back
-        .clear()
-        .roundRect(-width / 2 + 4, -SAIL.height / 2 + 6, width, SAIL.height, SAIL.height / 2)
-        .fill({ color: 0x000000, alpha: 0.4 })
-        .roundRect(-width / 2, -SAIL.height / 2, width, SAIL.height, SAIL.height / 2)
-        .fill({ color: hovered ? COLORS.sailHover : COLORS.sail })
-        .stroke({ width: 5, color: COLORS.gold });
-    paint(false);
-    button.addChild(back, label);
-    button.eventMode = 'static';
-    button.cursor = 'pointer';
-    button.on('pointerdown', (e) => e.stopPropagation());
-    button.on('pointerover', () => paint(true));
-    button.on('pointerout', () => paint(false));
-    button.on('pointertap', () => {
-      playTap();
-      onSetSail();
-    });
-    return button;
+    const label = t('Set sail  (Esc)');
+    const width = Math.max(
+      SAIL.width,
+      CanvasTextMetrics.measureText(label, new TextStyle(moonLabel(SAIL.size))).width + SAIL.room,
+    );
+    const { container } = moonButton(width, SAIL.height, label, onSetSail, SAIL.size, true).tile;
+    // Placed by its middle, as the plaque is
+    container.pivot.set(width / 2, SAIL.height / 2);
+    return container;
   }
 }
