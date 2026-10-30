@@ -7,10 +7,10 @@ import {
   isHostile,
   islandOutline,
   questDone,
+  questsToTurnIn,
   seaOpenTo,
   shipQuests,
   storyMark,
-  zoneBoss,
   type GameState,
   type GatePlace,
   type Island,
@@ -19,7 +19,6 @@ import {
   type ShipClassId,
   type StoryGoal,
   type UnitKind,
-  type ZoneId,
 } from '../../game';
 import type { IconSprites, MarkerId } from './iconAtlas';
 
@@ -50,6 +49,7 @@ export const CHART = {
   me: 0xf2b33d,
   route: 0xffffff,
   lost: 0xff8a2a, // the player's cargo floating where their ship went down
+  kept: 0xffcf3f, // a chest kept for the player: the story's prey's, a boss's
   boss: 0xff4a3a,
   gate: 0x7fe3ff, // a gate to another sea
   story: 0xffd36b, // where the story sends the player: the lighthouse's gold
@@ -95,9 +95,12 @@ export function bountyTargets(state: GameState): UnitKind[] {
   });
 }
 
-/** Whether a bounty of the ship sailed's is done, its reward waiting in port */
+/**
+ * Whether a bounty of the ship sailed's is done in this sea, its reward waiting in this port: not another ship's, nor
+ * another sea's
+ */
 export function bountyWaiting(state: GameState) {
-  return shipQuests(state, state.player).some(questDone);
+  return questsToTurnIn(state, state.player).length > 0;
 }
 
 /** Where the story sends the player, marked in gold: its prey's crescent, the harbour's lighthouse, else its star */
@@ -125,11 +128,6 @@ export function drawGoalGlow(g: Graphics, x: number, y: number, size: number, ti
   g.circle(x, y, size * 0.62).fill({ color: CHART.story, alpha: 0.16 + 0.16 * breath });
   const k = (time / GOAL_GLOW.period) % 1;
   g.circle(x, y, size * (0.45 + 0.55 * k)).stroke({ width: 1.5, color: CHART.story, alpha: 0.8 * (1 - k) });
-}
-
-/** Where a sea's boss has its lair, if it has a boss */
-export function bossLair(zone: ZoneId) {
-  return zoneBoss(zone)?.boss?.lair ?? null;
 }
 
 const LETTER_A = 65;
@@ -269,17 +267,20 @@ export function drawRoute(g: Graphics, ship: Ship, map: MapProjection, width: nu
 
 /**
  * What a captain keeps on their chart whether they see it or not: their own cargo floating where their ship went down,
- * an orange diamond in a ring. `size` scales it, pixels
+ * an orange diamond in a ring, and the chests kept for them (the story's prey's, a boss's), a gold one. `size` scales
+ * it, pixels
  */
-export function drawLostCargo(g: Graphics, state: GameState, map: MapProjection, size: number) {
+export function drawKeptLoot(g: Graphics, state: GameState, map: MapProjection, size: number) {
   for (const chest of state.chests) {
-    if (chest.lostBy !== state.ship.id) continue;
+    const lost = chest.lostBy === state.ship.id;
+    if (!lost && !chest.takers?.includes(state.ship.id)) continue;
     const x = map.x(chest.x, chest.y);
     const y = map.y(chest.x, chest.y);
-    g.circle(x, y, size * 1.6).stroke({ width: 1.5, color: CHART.lost, alpha: 0.9 });
+    const color = lost ? CHART.lost : CHART.kept;
+    g.circle(x, y, size * 1.6).stroke({ width: 1.5, color, alpha: 0.9 });
     g.poly([x, y - size, x + size, y, x, y + size, x - size, y])
-      .fill({ color: CHART.lost })
-      .stroke({ width: 1, color: 0x3a1800 });
+      .fill({ color })
+      .stroke({ width: 1, color: lost ? 0x3a1800 : 0x3a2400 });
   }
 }
 
@@ -332,10 +333,13 @@ export function drawStoryMark(
     .stroke({ width: 1, color: 0x3a2400 });
 }
 
-/** A sea's boss's lair, seen or not: a red ring round a dot. `size` scales it, pixels */
-export function drawBossLair(g: Graphics, map: MapProjection, size: number, zone: ZoneId) {
-  const lair = bossLair(zone);
-  if (!lair) return;
+/** A boss's or a mini-boss's lair, seen or not: a red ring round a dot. `size` scales it, pixels */
+export function drawBossLair(
+  g: Graphics,
+  map: MapProjection,
+  size: number,
+  lair: { readonly x: number; readonly y: number },
+) {
   const x = map.x(lair.x, lair.y);
   const y = map.y(lair.x, lair.y);
   g.circle(x, y, size * 1.8).stroke({ width: 2, color: CHART.boss, alpha: 0.85 });

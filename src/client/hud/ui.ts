@@ -301,7 +301,10 @@ export class HudWindow {
   private readonly screen: Rectangle;
   private readonly look: WindowLook;
   private background: Container;
-  private readonly width: number;
+  /** Its close button, `pad` pixels from the panel's top right corner */
+  private readonly close: { readonly container: Container; readonly width: number };
+  private readonly pad: number;
+  private width: number;
   /** Pixels down all of the window, before it is cut short to scroll */
   private height: number;
   /** Pixels down the panel as drawn: all of the window, or as much of it as the screen has room for */
@@ -339,9 +342,10 @@ export class HudWindow {
     this.container.visible = false;
     this.background = blocker(look.panel(size.width, size.height));
     blocker(this.dim).on('pointertap', onClose);
-    const close = look.close(onClose);
-    close.container.position.set(size.width - size.pad - close.width, size.pad);
-    this.panel.addChild(this.background, close.container);
+    this.pad = size.pad;
+    this.close = look.close(onClose);
+    this.close.container.position.set(size.width - size.pad - this.close.width, size.pad);
+    this.panel.addChild(this.background, this.close.container);
     // The stage takes the clicks on whatever in it takes none (a board, a line of text) as its own: the panel takes
     // them first, or a click there would steer the ship
     blocker(this.panel);
@@ -374,11 +378,20 @@ export class HudWindow {
     return this.drawnHeight;
   }
 
-  /** A window whose contents grow or shrink with what it shows: its panel made again at the new height */
-  resize(height: number) {
-    if (height === this.height) return;
+  /**
+   * A window whose contents grow or shrink with what it shows: its panel made again at the new height, and width (the
+   * talent tree of another ship, with more branches or fewer)
+   */
+  resize(height: number, width = this.width) {
+    if (height === this.height && width === this.width) return;
+    const wider = width !== this.width;
+    if (wider) {
+      this.width = width;
+      this.close.container.x = width - this.pad - this.close.width;
+      this.bar.container.x = width - SCROLL.inset - ScrollBar.WIDTH;
+    }
     this.height = height;
-    this.paint(height);
+    this.paint(height, wider);
     this.fittedTo = '';
   }
 
@@ -412,9 +425,9 @@ export class HudWindow {
     this.scrollTo(this.scroll);
   }
 
-  /** The panel drawn `height` pixels down, under the rest */
-  private paint(height: number) {
-    if (height === this.drawnHeight) return;
+  /** The panel drawn `height` pixels down, under the rest; `again` at the same height, for a new width */
+  private paint(height: number, again = false) {
+    if (height === this.drawnHeight && !again) return;
     this.drawnHeight = height;
     const background = blocker(this.look.panel(this.width, height));
     this.panel.addChildAt(background, 0);
@@ -452,6 +465,16 @@ export function drawWrench(g: Graphics, size: number, color: number) {
   const open = -Math.PI / 4;
   const gap = 0.8;
   g.arc(7 * k, -7 * k, 6 * k, open + gap, open - gap + Math.PI * 2).stroke({ width: 4.5 * k, color });
+}
+
+/** A padlock round (0, 0), `size` pixels tall: what isn't open yet (a tavern's quest not offered, a sea forbidden) */
+export function drawLock(g: Graphics, size: number, color: number) {
+  const h = size / 2;
+  const shackle = h * 0.55;
+  g.moveTo(-shackle, 0)
+    .arc(0, 0, shackle, Math.PI, Math.PI * 2)
+    .stroke({ width: 2.5, color });
+  g.roundRect(-h * 0.8, 0, h * 1.6, h, 2).fill({ color });
 }
 
 /** A cannonball with a ring of its tier's color */

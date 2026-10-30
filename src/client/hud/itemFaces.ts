@@ -10,6 +10,7 @@ import {
   OUTFIT_STATS,
   SHIP_LINES,
   SHIP_SOURCES,
+  STARTER_SHIP,
   WEAPON_IDS,
   ZONES,
   ammoPackPrice,
@@ -58,7 +59,7 @@ export const KNOT = 10; // world units per second: the HUD shows speed in knots,
 
 /**
  * Something the port sells: a gun, a pack of ammo, a piece of outfit, a ship (built, or planned for later), or an item
- * of the market's, for doubloons
+ * of the galleon's, for doubloons
  */
 export type ShopItem =
   | { readonly gun: GunId }
@@ -70,7 +71,7 @@ export type ShopItem =
 /** What buying and fitting do: game methods for the player of this client, each saying whether it worked */
 export interface ShopActions {
   buyGun: (gun: GunId) => boolean;
-  /** Buys `count` of an item at the market, for doubloons */
+  /** Buys `count` of an item on the Golden Galleon in port, for doubloons */
   buyItem: (id: ItemId, count?: number) => boolean;
   /** Buys shots of an ammo: a pack's, or `count` */
   buyAmmo: (ammo: AmmoId, count?: number) => boolean;
@@ -80,8 +81,11 @@ export interface ShopActions {
   buyOutfit: (id: OutfitId) => boolean;
   /** Fits a piece of outfit from the hold into its slot, or takes the slot's piece off (null) */
   fitOutfit: (slot: OutfitSlot, id: OutfitId | null) => boolean;
-  /** Buys a ship the shipyard offers and takes its helm */
-  buyShip: (id: ShipClassId) => boolean;
+  /**
+   * Buys a ship the shipyard offers and takes its helm; `unload`: the guns and outfit of the ship sailed now go into the
+   * hold first, for the new one
+   */
+  buyShip: (id: ShipClassId, unload?: boolean) => boolean;
   /** Takes the helm of a ship laid up in port (its place in the player's fleet) */
   takeHelm: (index: number) => boolean;
 }
@@ -105,7 +109,7 @@ export type Tone = 'good' | 'bad' | 'plain';
  */
 export interface ItemFace {
   readonly name: string;
-  /** Its tier, or for an item of the market's its grade: the colour of its slot's glow and its card's edge */
+  /** Its tier, or for an item of the galleon's its grade: the colour of its slot's glow and its card's edge */
   readonly tier: number;
   /** What the chip in its slot's corner says: its tier (`T2`) unless given; '' for no chip (an item's) */
   readonly chip?: string;
@@ -137,8 +141,10 @@ export interface ItemFace {
   inUse(state: GameState): boolean;
   /** Its button: what it says on a card and in the info window, and whether it can be pressed */
   button(state: GameState): { readonly short: string; readonly long: string; readonly enabled: boolean };
-  /** Presses it: what happened, or null if nothing did */
-  press(state: GameState): { readonly message: string; readonly tone: Tone } | null;
+  /** Presses it: what happened, or null if nothing did. `yes`: the answer picked, when `confirm` offers a choice */
+  press(state: GameState, yes?: boolean): { readonly message: string; readonly tone: Tone } | null;
+  /** What to ask before pressing it: the first ship bought after the starter sloop asks about the sloop's gear */
+  confirm?(state: GameState): Question | null;
   /** Selling it back, for what the arsenal buys back (guns, ammo): a second button, as `button` and `press` */
   readonly sell?: ItemButton;
   /** What the arsenal pays for it, in gold: on its card under the price, the coin before it */
@@ -159,7 +165,8 @@ export interface Amount {
 /** A button of an item's: what it says on a card and in the info window, whether it can be pressed, and pressing it */
 export interface ItemButton {
   button(state: GameState): { readonly short: string; readonly long: string; readonly enabled: boolean };
-  press(state: GameState): { readonly message: string; readonly tone: Tone } | null;
+  /** `yes`: the answer picked, when `confirm` offers a choice of two (`Question.no`) */
+  press(state: GameState, yes?: boolean): { readonly message: string; readonly tone: Tone } | null;
   /** What to ask before pressing it does anything that can't be undone; null when it would only say why it can't */
   confirm?(state: GameState): Question | null;
 }
@@ -492,6 +499,30 @@ function shipStats({ hp, maxSpeed, cannons, harpoons, hold }: ShipFigures) {
   });
 }
 
+/** Whether a ship has any guns or outfit on it */
+function hasGear(ship: Ship) {
+  return (
+    WEAPON_IDS.some((weapon) => ship.fittedGuns(weapon).length > 0) ||
+    Object.values(ship.outfit).some((piece) => piece !== null)
+  );
+}
+
+/**
+ * What the shipyard asks as the first ship after the starter sloop is bought, while the sloop has guns or outfit on it:
+ * whether they go into the hold for the new one. A new hull comes bare, and here a new captain learns that guns and
+ * outfit are a ship's own, moved between ships through the hold
+ */
+function gearQuestion(): Question {
+  return {
+    title: t("Take the sloop's gear off?"),
+    text: t(
+      "A new ship comes bare: no guns, no outfit. The sloop's can go into the hold, to be fitted on the new one: the guns in the loadout (L), the outfit at the workshop. Left aboard, they stay on the sloop, laid up in port. Either answer buys the ship.",
+    ),
+    yes: t('Take it off'),
+    no: t('Leave it aboard'),
+  };
+}
+
 /** How far the player has got along the Captain's path to the ship the shipyard sells them */
 function pathDone(state: GameState) {
   const steps = captainsPath(state, state.player);
@@ -601,7 +632,15 @@ function shipFace(id: LineShipId, actions: ShopActions): ItemFace {
       }
       return { short: t('Later'), long: t('Coming later'), enabled: false };
     },
-    press: (state) => {
+    // The first ship after the starter sloop: whether the sloop's gear goes into the hold for it
+    confirm: (state) => {
+      const { ship: now, player } = state;
+      if (!built || !ladder || laidUp(state) >= 0 || !goal(state) || !fitsSea(state, built.id)) return null;
+      if (!termsMet(state, player) || player.gold < ladder.price) return null;
+      return now.shipClass.id === STARTER_SHIP && hasGear(now) ? gearQuestion() : null;
+    },
+    // unload: the answer to that question, Take it off
+    press: (state, unload = false) => {
       const index = laidUp(state);
       if (index >= 0) {
         return actions.takeHelm(index)
@@ -610,7 +649,7 @@ function shipFace(id: LineShipId, actions: ShopActions): ItemFace {
       }
       if (!built || !goal(state)) return null;
       if (!termsMet(state, state.player)) return { message: t('Meet every term to buy it'), tone: 'bad' };
-      return actions.buyShip(built.id)
+      return actions.buyShip(built.id, unload)
         ? { message: t('The {name} is yours: you take its helm', { name }), tone: 'good' }
         : NOT_ENOUGH();
     },
@@ -618,7 +657,7 @@ function shipFace(id: LineShipId, actions: ShopActions): ItemFace {
 }
 
 /**
- * An item of the market's, for doubloons only: its group, what it is to do (it does nothing yet), how many are in the
+ * An item of the galleon's, for doubloons only: its group, what it is to do (it does nothing yet), how many are in the
  * hold and the quick slot it is in; bought by any count, picked in the info window
  */
 function wareFace(id: ItemId, actions: ShopActions): ItemFace {

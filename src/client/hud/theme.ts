@@ -114,7 +114,8 @@ const vertical = (stops: readonly (readonly [number, number])[]) =>
     colorStops: stops.map(([offset, color]) => ({ offset, color })),
     textureSpace: 'local',
   });
-const BRASS_FILL = vertical([
+/** Brass lit from above, light to dark down a shape */
+export const BRASS_FILL = vertical([
   [0, THEME.brassLight],
   [0.45, THEME.brass],
   [1, THEME.brassDark],
@@ -408,7 +409,7 @@ export function drawMeter(g: Graphics, width: number, height: number, share: num
 
 /**
  * A framed slot for an icon, `size` pixels square: a brass frame round a dark well lit from within in `glow` (a tier's
- * colour), and a chip with `chip` in its bottom right corner (the tier; none for '', an item of the market's). It shows
+ * colour), and a chip with `chip` in its bottom right corner (the tier; none for '', an item of the galleon's). It shows
  * a picture (`show`), or the chip's text in big letters in its middle while there is none (an icon still loading, or a
  * gun without one); without `letters` the well stays empty instead (a ship, whose picture is to come)
  */

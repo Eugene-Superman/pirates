@@ -19,7 +19,6 @@ import {
   type Talent,
   type TalentBranch,
   type TalentId,
-  type TalentTree,
 } from '../../game';
 import type { Question } from './ConfirmDialog';
 import { TALENT_ICONS, type TalentEmblemId } from './iconAtlas';
@@ -118,6 +117,9 @@ const COUNT_FORMS = ['long', 'short', 'bare'] as const;
 const RESET = { width: 210, height: 30 } as const;
 const FOOTER = 18; // pixels between the boards and the reset under them
 const SCROLL_TOP = 4; // pixels under the header's line where the boards scroll out of sight
+// Taller than the screen, the boards scroll between the header's line and the reset, pixels from the window's top and
+// bottom: the same for every ship's tree
+const SCROLL = { top: PAD + HEADER.rule + SCROLL_TOP, bottom: FOOTER / 2 + RESET.height + PAD } as const;
 const WELL = NIGHT.well; // a medallion's or an emblem's dark middle
 const EDGE = NIGHT.rim; // the dark rim round a medallion
 const SIGNATURE_COLOR = THEME.title;
@@ -393,12 +395,19 @@ function litTo(mast: Mast, count: number) {
 export class TalentPanel {
   readonly container: Container;
   private readonly window: HudWindow;
-  /** Pixels across, before scaling down to fit the screen: as many branches as the ship has */
-  private readonly width: number;
-  private readonly tree: TalentTree;
-  private readonly milestones: readonly number[];
+  /** The class of ship the tree is made for: another's taken in port, it is made again for it */
+  private shipClass: ShipClass;
+  /**
+   * Pixels across, before scaling down to fit the screen: as many branches as the ship has. The story's note over a
+   * talent keeps inside it
+   */
+  private readonly room = { width: LEAST_WIDTH };
+  private milestones: readonly number[] = [];
   /** Beside Close, apart: the milestones to pick, the points to spend */
-  private readonly counts: readonly Count[];
+  private counts: readonly Count[] = [];
+  /** What is made for the ship's tree, and made again for another's: the header with its counts, and the boards */
+  private readonly top = new Container();
+  private readonly boards = new Container();
   private readonly chips: { readonly label: Text; readonly count: (ship: Ship) => number }[] = [];
   private readonly emblems: Emblem[] = [];
   private readonly nodes: Node[] = [];
@@ -431,7 +440,7 @@ export class TalentPanel {
   private readonly resetText: Text;
   private readonly message = text('', 12, NIGHT.dim);
   /** Pixels across to the title's right end: the counts keep clear of it */
-  private readonly titleRight: number;
+  private titleRight = 0;
   /** The counts they were drawn for */
   private countsFor = '';
   /** The message is the last reset's: it stays up till the panel is closed */
@@ -460,22 +469,53 @@ export class TalentPanel {
   ) {
     this.actions = actions;
     this.ask = ask;
-    const { maxLevel } = shipClass;
+    this.shipClass = shipClass;
+    // Sized to the tree as it is built
+    const size = { width: this.room.width, height: SCROLL.top + SCROLL.bottom, pad: PAD, scroll: SCROLL };
+    this.window = new HudWindow(screen, size, () => this.hide(), NIGHT_WINDOW);
+    this.container = this.window.container;
+    this.buildCard();
+    const reset = moonButton(RESET.width, RESET.height, '', () => this.askForget(), 13);
+    this.reset = reset.tile;
+    this.resetText = reset.text;
+    this.message.anchor.set(0, 0.5);
+    // On a narrow tree's window in two lines, clear of the corner piece
+    this.message.style.wordWrap = true;
+    this.focus.visible = false;
+    this.guide = new StoryGuide(this.room);
+    this.window.panel.addChild(this.top, this.guide.container, this.card);
+    this.window.body.addChild(this.boards, this.ropes, this.focus);
+    this.window.foot.addChild(this.reset.container, this.message);
+    this.build();
+  }
+
+  /**
+   * The tree of the ship's class, its boards and the counts in the header, and the window sized to it: made again for
+   * another ship taken in port
+   */
+  private build() {
+    for (const part of [this.top, this.boards]) {
+      for (const child of part.removeChildren()) child.destroy({ children: true });
+    }
+    for (const parts of [this.chips, this.emblems, this.nodes, this.gates, this.masts]) parts.length = 0;
+    this.byId.clear();
+    this.hovered = null;
+    this.painted = this.shown = this.countsFor = '';
+    const { shipClass } = this;
     const tree = talentTree(shipClass.id);
-    this.tree = tree;
-    const milestones = MILESTONES.filter((m) => m <= maxLevel);
+    const milestones = MILESTONES.filter((m) => m <= shipClass.maxLevel);
     this.milestones = milestones;
     const boardsWidth = SIGNATURE_WIDTH + tree.branches.length * (BOARD_GAP + BRANCH_WIDTH);
     const wider = Math.max(0, LEAST_WIDTH - PAD * 2 - boardsWidth) / (tree.branches.length + 1);
     const signatureWidth = SIGNATURE_WIDTH + wider;
     const branchWidth = BRANCH_WIDTH + wider;
-    this.width = Math.max(LEAST_WIDTH, boardsWidth + PAD * 2);
+    const width = Math.max(LEAST_WIDTH, boardsWidth + PAD * 2);
+    this.room.width = width;
 
     // The header: the title, the counts and Close
-    const header = nightHeader(this.width, PAD, t('Talents'), { rule: HEADER.rule });
+    const header = nightHeader(width, PAD, t('Talents'), { rule: HEADER.rule });
     this.titleRight = header.title.x + header.title.width;
-    const divider = PAD + HEADER.rule;
-    const top = divider + HEADER.boards;
+    const top = PAD + HEADER.rule + HEADER.boards;
 
     const branchX = PAD + signatureWidth + BOARD_GAP;
     const signatures = boardAt(PAD, top, signatureWidth);
@@ -509,21 +549,15 @@ export class TalentPanel {
       ...tree.branches.map((branch, i) => this.buildBranch(branches[i], branch, layout)),
     );
     const boardHeight = bottom + BOARD_PAD;
-    for (const { container, back, width } of [signatures, ...branches]) {
-      drawNightCard(back, width, boardHeight);
-      const line = placed(nightDivider(width - 28, BOARD_STAR), 14, head - HEAD_GAP / 2);
-      container.addChildAt(nightCorners(width, boardHeight, BOARD_CORNER, 'corner1', 2), 1);
+    for (const board of [signatures, ...branches]) {
+      const { container, back } = board;
+      drawNightCard(back, board.width, boardHeight);
+      const line = placed(nightDivider(board.width - 28, BOARD_STAR), 14, head - HEAD_GAP / 2);
+      container.addChildAt(nightCorners(board.width, boardHeight, BOARD_CORNER, 'corner1', 2), 1);
       container.addChildAt(line, 1);
     }
-    this.buildCard();
-
     const footer = top + boardHeight + FOOTER;
-    const height = footer + RESET.height + PAD;
-    // Taller than the screen, the boards scroll between the header's line and the reset
-    const scroll = { top: divider + SCROLL_TOP, bottom: height - (top + boardHeight + FOOTER / 2) };
-    const size = { width: this.width, height, pad: PAD, scroll };
-    this.window = new HudWindow(screen, size, () => this.hide(), NIGHT_WINDOW);
-    this.container = this.window.container;
+    this.window.resize(footer + RESET.height + PAD, width);
 
     // The milestones' count wears their board's emblem, in a gold ring
     const milestoneSign = new Graphics();
@@ -545,25 +579,13 @@ export class TalentPanel {
       ),
     ];
 
-    const reset = moonButton(RESET.width, RESET.height, '', () => this.askForget(), 13);
-    this.reset = reset.tile;
-    this.resetText = reset.text;
     this.reset.container.position.set(NIGHT_CORNER_REACH, footer);
-    this.message.anchor.set(0, 0.5);
-    // On a narrow tree's window in two lines, clear of the corner piece
-    this.message.style.wordWrap = true;
-    this.message.style.wordWrapWidth = this.width - NIGHT_CORNER_REACH * 2 - RESET.width - 14;
+    this.message.style.wordWrapWidth = width - NIGHT_CORNER_REACH * 2 - RESET.width - 14;
     this.message.position.set(NIGHT_CORNER_REACH + RESET.width + 14, footer + RESET.height / 2);
-    this.focus.visible = false;
-    this.guide = new StoryGuide({ width: this.width });
-    this.window.panel.addChild(
-      header.container,
-      ...this.counts.map((c) => c.container),
-      this.guide.container,
-      this.card,
-    );
-    this.window.body.addChild(signatures.container, ...branches.map((b) => b.container), this.ropes, this.focus);
-    this.window.foot.addChild(this.reset.container, this.message);
+    this.top.addChild(header.container, ...this.counts.map((c) => c.container));
+    this.boards.addChild(signatures.container, ...branches.map((b) => b.container));
+    // The new medallions and emblems in their painted icons, if they have loaded
+    this.showIcons();
   }
 
   get isOpen() {
@@ -584,6 +606,11 @@ export class TalentPanel {
   /** dt: seconds since the last frame, for the halos; guided: the story asks for a talent (storyCue) */
   update(ship: Ship, player: Player, dt: number, guided: boolean) {
     this.guided = guided;
+    // Another ship bought or taken in port: its own tree
+    if (ship.shipClass !== this.shipClass) {
+      this.shipClass = ship.shipClass;
+      this.build();
+    }
     if (!this.isOpen) return;
     this.ship = ship;
     this.window.fit();
@@ -688,7 +715,7 @@ export class TalentPanel {
       c.container.visible = n > 0;
       return n > 0 ? [{ c, n }] : [];
     });
-    const right = this.width - PAD - CLOSE_WIDTH - 16;
+    const right = this.room.width - PAD - CLOSE_WIDTH - 16;
     const room = right - this.titleRight - 16;
     for (const form of COUNT_FORMS) {
       for (const { c, n } of shown) show(c.label, form === 'bare' ? `${n}` : c.text(n, form));
@@ -1090,7 +1117,7 @@ export class TalentPanel {
     // as drawn, the boards as scrolled
     const reach = hovered.kind === 'node' ? NODE.frame + FOCUS.out : KNOT;
     const right = hovered.x + reach + CARD.beside;
-    const x = right + CARD.width <= this.width - PAD / 2 ? right : hovered.x - reach - CARD.beside - CARD.width;
+    const x = right + CARD.width <= this.room.width - PAD / 2 ? right : hovered.x - reach - CARD.beside - CARD.width;
     const top = hovered.y - this.window.scrolled - reach;
     const y = Math.min(Math.max(top, PAD / 2), this.window.shownHeight - PAD / 2 - height);
     this.card.position.set(Math.round(Math.max(PAD / 2, x)), Math.round(y));
@@ -1102,8 +1129,13 @@ export class TalentPanel {
       const ability = talent.active ? ` · ${t('Ability')}` : '';
       return `${t('Milestones')} · ${t('Level {level}', { level: talent.level })}${ability}`;
     }
-    const branch = this.tree.branches.find((b) => b.key === talent.branch);
+    const branch = this.branch(talent.branch);
     return t('{branch} · row {row}', { branch: branch ? t(branch.name) : '', row: talent.row + 1 });
+  }
+
+  /** A branch of the ship's tree, by its key */
+  private branch(key: string) {
+    return talentTree(this.shipClass.id).branches.find((b) => b.key === key);
   }
 
   /** What a talent gives: a ranked one's now, with its next rank and in full */
@@ -1165,7 +1197,7 @@ export class TalentPanel {
   }
 
   private lookOf(branchKey: string) {
-    const branch = this.tree.branches.find((b) => b.key === branchKey);
+    const branch = this.branch(branchKey);
     return branch ? BRANCH_LOOKS[branch.look] : null;
   }
 

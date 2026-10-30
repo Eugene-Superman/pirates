@@ -382,13 +382,20 @@ interface QuickPress {
 /** What the player is told when the ship holds fire, and what to do about it */
 const HOLD_MESSAGES: Readonly<Record<HoldReason, (ship: Ship) => string>> = {
   noGuns: (ship) => t('No {weapon} fitted: fit some in the loadout (L)', weaponNames(ship.weapon)),
+  // The loaded ammo is aboard but off the bar: bought again after it ran out, while another may be at hand
   notAtHand: (ship) =>
-    t('No ammo at hand for your {weapon}: put some on the bar in the loadout (L)', weaponNames(ship.weapon)),
+    ship.ammoBar[ship.weapon].some((id) => id !== null)
+      ? t('{ammo} is not at hand: put it on the bar in the loadout (L), or load the other below (Z, X)', {
+          ammo: t(AMMO[ship.loaded[ship.weapon]].name),
+        })
+      : t('No ammo at hand for your {weapon}: put some on the bar in the loadout (L)', weaponNames(ship.weapon)),
   noAmmo: (ship) =>
     t('Out of {ammo}: load the other ammo below (Z, X), or put another at hand in the loadout (L)', {
       ammo: t(AMMO[ship.loaded[ship.weapon]].name),
     }),
   sight: () => t('Target hidden in the fog: sail closer'),
+  ink: () => t('Ink hides the target: sail out of it'),
+  deep: () => t('The target dived: get out of the dark glow where it comes up'),
   range: (ship) =>
     t("Target beyond your {weapon}' reach ({range}): sail closer", {
       ...weaponNames(ship.weapon),
@@ -825,7 +832,7 @@ export class SkillBar {
       });
       color = UI.dim;
     } else if (ship.broadsideArmed) {
-      message = t('{talent}: your next volley does ×{n} damage', {
+      message = t('{talent}: your guns wait for each other, then fire as one for ×{n} damage', {
         talent: t(SIGNATURES.broadside.name),
         n: PERKS.broadside,
       });
@@ -967,8 +974,13 @@ function drawSweep(g: Graphics, width: number, height: number, left: number) {
   g.poly(points).fill({ color: COLORS.sweep, alpha: SWEEP_ALPHA });
 }
 
-/** The repair's tooltip: what it mends and for how much */
+/** The repair's tooltip: what it mends and for how much; while the crew repairs, that it stops them */
 function repairHint({ ship }: GameState): TooltipText {
+  if (ship.repairing)
+    return {
+      title: t('Stop the repair (R)'),
+      lines: [t('The step under way is lost, and nothing is paid for it')],
+    };
   return {
     title: t('Repair your hull at sea (R)'),
     lines: [

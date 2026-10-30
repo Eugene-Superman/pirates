@@ -1,16 +1,18 @@
 import { Container, Text, type TextStyleOptions } from 'pixi.js';
-import { WEAPONS, WEAPON_IDS, ZONES, storyStep, type GameState, type QuestId, type WeaponId } from '../../game';
+import { storyStep, type ActiveQuest, type GameState, type WeaponId } from '../../game';
 import type { SoundSettings } from '../audio/Sounds';
 import type { GpuInfo } from '../render/gpu';
-import { FOG_LAYERS, type FogLayer } from '../scene/effects/fogOfWar';
 import { NAV_DEBUG, type NavDebug } from '../scene/effects/navDebug';
 import { ButtonRow } from './ButtonRow';
 import { Checkbox } from './Checkbox';
 import { DamagePanel, type DamageActions } from './DamagePanel';
 import { FpsMeter } from './FpsMeter';
+import type { FeatsActions } from './FeatsPanel';
 import type { HoldActions } from './HoldPanel';
 import type { LoadoutActions } from './LoadoutPanel';
 import type { MasteryActions } from './MasteryPanel';
+import { NIGHT } from './nightTheme';
+import { Select } from './Select';
 import type { TalentActions } from './TalentPanel';
 import { show } from './ui';
 import { LANGS, lang, t, type Lang } from '../i18n/i18n';
@@ -21,34 +23,35 @@ export const TEXT_STYLE = {
   fill: 0xffffff,
   stroke: { color: 0x000000, width: 3 },
 };
-export const LABEL_STYLE = { ...TEXT_STYLE, fontSize: 14 };
-// Camera zoom levels, as multiples of the default zoom
-const ZOOM_LEVELS: readonly number[] = [1, 1.5, 2, 3];
-const FOG_LABELS: Readonly<Record<FogLayer, string>> = { mist: 'Mist', clouds: 'Clouds' };
+/** What a control says beside its buttons in the settings: a value, a note */
+const VALUE_STYLE: TextStyleOptions = { fontFamily: 'Arial', fontSize: 13, fill: NIGHT.dim };
+/** Pixels across a control in the settings takes at most: its buttons wrap, and what it says beside them */
+export const CONTROL_WIDTH = 600;
+// Camera zoom levels, as multiples of the default zoom: farther out, as it is, nearer
+const ZOOM_LEVELS: readonly number[] = [0.5, 1, 1.5];
 const DEBUG_LABELS: Readonly<Record<NavDebug, string>> = { route: 'Route', hulls: 'Hulls and coasts' };
-const HELP_WIDTH = 360; // pixels: the help wraps, so the column leaves room for the frames at the top
+const WARNING_WIDTH = 360; // pixels: the warning under the FPS wraps, so the column leaves room for the frames at the top
+const LANGUAGE_WIDTH = 200; // pixels: the language's field and its list
 const DEBUG_GOLD: readonly number[] = [1000, 5000, 10000]; // gold each debug button gives
 const DEBUG_DOUBLOONS: readonly number[] = [10, 100, 1000]; // doubloons each debug button gives
 const KNOT = 10; // world units per second: the HUD shows speed in knots, a tenth of the game's units
 const VIEW_STEP = 50; // world units, for the view range buttons
-const VALUE_GAP = 10; // pixels between a row's buttons and what comes after them
+const PART_GAP = 10; // pixels between a control's parts: a checkbox, its buttons, what it says
+const LEAST_NOTE = 120; // pixels: what a control says beside its buttons wraps no narrower than this
 const WARNING_COLOR = 0xffb347;
 const SOFTWARE_WARNING =
   "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings";
-const HELP =
-  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F/G/T abilities, K talents, I statistics, H hold, P captain's mastery, N world chart";
 
-export interface HudActions extends DamageActions, HoldActions, LoadoutActions, MasteryActions, TalentActions {
+export interface HudActions
+  extends DamageActions, FeatsActions, HoldActions, LoadoutActions, MasteryActions, TalentActions {
   /** Uses the ship's ability in a slot: 0 its level 5 talent (F), 1 its level 25 one (G), 2 its level 50 one (T) */
   useAbility: (slot: number) => void;
-  /** Stops firing at the target */
-  ceaseFire: () => void;
   /** Fires at the unit the player picked out, or stops if the ship already does */
   toggleFire: () => void;
-  /** Orders the crew to repair, for gold */
+  /** Orders the crew to repair, for gold, or to stop */
   repair: () => void;
-  /** Gives a quest up, from the quest tracker (the player has said yes) */
-  dropQuest: (id: QuestId) => void;
+  /** Gives a quest of one of the player's ships up, done or not, from the quest tracker (the player has said yes) */
+  dropQuest: (quest: ActiveQuest) => void;
   /** Puts up the captain's portrait of that number */
   choosePortrait: (portrait: number) => void;
   /** Camera zoom as a multiple of the default one */
@@ -56,10 +59,6 @@ export interface HudActions extends DamageActions, HoldActions, LoadoutActions, 
   setWeapon: (weapon: WeaponId) => void;
   /** Shows or hides the range rings of the weapon picked */
   toggleRanges: () => void;
-  /** Shows or hides a part of the fog of war; the ship sees as far either way */
-  toggleFog: (layer: FogLayer) => void;
-  /** Shows or hides the clouds drifting over the sea */
-  toggleSky: () => void;
   /** Shows or hides a debug drawing of the navigation */
   toggleDebug: (kind: NavDebug) => void;
   /** Turns all sound on or off */
@@ -91,10 +90,6 @@ export interface HudActions extends DamageActions, HoldActions, LoadoutActions, 
   setLanguage: (lang: Lang) => void;
   /** Opens the layout editor: the parts of the main screen dragged where the player likes them, then saved */
   editLayout: () => void;
-  /** Opens or closes the world chart: every sea, its gates and what sails it */
-  toggleWorld: () => void;
-  /** Opens or closes the bestiary: every kind of bot of every sea */
-  toggleBestiary: () => void;
 }
 
 /** What the HUD shows of the view (not the game): set by SceneView */
@@ -102,9 +97,6 @@ export interface ViewStatus {
   zoom: number;
   /** Whether the range rings are shown */
   ranges: boolean;
-  fog: Readonly<Record<FogLayer, boolean>>;
-  /** Whether clouds drift over the sea */
-  sky: boolean;
   debug: Readonly<Record<NavDebug, boolean>>;
   sound: SoundSettings;
   /** What draws the picture: the graphics card, or the processor in software */
@@ -122,32 +114,36 @@ export interface HudFrame {
 export interface HudWidget {
   readonly container: Container;
   update(frame: HudFrame): void;
+  /** A widget that unfolds over what lies under it (a list to pick from): folds it, and says whether it was unfolded */
+  fold?(): boolean;
 }
 
-export const HUD_GROUPS = [
-  'Language',
-  'Interface',
-  'Info',
-  'Sound',
-  'Camera',
-  'World',
-  'Combat',
-  'Ship tuning',
-  'Debug',
-] as const;
+/**
+ * The settings' groups of controls: the player's, then the developer's tools (tuning the ship, and the debug
+ * buttons), on a board of their own at the bottom
+ */
+export const HUD_GROUPS = ['Game', 'Ship tuning', 'Debug'] as const;
 export type HudGroup = (typeof HUD_GROUPS)[number];
+/** The groups for the developer, not the player */
+export const DEV_GROUPS: readonly HudGroup[] = ['Ship tuning', 'Debug'];
 
 /**
- * One thing the HUD can show: a metric (text) or a control (a row of buttons). Each is defined once here and made as
- * many times as it is shown: on the screen, and as a control in the settings panel too
+ * A text the HUD can show on the screen, in the column under the player's plate: the settings tick it on or off. Made
+ * the first time it is shown
  */
-export interface HudItem {
+export interface HudMetric {
+  readonly id: string;
+  readonly label: string;
+  /** On the screen until the settings say otherwise */
+  readonly onScreen: boolean;
+  readonly create: () => HudWidget;
+}
+
+/** A control in the settings: a row of buttons, a switch, a list to pick from */
+export interface HudControl {
   readonly id: string;
   readonly group: HudGroup;
   readonly label: string;
-  readonly kind: 'metric' | 'control';
-  /** On the screen until the settings say otherwise */
-  readonly onScreen: boolean;
   readonly create: () => HudWidget;
 }
 
@@ -162,13 +158,27 @@ function metric(style: TextStyleOptions, value: (frame: HudFrame) => string): ()
   };
 }
 
-/** A row of buttons, maybe followed by something: a value, a checkbox */
-function control(row: { readonly container: Container }, after: Container | null, update: (frame: HudFrame) => void) {
+/**
+ * A control's parts side by side (a checkbox, a row of buttons), their first line's middles lined up, maybe followed
+ * by what it says (a value, a note), wrapped to what is left of the control's width
+ */
+function control(
+  parts: readonly { readonly container: Container }[],
+  note: Text | null,
+  update: (frame: HudFrame) => void,
+): HudWidget {
   const container = new Container();
-  container.addChild(row.container);
-  if (after) {
-    after.position.set(row.container.width + VALUE_GAP, (ButtonRow.HEIGHT - after.height) / 2);
-    container.addChild(after);
+  let x = 0;
+  for (const { container: part } of parts) {
+    part.position.set(x, Math.max(0, (ButtonRow.HEIGHT - part.height) / 2));
+    container.addChild(part);
+    x += part.width + PART_GAP;
+  }
+  if (note) {
+    note.style.wordWrap = true;
+    note.style.wordWrapWidth = Math.max(LEAST_NOTE, CONTROL_WIDTH - x);
+    note.position.set(x, Math.max(0, (ButtonRow.HEIGHT - note.height) / 2));
+    container.addChild(note);
   }
   return { container, update };
 }
@@ -177,13 +187,19 @@ function control(row: { readonly container: Container }, after: Container | null
 function stepper(change: (delta: number) => void, step: number, value: (frame: HudFrame) => string) {
   return () => {
     // Not empty: the row centres it by its height
-    const text = new Text({ text: ' ', style: LABEL_STYLE });
+    const text = new Text({ text: ' ', style: VALUE_STYLE });
     const row = new ButtonRow([
       { label: '−', key: null, onTap: () => change(-step) },
       { label: '+', key: null, onTap: () => change(step) },
     ]);
-    return control(row, text, (frame) => show(text, value(frame)));
+    return control([row], text, (frame) => show(text, value(frame)));
   };
+}
+
+/** Buttons, then what they say beside them, changing with the game */
+function buttons(row: { readonly container: Container }, value: (frame: HudFrame) => string): HudWidget {
+  const text = new Text({ text: ' ', style: VALUE_STYLE });
+  return control([row], text, (frame) => show(text, value(frame)));
 }
 
 /** The frame rate, and under it a warning while the processor draws the game: the usual reason for a low one */
@@ -192,7 +208,7 @@ function fps(): HudWidget {
   const text = new Text({ text: 'FPS: …', style: TEXT_STYLE });
   const warning = new Text({
     text: t(SOFTWARE_WARNING),
-    style: { ...TEXT_STYLE, fontSize: 13, fill: WARNING_COLOR, wordWrap: true, wordWrapWidth: HELP_WIDTH },
+    style: { ...TEXT_STYLE, fontSize: 13, fill: WARNING_COLOR, wordWrap: true, wordWrapWidth: WARNING_WIDTH },
   });
   warning.y = text.height;
   warning.visible = false;
@@ -207,50 +223,12 @@ function fps(): HudWidget {
   };
 }
 
-/** Everything the HUD can show, in the order it is shown on the screen; the settings panel groups them */
-export function hudItems(actions: HudActions): readonly HudItem[] {
+/** What the HUD can show on the screen, in the order it is shown there */
+export function hudMetrics(): readonly HudMetric[] {
   return [
     {
-      id: 'language',
-      group: 'Language',
-      label: 'Language',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const row = new ButtonRow(
-          LANGS.map(({ id, name }) => ({ label: name, key: id, onTap: () => actions.setLanguage(id) })),
-        );
-        return control(row, null, () => row.setActive(lang()));
-      },
-    },
-    {
-      id: 'layout',
-      group: 'Interface',
-      label: 'Layout',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const text = new Text({
-          text: t('drag the panels on the screen where you like, then save'),
-          style: LABEL_STYLE,
-        });
-        const row = new ButtonRow([{ label: t('Edit'), key: null, onTap: actions.editLayout }]);
-        return control(row, text, () => {});
-      },
-    },
-    {
-      id: 'help',
-      group: 'Info',
-      label: 'Help',
-      kind: 'metric',
-      onScreen: true,
-      create: metric({ ...TEXT_STYLE, fontSize: 13, wordWrap: true, wordWrapWidth: HELP_WIDTH }, () => t(HELP)),
-    },
-    {
       id: 'speed',
-      group: 'Info',
       label: 'Speed',
-      kind: 'metric',
       onScreen: true,
       // Whole knots for the current speed: it changes every frame while the ship speeds up
       create: metric(TEXT_STYLE, ({ state: { ship } }) => {
@@ -260,158 +238,91 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
         });
       }),
     },
+    { id: 'fps', label: 'FPS', onScreen: true, create: fps },
+  ];
+}
+
+/** The settings' controls, in the order they are shown, each in its group */
+export function hudControls(actions: HudActions): readonly HudControl[] {
+  return [
     {
-      id: 'hull',
-      group: 'Info',
-      label: 'Hull',
-      kind: 'metric',
-      // The frame at the top shows it
-      onScreen: false,
-      create: metric(TEXT_STYLE, ({ state: { ship } }) => {
-        return t('Hull: {hp}/{max} ({health}%, {stage})', {
-          hp: ship.hp,
-          max: ship.maxHp,
-          health: Math.round(ship.health),
-          stage: t(ship.damageStage),
-        });
-      }),
+      id: 'language',
+      group: 'Game',
+      label: 'Language',
+      create: () => {
+        const select = new Select(
+          LANGS.map(({ id, name }) => ({ key: id, label: name })),
+          LANGUAGE_WIDTH,
+          actions.setLanguage,
+        );
+        return { container: select.container, update: () => select.show(lang()), fold: () => select.fold() };
+      },
     },
-    { id: 'fps', group: 'Info', label: 'FPS', kind: 'metric', onScreen: true, create: fps },
     {
-      id: 'gpu',
-      group: 'Info',
-      label: 'GPU',
-      kind: 'metric',
-      onScreen: false,
-      create: metric(
-        { ...TEXT_STYLE, fontSize: 13, wordWrap: true, wordWrapWidth: HELP_WIDTH },
-        ({ view: { renderer } }) => `GPU: ${renderer.name}${renderer.software ? ` (${t('software')})` : ''}`,
-      ),
+      id: 'layout',
+      group: 'Game',
+      label: 'Layout',
+      create: () => {
+        const note = new Text({
+          text: t('drag the panels on the screen where you like, then save'),
+          style: VALUE_STYLE,
+        });
+        const row = new ButtonRow([{ label: t('Edit'), key: null, onTap: actions.editLayout }]);
+        return control([row], note, () => {});
+      },
     },
     {
       id: 'sound',
-      group: 'Sound',
+      group: 'Game',
       label: 'Sound',
-      kind: 'control',
-      onScreen: true,
-      // On/off (lit while on), then the volume down and up
+      // On or off, then the volume down and up
       create: () => {
-        const row = new ButtonRow<'on'>([
-          { label: t('On'), key: 'on', onTap: actions.toggleSound },
+        const on = new Checkbox(t('On'), actions.toggleSound);
+        const row = new ButtonRow([
           { label: '−', key: null, onTap: () => actions.changeVolume(-1) },
           { label: '+', key: null, onTap: () => actions.changeVolume(1) },
         ]);
-        const volume = new Text({ text: ' ', style: LABEL_STYLE });
-        return control(row, volume, ({ view: { sound } }) => {
-          row.setActive(sound.enabled ? 'on' : null);
+        const volume = new Text({ text: ' ', style: VALUE_STYLE });
+        return control([on, row], volume, ({ view: { sound } }) => {
+          on.setChecked(sound.enabled);
           show(volume, sound.enabled ? t('Volume {volume}%', { volume: Math.round(sound.volume * 100) }) : t('Muted'));
         });
       },
     },
     {
       id: 'zoom',
-      group: 'Camera',
+      group: 'Game',
       label: 'Zoom',
-      kind: 'control',
-      onScreen: false,
       create: () => {
         const row = new ButtonRow(
           ZOOM_LEVELS.map((level) => ({ label: `×${level}`, key: level, onTap: () => actions.setZoom(level) })),
         );
-        return control(row, null, ({ view }) => row.setActive(view.zoom));
-      },
-    },
-    {
-      // The sea the player is in, the world chart (every sea, the gates between them, what sails each) and the bestiary
-      id: 'seas',
-      group: 'World',
-      label: 'Seas',
-      kind: 'control',
-      onScreen: true,
-      create: () => {
-        const row = new ButtonRow<never>([
-          { label: t('World chart (N)'), key: null, onTap: actions.toggleWorld },
-          { label: t('Bestiary (B)'), key: null, onTap: actions.toggleBestiary },
-        ]);
-        const sea = new Text({ text: ' ', style: LABEL_STYLE });
-        return control(row, sea, ({ state }) => show(sea, t(ZONES[state.world.zone].name)));
-      },
-    },
-    {
-      id: 'fog',
-      group: 'World',
-      label: 'Fog',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const row = new ButtonRow(
-          FOG_LAYERS.map((layer) => ({
-            label: t(FOG_LABELS[layer]),
-            key: layer,
-            onTap: () => actions.toggleFog(layer),
-          })),
-        );
-        return control(row, null, ({ view }) => row.setPressed((layer) => view.fog[layer]));
-      },
-    },
-    {
-      id: 'sky',
-      group: 'World',
-      label: 'Sky',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const row = new ButtonRow([{ label: t('Clouds'), key: 'clouds', onTap: actions.toggleSky }]);
-        return control(row, null, ({ view }) => row.setPressed(() => view.sky));
-      },
-    },
-    {
-      id: 'weapon',
-      group: 'Combat',
-      label: 'Weapon',
-      kind: 'control',
-      // The skill bar picks the weapon too
-      onScreen: false,
-      // The weapon to fire, and a button to stop firing (lit while the ship has a target)
-      create: () => {
-        const row = new ButtonRow<WeaponId | 'fire'>([
-          ...WEAPON_IDS.map((id) => ({ label: t(WEAPONS[id].name), key: id, onTap: () => actions.setWeapon(id) })),
-          { label: t('Cease fire'), key: 'fire', onTap: actions.ceaseFire },
-        ]);
-        return control(row, null, ({ state: { ship } }) => {
-          row.setPressed((key) => key === ship.weapon || (key === 'fire' && ship.attackTarget !== null));
-        });
+        return control([row], null, ({ view }) => row.setActive(view.zoom));
       },
     },
     {
       id: 'range',
-      group: 'Combat',
+      group: 'Game',
       label: 'Range',
-      kind: 'control',
-      onScreen: false,
       // The rings follow the weapon picked, in its colour
       create: () => {
         const box = new Checkbox(t('Show'), actions.toggleRanges);
-        return control(box, null, ({ view }) => box.setChecked(view.ranges));
+        return control([box], null, ({ view }) => box.setChecked(view.ranges));
       },
     },
     {
       id: 'damage',
       group: 'Ship tuning',
       label: 'Damage',
-      kind: 'control',
-      onScreen: false,
       create: () => {
-        const panel = new DamagePanel(actions);
-        return control(panel, null, ({ state }) => panel.update(state.ship.damageStage));
+        const panel = new DamagePanel(actions, CONTROL_WIDTH);
+        return control([panel], null, ({ state }) => panel.update(state.ship.damageStage));
       },
     },
     {
       id: 'maxSpeed',
       group: 'Ship tuning',
       label: 'Max speed',
-      kind: 'control',
-      onScreen: false,
       create: stepper(actions.changeMaxSpeed, KNOT, ({ state }) =>
         t('{speed} kn, intact', { speed: knots(state.ship.maxSpeed) }),
       ),
@@ -420,8 +331,6 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       id: 'minSpeed',
       group: 'Ship tuning',
       label: 'Min speed',
-      kind: 'control',
-      onScreen: false,
       create: stepper(actions.changeMinSpeed, KNOT, ({ state }) =>
         t('{speed} kn, nearly wrecked', { speed: knots(state.ship.minSpeed) }),
       ),
@@ -430,8 +339,6 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       id: 'view',
       group: 'Ship tuning',
       label: 'View',
-      kind: 'control',
-      onScreen: false,
       create: stepper(actions.changeViewRange, VIEW_STEP, ({ state }) =>
         t('{range}, fog beyond', { range: Math.round(state.ship.viewRange) }),
       ),
@@ -440,88 +347,67 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
       id: 'gold',
       group: 'Debug',
       label: 'Gold',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const text = new Text({ text: ' ', style: LABEL_STYLE });
-        const row = new ButtonRow(
-          DEBUG_GOLD.map((amount) => ({ label: `+${amount}`, key: null, onTap: () => actions.addGold(amount) })),
-        );
-        return control(row, text, ({ state }) =>
-          show(text, t('{gold}, for testing the shop', { gold: state.player.gold })),
-        );
-      },
+      create: () =>
+        buttons(
+          new ButtonRow(
+            DEBUG_GOLD.map((amount) => ({ label: `+${amount}`, key: null, onTap: () => actions.addGold(amount) })),
+          ),
+          ({ state }) => t('{gold}, for testing the shop', { gold: state.player.gold }),
+        ),
     },
     {
       id: 'doubloons',
       group: 'Debug',
       label: 'Doubloons',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const text = new Text({ text: ' ', style: LABEL_STYLE });
-        const row = new ButtonRow(
-          DEBUG_DOUBLOONS.map((amount) => ({
-            label: `+${amount}`,
-            key: null,
-            onTap: () => actions.addDoubloons(amount),
-          })),
-        );
-        return control(row, text, ({ state }) =>
-          show(text, t('{n}, for testing the mastery', { n: state.player.doubloons })),
-        );
-      },
+      create: () =>
+        buttons(
+          new ButtonRow(
+            DEBUG_DOUBLOONS.map((amount) => ({
+              label: `+${amount}`,
+              key: null,
+              onTap: () => actions.addDoubloons(amount),
+            })),
+          ),
+          ({ state }) => t('{n}, for testing the mastery', { n: state.player.doubloons }),
+        ),
     },
     {
       id: 'level',
       group: 'Debug',
       label: 'Level',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const text = new Text({ text: ' ', style: LABEL_STYLE });
-        const row = new ButtonRow([
-          { label: '−1', key: null, onTap: () => actions.changeLevel(-1) },
-          { label: '+1', key: null, onTap: () => actions.changeLevel(1) },
-        ]);
-        return control(row, text, ({ state: { ship } }) =>
-          show(text, t('{level} of {max}', { level: ship.level, max: ship.shipClass.maxLevel })),
-        );
-      },
+      create: () =>
+        buttons(
+          new ButtonRow([
+            { label: '−1', key: null, onTap: () => actions.changeLevel(-1) },
+            { label: '+1', key: null, onTap: () => actions.changeLevel(1) },
+          ]),
+          ({ state: { ship } }) => t('{level} of {max}', { level: ship.level, max: ship.shipClass.maxLevel }),
+        ),
     },
     {
       id: 'story',
       group: 'Debug',
       label: 'Story',
-      kind: 'control',
-      onScreen: false,
-      create: () => {
-        const text = new Text({ text: ' ', style: LABEL_STYLE });
-        const row = new ButtonRow([{ label: t('Skip step'), key: null, onTap: actions.skipStory }]);
-        return control(row, text, ({ state }) => {
+      create: () =>
+        buttons(new ButtonRow([{ label: t('Skip step'), key: null, onTap: actions.skipStory }]), ({ state }) => {
           const step = storyStep(state.player);
-          show(text, step ? t(step.title) : t('told to its end'));
-        });
-      },
+          return step ? t(step.title) : t('told to its end');
+        }),
     },
     {
       id: 'newGame',
       group: 'Debug',
       label: 'Progress',
-      kind: 'control',
-      onScreen: false,
       create: () => {
-        const text = new Text({ text: t('forgets the gold, guns, quests and settings'), style: LABEL_STYLE });
+        const note = new Text({ text: t('forgets the gold, guns, quests and settings'), style: VALUE_STYLE });
         const row = new ButtonRow([{ label: t('New game'), key: null, onTap: actions.newGame }]);
-        return control(row, text, () => {});
+        return control([row], note, () => {});
       },
     },
     {
       id: 'navDebug',
       group: 'Debug',
       label: 'Navigation',
-      kind: 'control',
-      onScreen: false,
       create: () => {
         const row = new ButtonRow(
           NAV_DEBUG.map((kind) => ({
@@ -530,7 +416,7 @@ export function hudItems(actions: HudActions): readonly HudItem[] {
             onTap: () => actions.toggleDebug(kind),
           })),
         );
-        return control(row, null, ({ view }) => row.setPressed((kind) => view.debug[kind]));
+        return control([row], null, ({ view }) => row.setPressed((kind) => view.debug[kind]));
       },
     },
   ];

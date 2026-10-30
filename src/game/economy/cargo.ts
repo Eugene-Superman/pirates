@@ -2,7 +2,16 @@ import type { Ship } from '../ships/Ship';
 
 /** Goods a bot's wreck leaves floating, hauled aboard into the hold and sold at the port's market */
 export type GoodId =
-  'fish' | 'cloth' | 'spices' | 'rum' | 'contraband' | 'turtleShell' | 'serpentScale' | 'moonGlass' | 'baronsStrongbox';
+  | 'fish'
+  | 'cloth'
+  | 'spices'
+  | 'rum'
+  | 'contraband'
+  | 'turtleShell'
+  | 'serpentScale'
+  | 'moonGlass'
+  | 'moonPearl'
+  | 'baronsStrongbox';
 
 export interface Good {
   readonly id: GoodId;
@@ -26,6 +35,8 @@ export const GOODS: Readonly<Record<GoodId, Good>> = {
   serpentScale: { id: 'serpentScale', name: 'Serpent scales', price: 4 },
   // The Moon's shards (docs/story.md): what the starting waters' story is about
   moonGlass: { id: 'moonGlass', name: 'Moon glass', price: 10 },
+  // Grown round a shard inside a beast that swallowed it: the Inkmother's
+  moonPearl: { id: 'moonPearl', name: 'Moon pearl', price: 30 },
   baronsStrongbox: { id: 'baronsStrongbox', name: "Baron's strongbox", price: 50 },
 };
 
@@ -38,6 +49,7 @@ export const GOOD_IDS: readonly GoodId[] = [
   'turtleShell',
   'serpentScale',
   'moonGlass',
+  'moonPearl',
   'baronsStrongbox',
 ];
 

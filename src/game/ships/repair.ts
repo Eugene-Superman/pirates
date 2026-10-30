@@ -42,11 +42,15 @@ export function canPayRepair(state: GameState, ship: Ship) {
 }
 
 /**
- * The player orders the crew to repair (R): not while in combat (the player has to get away first, or fight on), nor
+ * The player orders the crew to repair (R), or while they repair, to stop, at any moment: the step under way is lost
+ * and nothing is paid for it. A repair starts not while in combat (the player has to get away first, or fight on), nor
  * with the hull whole, nor without the gold for the first step. False if it didn't start
  */
-export function orderRepair(state: GameState, ship: Ship) {
-  if (ship.repairing) return true;
+export function toggleRepair(state: GameState, ship: Ship) {
+  if (ship.repairing) {
+    ship.stopRepair();
+    return true;
+  }
   if (ship.inCombat(state.time) || !canPayRepair(state, ship)) return false;
   ship.startRepair();
   return ship.repairing;

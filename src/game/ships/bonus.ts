@@ -34,7 +34,7 @@ export interface ShipBonus {
   readonly cannonCrit: number;
   /** More damage within BONUS_PERKS.pointBlankWithin of the weapon's reach */
   readonly pointBlank: number;
-  /** More damage on every BONUS_PERKS.thunderEvery-th cannon volley in a row at one target */
+  /** More damage on every BONUS_PERKS.thunderEvery-th cannon round in a row at one target (Ship.fireRun) */
   readonly rollingThunder: number;
   /** More cannon damage beyond BONUS_PERKS.marksmanBeyond of the cannons' reach */
   readonly marksman: number;
@@ -205,7 +205,7 @@ export function addBonuses(a: ShipBonus, b: ShipBonus): ShipBonus {
 
 /** The conditions of the effects that work only sometimes, used by combat and the ship */
 export const BONUS_PERKS = {
-  /** Rolling thunder: every this many cannon volleys in a row at one target */
+  /** Rolling thunder: every volley of every this many cannon rounds in a row at one target */
   thunderEvery: 3,
   /** Marksman: beyond this share of the cannons' reach */
   marksmanBeyond: 0.5,

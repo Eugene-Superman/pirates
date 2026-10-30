@@ -41,4 +41,4 @@ export function damageShare(weapon: WeaponId, nature: TargetNature) {
  * loaded not at hand (a player's ship fires only what is on its bar, not straight from the hold), the target hidden in
  * the fog of war, or beyond every fitted gun's range. The client tells the player
  */
-export type HoldReason = 'noGuns' | 'noAmmo' | 'notAtHand' | 'sight' | 'range';
+export type HoldReason = 'noGuns' | 'noAmmo' | 'notAtHand' | 'sight' | 'ink' | 'deep' | 'range';

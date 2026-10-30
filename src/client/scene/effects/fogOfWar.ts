@@ -8,6 +8,10 @@ const WISPS_URL = `${import.meta.env.BASE_URL}sprites/fog/wisps.webp`;
 
 const HAZE_COLOR = 0xdce6eb; // light sea haze
 const HAZE_ALPHA = 0.22; // at full strength, past the edge
+// In a monster's cloud of ink (combat/monsterSkills.ts) the crew sees only what is near: past that, the ink's murk
+// instead of the haze, nearly hiding the sea, and no mist over it
+const INK_COLOR = 0x0c0718;
+const INK_ALPHA = 0.86;
 // Shares of the view range: the fog thickens from nothing to full strength between them, smoothly for every pixel. It
 // starts a little inside the range, so what is about to drop out of sight is already faintly hazed
 const EDGE = [0.92, 1.25] as const;
@@ -76,10 +80,14 @@ void main() {
 }
 `;
 
+/** A colour at an opacity, premultiplied, as the shader lays it */
+function premultiplied(color: number, alpha: number) {
+  return [((color >> 16) & 0xff) / 255, ((color >> 8) & 0xff) / 255, (color & 0xff) / 255, 1].map((c) => c * alpha);
+}
+const HAZE = premultiplied(HAZE_COLOR, HAZE_ALPHA);
+const INK = premultiplied(INK_COLOR, INK_ALPHA);
+
 function fogUniforms() {
-  const r = ((HAZE_COLOR >> 16) & 0xff) / 255;
-  const g = ((HAZE_COLOR >> 8) & 0xff) / 255;
-  const b = (HAZE_COLOR & 0xff) / 255;
   return new UniformGroup({
     uShip: { value: new Float32Array(2), type: 'vec2<f32>' },
     uViewRange: { value: 1, type: 'f32' },
@@ -87,25 +95,23 @@ function fogUniforms() {
     uSpot: { value: new Float32Array(3), type: 'vec3<f32>' },
     uMist1: { value: new Float32Array(4), type: 'vec4<f32>' },
     uMist2: { value: new Float32Array(4), type: 'vec4<f32>' },
-    uHaze: { value: new Float32Array([r * HAZE_ALPHA, g * HAZE_ALPHA, b * HAZE_ALPHA, HAZE_ALPHA]), type: 'vec4<f32>' },
+    uHaze: { value: new Float32Array(HAZE), type: 'vec4<f32>' },
     uEdge: { value: new Float32Array(EDGE), type: 'vec2<f32>' },
     // No mist until its texture has loaded: the haze shows alone
     uMistAlpha: { value: new Float32Array(2), type: 'vec2<f32>' },
   });
 }
 
-/** Parts of the fog the HUD shows or hides: the mist (with its haze, this file) and the clouds (FogClouds) */
-export const FOG_LAYERS = ['mist', 'clouds'] as const;
-export type FogLayer = (typeof FOG_LAYERS)[number];
-
 export interface FogOfWar {
   /** Goes over everything on the water (islands, the port, ships), so beyond the view they are hazed like the sea */
   readonly mesh: Mesh<Geometry, Shader>;
   readonly uniforms: ReturnType<typeof fogUniforms>['uniforms'];
+  /** Whether the mist's texture has loaded: till then the haze shows alone */
+  mist: boolean;
 }
 
 /**
- * The fog of war's haze and mist (its puffs are FogClouds): one mesh, a ring from the edge of the ship's view out past
+ * The fog of war's haze and mist: one mesh, a ring from the edge of the ship's view out past
  * the screen, drawn in one pass by its own shader; until the mist's texture loads, the haze shows alone.
  * It replaced stacked translucent bands, which made the edge stripy, and big Graphics shapes rebuilt every frame,
  * which cost more than the rest of the scene. WebGL only (Pixi's default renderer)
@@ -129,29 +135,37 @@ export function createFogOfWar(): FogOfWar {
     glProgram: new GlProgram({ name: 'fog-of-war', vertex: VERTEX, fragment: FRAGMENT }),
     resources: { fogUniforms: group, uWisps: Texture.WHITE.source },
   });
+  const fog: FogOfWar = { mesh: new Mesh({ geometry, shader }), uniforms: group.uniforms, mist: false };
   Assets.load<Texture>(WISPS_URL)
     .then((texture) => {
       // The mist's texture coordinates run far beyond 0..1
       texture.source.addressMode = 'repeat';
       shader.resources.uWisps = texture.source;
-      group.uniforms.uMistAlpha.set(MIST_LAYERS.map((layer) => layer.alpha));
+      fog.mist = true;
     })
     .catch((error) => console.warn('Fog mist failed to load', error));
-  return { mesh: new Mesh({ geometry, shader }), uniforms: group.uniforms };
+  return fog;
 }
 
-/** screenWidth/Height: pixels; the camera must already be set for this frame */
+/**
+ * range: world units the crew sees round the ship (its view range, less in a cloud of ink); ink: how much the ink's murk
+ * has taken the haze's place (0..1). screenWidth/Height: pixels; the camera must already be set for this frame
+ */
 export function updateFogOfWar(
   fog: FogOfWar,
   camera: Camera3D,
   ship: Ship,
+  range: number,
+  ink: number,
   time: number,
   screenWidth: number,
   screenHeight: number,
 ) {
   const u = fog.uniforms;
   u.uShip.set([ship.x, ship.y]);
-  u.uViewRange = ship.viewRange;
+  u.uViewRange = range;
+  u.uHaze.set(HAZE.map((haze, i) => haze + (INK[i] - haze) * ink));
+  u.uMistAlpha.set(MIST_LAYERS.map((layer) => (fog.mist ? layer.alpha * (1 - ink) : 0)));
   const { spotted } = ship;
   u.uSpot.set(spotted ? [spotted.x, spotted.y, spotted.radius] : [0, 0, 0]);
   MIST_LAYERS.forEach((layer, i) => {
@@ -176,7 +190,7 @@ export function updateFogOfWar(
     const p = camera.screenToGround(sx, sy);
     far = Math.max(far, Math.hypot(p.x - ship.x, p.y - ship.y));
   }
-  const inner = ship.viewRange * EDGE[0];
+  const inner = range * EDGE[0];
   fog.mesh.visible = far > inner;
   if (!fog.mesh.visible) return;
   const outer = far + MARGIN;

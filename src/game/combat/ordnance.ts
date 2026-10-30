@@ -59,7 +59,7 @@ export function abilityTarget(
 ): Unit | null {
   if (id === null || id === ship.id || !chargeOf(ship)) return null;
   const unit = findUnit(state, id);
-  if (!unit || !isAfloat(unit) || unit.docked || !ship.canSee(unit.x, unit.y)) return null;
+  if (!unit || !isAfloat(unit) || unit.docked || unit.submerged || !ship.canSee(unit.x, unit.y)) return null;
   return Math.hypot(unit.x - ship.x, unit.y - ship.y) <= PERKS[ability].range ? unit : null;
 }
 
@@ -110,7 +110,14 @@ export function shellBlast(
 ) {
   const shot = { ownerId: shell.ownerId, ...shell.ordnance };
   for (const unit of state.ships) {
-    if (unit.bot === null || !isAfloat(unit) || unit.docked || hullGap(shell.x, shell.y, unit) > shell.radius) continue;
+    if (
+      unit.bot === null ||
+      !isAfloat(unit) ||
+      unit.docked ||
+      unit.submerged ||
+      hullGap(shell.x, shell.y, unit) > shell.radius
+    )
+      continue;
     const { roll, strike } = rolled(shot, 'bombardment', random);
     hurt(state, unit, strike, roll, { x: unit.x, y: unit.y, z: unit.height });
   }
@@ -235,6 +242,7 @@ function setOff(state: GameState, keg: PowderKeg) {
       unit.bot !== null &&
       isAfloat(unit) &&
       !unit.docked &&
+      !unit.submerged &&
       isHostile(unit, keg.ownerId) &&
       hullGap(keg.x, keg.y, unit) <= reach,
   );
@@ -248,7 +256,8 @@ function blast(state: GameState, keg: PowderKeg, random: () => number) {
   const radius = PERKS.powderKeg.blast;
   state.events.push({ type: 'kegBlast', ownerId: keg.ownerId, at: { x: keg.x, y: keg.y, z: 0 }, radius });
   for (const unit of state.ships) {
-    if (unit.bot === null || !isAfloat(unit) || unit.docked || hullGap(keg.x, keg.y, unit) > radius) continue;
+    if (unit.bot === null || !isAfloat(unit) || unit.docked || unit.submerged || hullGap(keg.x, keg.y, unit) > radius)
+      continue;
     const { roll, strike } = rolled(keg, 'powderKeg', random);
     hurt(state, unit, strike, roll, { x: unit.x, y: unit.y, z: unit.height });
   }

@@ -92,6 +92,8 @@ const EMBLEM_AMMO: Readonly<Record<WeaponId, AmmoId>> = { cannon: 'ball1', harpo
 export interface LoadoutActions {
   /** Fits a gun from the hold into one of its weapon's slots, or empties the slot (null): the old gun goes to the hold */
   fitGun: (weapon: WeaponId, slot: number, gun: GunId | null) => void;
+  /** Moves a fitted gun into another slot of its weapon, the two swapping */
+  swapGuns: (weapon: WeaponId, from: number, to: number) => void;
   /** Picks the ammo its weapon fires */
   loadAmmo: (ammo: AmmoId) => void;
   /** Puts an ammo in one of its weapon's two places at hand (the skill bar's), or empties it (null) */
@@ -174,7 +176,8 @@ function headLine(value: string, width: number, size = 12, color: number = NIGHT
  * right its two ammo at hand (as on the skill bar under the window, Z and X) over what waits in the hold, its guns and
  * its ammo, a card each with its figures and how many. The slots and the hold scroll on their own (the wheel, a bar),
  * so a ship of sixty guns fits as the starter sloop does. A click on a slot picks it, a click on a gun in the hold fits
- * it there and picks the next empty slot, the small gold cross takes one off; ammo from the hold is put at hand with a click or dragged onto a place here or on the bar below, and an
+ * it there and picks the next empty slot, a fitted gun dragged onto another slot swaps with what is there, the small
+ * gold cross takes one off; ammo from the hold is put at hand with a click or dragged onto a place here or on the bar below, and an
  * ammo at hand is loaded with a click or dragged back to the hold. The line at the bottom tells all about what is
  * under the pointer. Closed by its gold cross, Escape, L or a click beside it. While the story asks for guns that wait
  * in the hold, a guide shows a new player how they are fitted (StoryGuide)
@@ -261,7 +264,12 @@ export class LoadoutPanel {
     this.fitted.position.set(SLOTS.width - BOARD.pad, BOARD.heading.y + 2);
     this.summary.position.set(BOARD.pad, SLOTS_HEAD.summary);
     this.purpose.position.set(BOARD.pad, SLOTS_HEAD.purpose);
-    const slotsHow = headLine(t('Pick a slot, then a gun in the hold to fit it there; × takes a gun off'), SLOTS.width);
+    const slotsHow = headLine(
+      t(
+        'Pick a slot, then a gun in the hold to fit it there; drag a fitted gun onto another slot to swap them; × takes a gun off',
+      ),
+      SLOTS.width,
+    );
     slotsHow.position.set(BOARD.pad, SLOTS_HEAD.how);
     // Its rows as far in as the lines over them, the pane wider by their edge
     this.slots.container.position.set(BOARD.pad - SLOT.edge, SLOTS_HEAD.pane);
@@ -727,6 +735,7 @@ export class LoadoutPanel {
     if (target) {
       const into = target.item;
       if (into.kind === 'slot' && item.kind === 'gun') this.actions.fitGun(into.weapon, into.slot, item.gun);
+      if (into.kind === 'slot' && item.kind === 'slot') this.actions.swapGuns(into.weapon, item.slot, into.slot);
       if (into.kind === 'place') this.actions.setAmmoSlot(into.weapon, into.index, ammoOf(item));
       return;
     }
@@ -780,10 +789,16 @@ function countOf(item: Item, ship: Ship, player: Player) {
   return '';
 }
 
-/** Whether a cell takes what is dragged onto it: a slot a gun of its weapon, a place an ammo of its weapon */
+/**
+ * Whether a cell takes what is dragged onto it: a slot a gun of its weapon, from the hold or another of its slots (the
+ * two swapping), a place an ammo of its weapon
+ */
 function takes(into: Item, dragged: Item) {
   if (into === dragged) return false;
-  if (into.kind === 'slot') return dragged.kind === 'gun' && GUNS[dragged.gun].weapon === into.weapon;
+  if (into.kind === 'slot') {
+    if (dragged.kind === 'slot') return dragged.weapon === into.weapon && dragged.slot !== into.slot;
+    return dragged.kind === 'gun' && GUNS[dragged.gun].weapon === into.weapon;
+  }
   if (into.kind === 'place') {
     const ammo = ammoOf(dragged);
     return ammo !== null && AMMO[ammo].weapon === into.weapon;

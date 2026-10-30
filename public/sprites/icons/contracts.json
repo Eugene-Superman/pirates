@@ -1,0 +1,42 @@
+{
+ "file": "contracts.webp",
+ "tile": 256,
+ "icons": {
+  "fishers": [
+   0,
+   0
+  ],
+  "turtles": [
+   1,
+   0
+  ],
+  "merchants": [
+   2,
+   0
+  ],
+  "smugglers": [
+   0,
+   1
+  ],
+  "serpents": [
+   1,
+   1
+  ],
+  "jackals": [
+   2,
+   1
+  ],
+  "inkmother": [
+   0,
+   2
+  ],
+  "baron": [
+   1,
+   2
+  ],
+  "contract": [
+   2,
+   2
+  ]
+ }
+}

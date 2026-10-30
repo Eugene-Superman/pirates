@@ -99,14 +99,14 @@ export function buyAmmo(state: GameState, player: Player, ammo: AmmoId, count: n
   return true;
 }
 
-/** What `count` of an item cost at the market, in doubloons */
+/** What `count` of an item cost on the Golden Galleon, in doubloons */
 export function itemPrice(id: ItemId, count = 1) {
   return ITEMS[id].price * count;
 }
 
 /**
- * Buys `count` of an item at the market into the player's hold, for doubloons only (items/items.ts): as many as they
- * like, the hold has room for every one. False if not in port or short of doubloons
+ * Buys `count` of an item on the Golden Galleon in port into the player's hold, for doubloons only (items/items.ts):
+ * as many as they like, the hold has room for every one. False if not in port or short of doubloons
  */
 export function buyItem(state: GameState, player: Player, id: ItemId, count = 1) {
   // Online the id is a player's: checked before it is priced

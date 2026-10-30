@@ -2,7 +2,7 @@ import { Graphics, Sprite } from 'pixi.js';
 import type { Chest } from '../../../game';
 import type { Camera3D } from '../../render/Camera3D';
 import { Painter3D } from '../../render/Painter3D';
-import { CHEST_BLINK, chestAge } from './chest3d';
+import { blinkedOut, chestAge } from './chest3d';
 import { frameOf, loadAtlases, type Atlases, type FrameSet } from './ShipSprite';
 
 // The loot's atlases, rendered in Blender (blender-assets/loot/chest/build.py): a look each, from every direction
@@ -38,8 +38,7 @@ class ChestSprite {
   }
 
   update(chest: Chest, set: FrameSet, camera: Camera3D, time: number) {
-    const left = chest.expiresAt - time;
-    const blinking = left < CHEST_BLINK && Math.sin(time * 10) < 0;
+    const blinking = blinkedOut(chest, time);
     // Dropped a moment ago: it falls, then bobs
     const t = Math.min(chestAge(chest, time) / DROP.time, 1);
     const fall = DROP.height * (1 - t) * (1 - t);
@@ -68,8 +67,8 @@ class ChestSprite {
 
 /**
  * The chests afloat drawn from their atlases, by chest id: made when one comes into sight, let go once it isn't drawn
- * for a frame. It falls into the sea when dropped, bobs and rolls on the waves, a chest of gold glints, and every chest
- * blinks in its last seconds before it sinks
+ * for a frame. It falls into the sea when dropped, bobs and rolls on the waves, a chest of gold glints, and one that
+ * sinks blinks in its last seconds before it does
  */
 export class ChestSprites {
   private readonly sprites = new Map<number, ChestSprite>();

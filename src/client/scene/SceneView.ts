@@ -1,5 +1,6 @@
 import { Container, Graphics, type Application } from 'pixi.js';
 import {
+  BOT_KINDS,
   PERKS,
   isAfloat,
   isHostile,
@@ -10,11 +11,10 @@ import {
   storyMark,
   storyTargets,
   storyWatch,
-  zoneBoss,
-  type BotKindId,
   type GameState,
   type GatePlace,
   type Ship,
+  type ShipClass,
   type Unit,
   type UnitKind,
 } from '../../game';
@@ -23,27 +23,34 @@ import type { Selection } from '../input/selection';
 import { Camera3D, type CameraConfig } from '../render/Camera3D';
 import { Painter3D } from '../render/Painter3D';
 import { CameraControl } from './cameraControl';
+import { Auras } from './effects/Auras';
 import { BarrageMarks } from './effects/BarrageMarks';
-import { Beacon, ShellBeacons, bossSpot, markSpot } from './effects/Beacon';
+import { Beacon, SpotBeacons, bossSpot, markSpot, type MarkedSpot } from './effects/Beacon';
 import { DamageNumbers } from './effects/DamageNumbers';
-import { FogClouds } from './effects/FogClouds';
-import { FOG_LAYERS, createFogOfWar, type FogLayer, type FogOfWar, updateFogOfWar } from './effects/fogOfWar';
+import { createFogOfWar, type FogOfWar, updateFogOfWar } from './effects/fogOfWar';
 import { LevelUpEffect } from './effects/LevelUpEffect';
 import { drawRangeRings } from './effects/rangeRings';
 import { RepairEffect } from './effects/RepairEffect';
 import { SeamWalls } from './effects/SeamWalls';
 import { ShipFire } from './effects/ShipFire';
 import { ShotEffects } from './effects/ShotEffects';
-import { SkyClouds } from './effects/SkyClouds';
 import { Sinking } from './effects/Sinking';
 import { NAV_DEBUG, drawHulls, drawRoute, type NavDebug } from './effects/navDebug';
-import { drawSelection, drawTargetLock } from './effects/targetLock';
 import { drawTargetMarker } from './effects/targetMarker';
 import { Trails } from './effects/Trails';
 import { Wake } from './effects/Wake';
 import { Wrecks } from './effects/Wrecks';
 import { SEA_COLOR } from './effects/seaLook';
-import { createSeaSurface, type SeaSurface, type WaterGate, updateSeaSurface } from './effects/seaSurface';
+import {
+  DIVE_LIGHTS,
+  INK_CLOUDS,
+  SHELL_LIGHTS,
+  createSeaSurface,
+  type SeaSurface,
+  type WaterGate,
+  type WaterLight,
+  updateSeaSurface,
+} from './effects/seaSurface';
 import { drawChest, drawChestWater } from './models/chest3d';
 import { drawKeg, drawKegWater } from './models/keg3d';
 import { drawStandardWater } from './models/standard3d';
@@ -55,8 +62,8 @@ import { BotSprites } from './models/BotSprites';
 import { ChestSprites } from './models/ChestSprites';
 import { botShipTop, drawBotShip } from './models/botShip3d';
 import { drawGate } from './models/gate3d';
-import { drawStoryChevron, drawStoryMark, drawStoryPointer, drawStoryTargetWater } from './models/storyMark3d';
-import { drawMonster, drawMonsterWater, isMonsterModel, monsterTop } from './models/monster3d';
+import { drawStoryChevron, drawStoryMark, drawStoryPointer } from './models/storyMark3d';
+import { drawDiveWater, drawMonster, drawMonsterWater, isMonsterModel, monsterTop } from './models/monster3d';
 import { drawProjectile, drawProjectileShadow } from './models/projectile3d';
 import { SPINE, drawSerpent, drawSerpentWater, type SpinePoint } from './models/serpent3d';
 import { ShipSprite } from './models/ShipSprite';
@@ -68,9 +75,10 @@ export const CAMERA: CameraConfig = { pitch: 30, yaw: 45, zoom: 1.4, originY: 0.
 // The ship atlases (see ShipSprite) are rendered in Blender for exactly this camera.
 // Changing the camera means re-rendering them from their source outside this repo
 
-// The zoom levels the HUD offers range over these, as multiples of CAMERA.zoom
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 3;
+// The zoom levels the HUD offers range over these, as multiples of CAMERA.zoom: half as near (twice the sea on the
+// screen) to half as near again
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 1.5;
 // How fast the camera reaches a new zoom: the share of the remaining difference closed per second
 const ZOOM_EASE = 8;
 const ZOOM_SNAP = 0.001; // pixels per unit: close enough to stop easing
@@ -94,6 +102,10 @@ const GATE_NEAR = 2500;
 // the player (an aggressive bot, or one fighting them)
 const HP_BAR = { width: 36, height: 5, lift: 12 };
 const HP_COLORS = { back: 0x0b1a22, high: 0x5ad15a, mid: 0xf2c84b, low: 0xe5533d, border: 0xffffff, hostile: 0xff3b2f };
+// A cloud of ink (combat/monsterSkills.ts): seconds it takes to darken the water as it is shed, and to thin away before
+// it is gone; how fast the fog closes in round a ship in one and opens again, the share of the way a second
+const INK_FADE = { in: 0.3, out: 1.2 } as const;
+const SIGHT_EASE = 5;
 // Radians a ship's sprite rolls when hit (the player's and the bots'), rocking to and fro as the shake dies out
 const SHAKE_TILT = 0.06;
 const SHAKE_SWINGS = 16; // radians of the rocking over the whole shake: about two and a half swings
@@ -136,7 +148,7 @@ export class SceneView {
    * them layers (`segments`) of the vector-drawn objects in between, starting with `scene` */
   private readonly layers = new Container();
   private readonly segments: { graphics: Graphics; painter: Painter3D }[] = [];
-  /** Over the fog, under the sky's clouds: the target marker where the ship can't see, so the fog doesn't dim it */
+  /** Over the fog: the target marker where the ship can't see, so the fog doesn't dim it */
   private readonly markerLayer = new Graphics();
   /** Over the fog too: the pillar of light over where the story sends the player, its light in the water */
   private readonly storyLight = new Beacon('story');
@@ -146,9 +158,9 @@ export class SceneView {
    */
   private readonly bossLight = new Beacon('boss');
   /** Under the ships too: the same red over every spot a boss's shells are to land on */
-  private readonly shellLights = new ShellBeacons();
-  /** This sea's boss's kind, if it has one */
-  private readonly bossKind: BotKindId | null;
+  private readonly shellLights = new SpotBeacons('boss', 'shell', SHELL_LIGHTS);
+  /** And ink-dark over every spot a monster is to come up at from a dive */
+  private readonly diveLights = new SpotBeacons('ink', 'dive', DIVE_LIGHTS);
   /** Over the whole scene: the debug drawings */
   private readonly overlay = new Graphics();
   /** Fire, smoke and shot effects above the player's ship, under whatever is nearer than it */
@@ -165,6 +177,8 @@ export class SceneView {
   private readonly barrage = new BarrageMarks();
   private readonly repair = new RepairEffect();
   private readonly levelUp = new LevelUpEffect();
+  /** Round the unit fired at, the one picked out and the story's prey: their light in the water */
+  private readonly auras = new Auras();
   private readonly trails = new Trails();
   private readonly wrecks = new Wrecks();
   /** Each serpent's body as last drawn, by id: a wreck keeps the pose it died in */
@@ -179,13 +193,12 @@ export class SceneView {
   /** The Seams' walls at the map's edges: those behind the sea over it, those in front of it over everything on it */
   private readonly seams = new SeamWalls();
   private readonly fog: FogOfWar;
-  private readonly fogClouds: FogClouds;
-  /** Now and then a light cloud high over the sea, and its shadow */
-  private readonly sky = new SkyClouds();
   private readonly overlayPainter: Painter3D;
   private readonly markerPainter: Painter3D;
   private readonly firePainter: Painter3D;
-  private readonly shipSprite: ShipSprite;
+  /** The player's ship from its class's atlases: drawn anew for another ship bought or taken in port */
+  private shipSprite: ShipSprite;
+  private spriteClass: ShipClass;
   private readonly bots: BotSprites;
   /** The chests afloat in sight, drawn from their atlases */
   private readonly chestSprites: ChestSprites;
@@ -197,10 +210,6 @@ export class SceneView {
   private zoomLevel = 1;
   /** Which weapons' range rings are shown */
   private showRanges = true;
-  /** Which parts of the fog are drawn. Hiding them changes only the picture: the ship still sees no farther */
-  private readonly fogLayers: Record<FogLayer, boolean> = { mist: true, clouds: false };
-  /** Whether clouds drift over the sea */
-  private skyShown = true;
   /** Where the ship was heading last frame, and since when: the marker comes up anew for a new course */
   private goal: { x: number; y: number } | null = null;
   private goalSince = 0;
@@ -208,6 +217,12 @@ export class SceneView {
   private steering = false;
   /** Debug drawings of what the game logic sees */
   private readonly debug: Record<NavDebug, boolean> = { route: false, hulls: false };
+  /**
+   * How far the fog lets the crew see now, world units, and how much of it is a cloud of ink's murk: easing after the
+   * ship's view range and the ink it is in
+   */
+  private sight: number;
+  private inked = 0;
 
   constructor(app: Application, state: GameState, selection: Selection) {
     this.app = app;
@@ -219,21 +234,20 @@ export class SceneView {
     // The whole screen behind the scene is open sea: its flat color shows until the surface's maps have loaded
     app.renderer.background.color = SEA_COLOR;
     this.fog = createFogOfWar();
-    this.fogClouds = new FogClouds();
     this.overlayPainter = new Painter3D(this.overlay, this.camera);
     this.markerPainter = new Painter3D(this.markerLayer, this.camera);
     this.firePainter = new Painter3D(this.fireLayer, this.camera);
-    this.shipSprite = new ShipSprite(state.ship.shipClass);
+    this.spriteClass = state.ship.shipClass;
+    this.shipSprite = new ShipSprite(this.spriteClass);
     this.bots = new BotSprites(this.camera);
     this.chestSprites = new ChestSprites(this.camera);
     this.islandSprites = new IslandSprites(state.world.islands);
-    this.bossKind = zoneBoss(state.world.zone)?.id ?? null;
 
     this.camera.focusX = state.ship.x;
     this.camera.focusY = state.ship.y;
+    this.sight = state.ship.viewRange;
 
-    // The fog lies over everything on the water, so beyond the view islands, the port and wakes are hazed like the
-    // sea; clouds drift over it all, and their shadows over everything under the fog
+    // The fog lies over everything on the water, so beyond the view islands, the port and wakes are hazed like the sea
     this.container.addChild(
       this.seaSurface.mesh,
       this.seams.back,
@@ -241,14 +255,13 @@ export class SceneView {
       this.sinking.water,
       this.bossLight.container,
       this.shellLights.container,
+      this.diveLights.container,
+      this.levelUp.light.container,
       this.layers,
       this.seams.front,
-      this.sky.shadows,
       this.fog.mesh,
-      this.fogClouds.container,
       this.markerLayer,
       this.storyLight.container,
-      this.sky.clouds,
       this.overlay,
       this.hpBars,
       this.arrows.container,
@@ -270,8 +283,8 @@ export class SceneView {
           ship.canSee(other.x, other.y)),
     );
     const stage = ship.damageStage;
-    // Far ships' wakes would never be seen
-    this.wake.update(time, [ship, ...near]);
+    // Far ships' wakes would never be seen, nor a monster's under water
+    this.wake.update(time, [ship, ...near.filter((other) => !other.submerged)]);
     // Wrecks keep the serpent's body as last drawn, before this frame's trails move on
     this.wrecks.update(this.state, (id) => this.spines.get(id) ?? null);
     const serpents = near.filter((other) => other.shipClass.id === 'seaSerpent');
@@ -284,8 +297,8 @@ export class SceneView {
     this.sinking.update(time, stage, ship);
     this.fire.update(dt, ship, stage, this.sinking.pose, time);
     this.shots.update(dt, this.state);
+    this.barrage.update(this.state, this.shots);
     this.repair.update(dt, this.state);
-    this.levelUp.update(dt, this.state);
 
     const targetZoom = CAMERA.zoom * this.zoomLevel;
     camera.zoom += (targetZoom - camera.zoom) * Math.min(1, dt * ZOOM_EASE);
@@ -300,13 +313,28 @@ export class SceneView {
     this.scene.clear();
     this.markerLayer.clear();
 
+    // Units in the fog of war are not drawn at all, nor wrecks, nor a monster under water. The serpent is long: it is
+    // culled by its body
+    const others = near.filter(
+      (other) =>
+        !other.isSinking &&
+        !other.submerged &&
+        ship.canSee(other.x, other.y) &&
+        painter.isVisible(other.x, other.y, 0, other.height * 3 + other.hull.bow),
+    );
+    // What the story asks the player to sink: marked gold
+    const targets = storyTargets(this.state.player);
+
     // Everything lying on the water; where the story sends the player now, if anywhere, a boss that fights them and
-    // where its shells will land, their lights in it
+    // where its shells will land, a level reached, the units marked, their lights in it
     const mark = storyMark(this.state, this.state.player);
     this.storyLight.update(dt, mark && markSpot(mark), camera, time, width, height);
     const boss = this.fightingBoss();
     this.bossLight.update(dt, boss && bossSpot(boss), camera, time, width, height);
-    this.shellLights.update(dt, this.state.shells, camera, time, width, height);
+    this.shellLights.update(dt, this.bossShells(), camera, time, width, height);
+    this.diveLights.update(dt, this.diveSpots(near), camera, time, width, height);
+    this.levelUp.update(dt, this.state, camera, width, height);
+    this.auras.update(dt, others, ship, this.selection.id, targets);
     updateSeaSurface(
       this.seaSurface,
       camera,
@@ -316,16 +344,19 @@ export class SceneView {
       this.storyLight.water,
       this.bossLight.water,
       this.shellLights.water,
+      this.levelUp.light.water,
+      this.auras.water,
       this.waterGate(),
+      this.diveLights.water,
+      this.inkClouds(),
     );
     this.seams.update(camera, ship, time, this.seaSurface.textures.ripples);
-    if (this.fogLayers.mist) updateFogOfWar(this.fog, camera, ship, time, width, height);
-    else this.fog.mesh.visible = false;
-    // Hidden clouds aren't updated either: placing them is most of their cost on the CPU
-    this.fogClouds.container.visible = this.fogLayers.clouds;
-    if (this.fogLayers.clouds) this.fogClouds.update(camera, ship, time, width, height);
-    this.sky.shadows.visible = this.sky.clouds.visible = this.skyShown;
-    this.sky.update(camera, time, width, height);
+    // In a cloud of ink the fog closes in round the ship, the ink's murk for its haze
+    const inkSight = ship.inkSight;
+    const ease = Math.min(1, dt * SIGHT_EASE);
+    this.sight += ((inkSight ?? ship.viewRange) - this.sight) * ease;
+    this.inked += ((inkSight === null ? 0 : 1) - this.inked) * ease;
+    updateFogOfWar(this.fog, camera, ship, this.sight, this.inked, time, width, height);
 
     const islands = world.islands.filter((island) =>
       painter.isVisible(island.x, island.y, 0, island.reach * ISLAND_SHALLOWS + ISLAND_MARGIN),
@@ -344,8 +375,6 @@ export class SceneView {
     }
     // The story's buoy
     if (mark && painter.isVisible(mark.x, mark.y, 0, mark.radius + ISLAND_MARGIN)) drawStoryMark(painter, mark, time);
-    // What the story asks the player to sink: marked gold
-    const targets = storyTargets(this.state.player);
 
     // Only the islands on the screen can fade a wake that is: hundreds of them would cost a lot per point
     this.wake.draw(camera, ship, time, islands);
@@ -356,13 +385,6 @@ export class SceneView {
     if (this.showRanges && longest > 0) {
       drawRangeRings(painter, ship, { shortest: ship.fullVolleyRange(weapon), longest, weapon }, time);
     }
-    // Units in the fog of war are not drawn at all, nor wrecks. The serpent is long: it is culled by its body
-    const others = near.filter(
-      (other) =>
-        !other.isSinking &&
-        ship.canSee(other.x, other.y) &&
-        painter.isVisible(other.x, other.y, 0, other.height * 3 + other.hull.bow),
-    );
     this.spines = new Map(
       others
         .filter((other) => other.shipClass.id === 'seaSerpent')
@@ -379,9 +401,25 @@ export class SceneView {
       if (spine) drawSerpentWater(painter, spine, time);
       else if (kind === 'seaTurtle') drawTurtleWater(painter, other, time);
       else if (isMonsterModel(kind)) drawMonsterWater(painter, other, kind, time);
-      if (targets.includes(kind)) drawStoryTargetWater(painter, other, time);
     }
     this.wrecks.drawWater(painter, time);
+    // A monster under water: its shape gliding at its foe, bubbles breaking over it
+    for (const other of near) {
+      const { diving } = other;
+      const kind = other.shipClass.id;
+      if (!diving || !isMonsterModel(kind)) continue;
+      // Till its spot is marked, at where the game will mark it (as far ahead of the foe as it will be): no jump then
+      const foe = diving.spot ? null : this.state.ships.find((s) => s.id === diving.targetId);
+      const ahead = diving.surfaceAt - diving.markAt;
+      const to = diving.spot ?? (foe ? { x: foe.x + foe.vx * ahead, y: foe.y + foe.vy * ahead } : null);
+      if (!to) continue;
+      const k = Math.min(1, (time - diving.startAt) / (diving.surfaceAt - diving.startAt));
+      const from = { x: diving.fromX, y: diving.fromY };
+      const x = from.x + (to.x - from.x) * k;
+      const y = from.y + (to.y - from.y) * k;
+      if (!ship.canSee(x, y) || !painter.isVisible(x, y, 0, other.radius * 2)) continue;
+      drawDiveWater(painter, from, to, k, kind, time);
+    }
     // Chests in sight: a ring of foam round each
     const chests = this.state.chests.filter((c) => ship.canSee(c.x, c.y) && painter.isVisible(c.x, c.y, 0, 12));
     for (const chest of chests) drawChestWater(painter, chest, time);
@@ -391,15 +429,11 @@ export class SceneView {
     );
     for (const keg of kegs) drawKegWater(painter, keg, time);
     this.repair.drawWater(painter);
-    this.levelUp.drawWater(painter);
     drawStandardWater(painter, ship, time);
-    const units: Unit[] = others;
-    const locked = units.find((u) => u.id === ship.attackTarget);
-    if (locked) drawTargetLock(painter, locked, time, ship.holdReason !== null);
-    const selected = units.find((u) => u.id === this.selection.id);
-    if (selected && selected !== locked) drawSelection(painter, selected);
+    // The units' auras are lights in the sea's water: till its maps load, rings on it
+    if (!this.seaSurface.mesh.visible) this.auras.drawWater(painter);
     this.shots.drawWater(painter);
-    this.barrage.drawWater(painter, this.state);
+    this.barrage.drawWater(painter, time, this.seaSurface.mesh.visible);
     for (const projectile of this.state.projectiles) drawProjectileShadow(painter, projectile);
     // No ship shadow here: it is baked into the ship's sprite
     // Where the ship will stop: the target, or the nearest open water to it when it is on land
@@ -476,11 +510,21 @@ export class SceneView {
     // Sorted by a point about half the ship's height up; its collision radius is a fair measure of its size
     const shipDepth = painter.depth([ship.x, ship.y, ship.radius]);
     const { pose } = this.sinking;
+    if (ship.shipClass !== this.spriteClass) {
+      this.spriteClass = ship.shipClass;
+      this.shipSprite.destroy();
+      this.shipSprite = new ShipSprite(ship.shipClass);
+    }
     this.shipSprite.update(ship, camera, time, stage, {
       ...pose,
       tilt: pose.tilt + hitRoll(this.shots.shake(ship.id, time)),
     });
-    objects.push({ depth: shipDepth, layers: [...this.shipSprite.layers, this.fireLayer] });
+    // Its gold glow at a level reached under it, its hull lit over it
+    this.levelUp.dress(this.shipSprite.sprite, camera, time);
+    objects.push({
+      depth: shipDepth,
+      layers: [this.levelUp.glow, ...this.shipSprite.layers, this.levelUp.shine, this.fireLayer],
+    });
     objects.sort((a, b) => b.depth - a.depth);
     const behindShip = this.drawLayers(objects, width, height);
     this.bots.sweep();
@@ -494,7 +538,7 @@ export class SceneView {
     this.shots.draw(behindShip, this.firePainter, shipDepth);
     this.repair.draw(this.firePainter);
     this.levelUp.draw(this.firePainter);
-    this.barrage.draw(this.firePainter, this.state);
+    this.barrage.draw(this.firePainter, time);
 
     // On the top layer, so nothing hides it
     this.overlay.clear();
@@ -502,12 +546,12 @@ export class SceneView {
     if (this.debug.hulls) drawHulls(this.overlayPainter, this.state);
 
     this.arrows.begin();
-    this.drawHpBars(units, targets, time);
-    // Off the screen, where the story sends the player: the mark, or else the nearest of the prey brought in for them;
-    // that prey on the screen too while the fog hides it
+    this.drawHpBars(others, targets, time);
+    // Off the screen, where the story sends the player: the mark, or else the nearest of the prey brought in for them
+    // and the loot it asks them to haul up; that on the screen too while the fog hides it
     const sendTo = storyGoal(this.state, this.state.player);
     if (sendTo && !ship.docked) {
-      const hidden = sendTo.kind === 'prey' && !ship.canSee(sendTo.x, sendTo.y);
+      const hidden = (sendTo.kind === 'prey' || sendTo.kind === 'loot') && !ship.canSee(sendTo.x, sendTo.y);
       drawStoryPointer(this.hpBars, this.arrows, camera, ship, sendTo, width, height, time, hidden);
     }
     this.arrows.end();
@@ -569,8 +613,6 @@ export class SceneView {
     return {
       zoom: this.zoomLevel,
       ranges: this.showRanges,
-      fog: { ...this.fogLayers },
-      sky: this.skyShown,
       debug: { ...this.debug },
     };
   }
@@ -583,8 +625,6 @@ export class SceneView {
     }
     // Kept as one flag a weapon before the rings followed the weapon picked: that is left as it is
     if ('ranges' in saved && typeof saved.ranges === 'boolean') this.showRanges = saved.ranges;
-    if ('fog' in saved) readFlags(saved.fog, FOG_LAYERS, this.fogLayers);
-    if ('sky' in saved && typeof saved.sky === 'boolean') this.skyShown = saved.sky;
     if ('debug' in saved) readFlags(saved.debug, NAV_DEBUG, this.debug);
   }
 
@@ -594,7 +634,7 @@ export class SceneView {
     return { rightX, rightY, upX: fwdX, upY: fwdY };
   }
 
-  /** Zoom as a multiple of the default one: 1 is the normal view, 2 shows everything twice as big */
+  /** Zoom as a multiple of the default one: 1 is the normal view, 1.5 shows everything half as big again */
   get zoom() {
     return this.zoomLevel;
   }
@@ -629,24 +669,6 @@ export class SceneView {
     this.debug[kind] = !this.debug[kind];
   }
 
-  /** Which parts of the fog of war are shown */
-  get fogShown(): Readonly<Record<FogLayer, boolean>> {
-    return this.fogLayers;
-  }
-
-  toggleFog(layer: FogLayer) {
-    this.fogLayers[layer] = !this.fogLayers[layer];
-  }
-
-  /** Whether clouds drift over the sea */
-  get skyIsShown() {
-    return this.skyShown;
-  }
-
-  toggleSky() {
-    this.skyShown = !this.skyShown;
-  }
-
   /**
    * The unit under a screen point, if any: the nearest whose target (PICK) the point is in, `held` (the unit under the
    * mouse last frame) winning a tie. Only what the player can see, and never their own ship
@@ -658,7 +680,7 @@ export class SceneView {
     let bestScore = Infinity;
     for (const unit of this.state.ships) {
       if (unit === ship) continue;
-      if (!isAfloat(unit) || !ship.canSee(unit.x, unit.y)) continue;
+      if (!isAfloat(unit) || unit.submerged || !ship.canSee(unit.x, unit.y)) continue;
       const water = camera.project(unit.x, unit.y, 0);
       if (Math.abs(water.x - x) > PICK.far || Math.abs(water.y - y) > PICK.far) continue;
       // The hull's line on the water, stern to bow, and the same line raised to the top of its hit point bar
@@ -729,9 +751,48 @@ export class SceneView {
     return { x: nearest.x, y: nearest.y, radius: nearest.radius, open };
   }
 
-  /** This sea's boss while it fights the player's ship: from the moment it goes for it till it gives up or sinks */
+  /**
+   * This sea's boss or a mini-boss while it fights the player's ship: from the moment it goes for it till it gives up
+   * or sinks, but for while the crew can't see it: under water, or in a cloud of its ink
+   */
   private fightingBoss(): Ship | null {
     const { ship, ships } = this.state;
-    return ships.find((other) => other.bot?.kind === this.bossKind && other.bot.foe === ship.id) ?? null;
+    const fighting = ships.find((other) => other.bot?.foe === ship.id && BOT_KINDS[other.bot.kind]?.boss);
+    return fighting && !fighting.submerged && ship.canSee(fighting.x, fighting.y) ? fighting : null;
+  }
+
+  /** The spots a boss's shells are to land on (a player's own bombardment's glow gold, BarrageMarks) */
+  private bossShells(): MarkedSpot[] {
+    return this.state.shells
+      .filter((shell) => shell.ordnance === null)
+      .map(({ id, x, y, radius, firedAt, landsAt }) => ({ key: id, x, y, radius, from: firedAt, to: landsAt }));
+  }
+
+  /** The spots the monsters under water near the ship are to come up at, those the crew can see */
+  private diveSpots(near: readonly Ship[]): MarkedSpot[] {
+    const { ship } = this.state;
+    const spots: MarkedSpot[] = [];
+    for (const other of near) {
+      const { diving } = other;
+      const spot = diving?.spot;
+      if (!diving || !spot || !ship.canSee(spot.x, spot.y)) continue;
+      const { radius, markAt: from, surfaceAt: to } = diving;
+      spots.push({ key: other.id, x: spot.x, y: spot.y, radius, from, to });
+    }
+    return spots;
+  }
+
+  /** The clouds of ink on the screen, darkening the water as each is shed, thinning away before it is gone */
+  private inkClouds(): WaterLight[] {
+    const { time, inks } = this.state;
+    return inks
+      .filter((cloud) => this.painter.isVisible(cloud.x, cloud.y, 0, cloud.reach))
+      .slice(0, INK_CLOUDS)
+      .map(({ x, y, radius, from, until }) => ({
+        x,
+        y,
+        radius,
+        shown: Math.min(1, (time - from) / INK_FADE.in, (until - time) / INK_FADE.out),
+      }));
   }
 }

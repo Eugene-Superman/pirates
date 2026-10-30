@@ -1,5 +1,6 @@
 import type { Bite, GunId } from '../combat/arsenal';
 import type { Barrage } from '../combat/barrage';
+import type { MonsterSkills } from '../combat/monsterSkills';
 import type { TargetNature, WeaponId } from '../combat/weapons';
 import type { Hull } from '../physics/hull';
 
@@ -25,9 +26,12 @@ export type ShipClassId =
   | 'fishingBoat'
   | 'merchantSloop'
   | 'smugglerSloop'
+  | 'jackalCutter'
   | 'baronBrig'
   | 'seaTurtle'
   | 'seaSerpent'
+  | 'inkmother'
+  | 'inkling'
   | 'pirateBrig'
   | 'warship'
   | 'flagship'
@@ -85,6 +89,8 @@ export interface ShipClass {
   readonly bite: Bite | null;
   /** A boss's barrage: shells on marked spots round its foe (combat/barrage.ts); null for the rest */
   readonly barrage: Barrage | null;
+  /** A monster's own ways of fighting besides its jaws: diving, ink, a brood (combat/monsterSkills.ts); null for the rest */
+  readonly skills: MonsterSkills | null;
   /** Places in the hold for goods (economy/cargo.ts); 0 for a bot's */
   readonly hold: number;
   /** The highest level a ship of the class reaches (ships/talents.ts); 1 for a bot's, which don't level */
@@ -153,6 +159,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: UNARMED,
     bite: null,
     barrage: null,
+    skills: null,
     hold: 10,
   },
 
@@ -213,6 +220,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: UNARMED,
     bite: null,
     barrage: null,
+    skills: null,
     hold: 15,
   },
 
@@ -274,6 +282,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: UNARMED,
     bite: null,
     barrage: null,
+    skills: null,
     hold: 20,
   },
 
@@ -346,6 +355,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: UNARMED,
     bite: null,
     barrage: null,
+    skills: null,
     hold: 32,
   },
 
@@ -435,6 +445,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: UNARMED,
     bite: null,
     barrage: null,
+    skills: null,
     hold: 40,
   },
 
@@ -539,6 +550,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: UNARMED,
     bite: null,
     barrage: null,
+    skills: null,
     hold: 54,
   },
 
@@ -676,6 +688,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: UNARMED,
     bite: null,
     barrage: null,
+    skills: null,
     hold: 100,
   },
 
@@ -703,6 +716,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     ...NO_GUNS,
     bite: null,
     barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -728,6 +742,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: { cannon: ['swivelGun'], harpoon: [] },
     bite: null,
     barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -751,18 +766,48 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: { cannon: ['cannon1'], harpoon: [] },
     bite: null,
     barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
-  // The starting waters' boss (bots/botKinds.ts, `baron`): a slow brig with four cannons and a mortar that marks
-  // where its shells will fall; it sails with two smugglers. Balanced against a sloop of about level 7 with guns of
-  // tier 2: a fight of a minute or two, won by keeping out of the marked circles
+  // A pack's cutter (bots/botKinds.ts, `jackals`, and every other sea's `pack`): small, light and quick to turn, a
+  // swivel gun on its rail, sunk in a few volleys; four of them at once are the danger. A little slower than a sound
+  // sloop, so a captain who keeps them at their gun's reach and runs before the hull is holed fights them at no cost.
+  // Vector-drawn for now (botShip3d.ts), until it is modelled
+  jackalCutter: {
+    id: 'jackalCutter',
+    line: 'bots',
+    tier: 1,
+    name: 'Jackal cutter',
+    hp: 110,
+    nature: 'object',
+    height: 6,
+    radius: 7.5,
+    hull: { bow: 12, stern: -11, halfBeam: 4.4 },
+    viewRange: 330,
+    maxSpeed: 80,
+    minSpeed: 44,
+    acceleration: 55,
+    deceleration: 85,
+    turnSpeed: 2,
+    slots: { cannon: [{ x: 1, y: 4.2, z: 3.4 }], harpoon: [] },
+    startingGuns: { cannon: ['swivelGun'], harpoon: [] },
+    bite: null,
+    barrage: null,
+    skills: null,
+    hold: 0,
+    ...BOT_HULL,
+  },
+  // The starting waters' boss (bots/botKinds.ts, `baron`): a slow brig with two swivel guns and a mortar that marks
+  // where its shells will fall; it sails with two smugglers, alone in its waters (nearLair). A new captain's first
+  // strong foe: half a minute's fire for a sloop of about level 7 with its four Cannons I, a little less with the
+  // arsenal's guns of tier 2, won by keeping out of where the shot falls
   baronBrig: {
     id: 'baronBrig',
     line: 'bots',
     tier: 2,
     name: 'Smuggler Baron',
-    hp: 900,
+    hp: 500,
     nature: 'object',
     height: 10,
     radius: 15,
@@ -795,6 +840,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
       critMultiplier: 2,
       bonus: 5,
     },
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -818,6 +864,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     ...NO_GUNS,
     bite: { die: 6, missOn: 1, critFrom: 6, critMultiplier: 2, bonus: 1, reach: 18, reload: 3 },
     barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -843,6 +890,83 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     ...NO_GUNS,
     bite: { die: 12, missOn: 1, critFrom: 12, critMultiplier: 2, bonus: 2, reach: 20, reload: 2.5 },
     barrage: null,
+    skills: null,
+    hold: 0,
+    ...BOT_HULL,
+  },
+  // The starting waters' mini-boss (bots/botKinds.ts, `inkmother`): a squid that swallowed moon glass and grew, alone
+  // at its lair. Its arms reach farther than any jaws of the starting waters and bite harder, and it is slow, but a
+  // captain who keeps out of their reach isn't safe from it (combat/monsterSkills.ts): every 9 s it dives at them and
+  // comes up under them, its arms striking all round, where the water glows ink-dark a moment before; it clouds the
+  // water with ink as it is hurt, blinding a crew in it; and at half its hull lets its brood loose (`inkling`), diving
+  // more often from then. A sloop of about level 6 with its four harpoon guns I sinks it in a minute and a half or so
+  inkmother: {
+    id: 'inkmother',
+    line: 'monsters',
+    tier: 2,
+    name: 'Inkmother',
+    hp: 720,
+    nature: 'creature',
+    height: 9,
+    radius: 16,
+    // Its mantle behind and its arms gathered ahead of it (client/scene/models/monster3d.ts)
+    hull: { bow: 15, stern: -16, halfBeam: 8 },
+    viewRange: 340,
+    // Far slower than a sound sloop: it catches a captain who keeps away by diving
+    maxSpeed: 58,
+    minSpeed: 40,
+    acceleration: 35,
+    deceleration: 60,
+    turnSpeed: 1.3,
+    ...NO_GUNS,
+    bite: { die: 16, missOn: 1, critFrom: 16, critMultiplier: 2, bonus: 4, reach: 26, reload: 3 },
+    barrage: null,
+    skills: {
+      phase: 0.5,
+      // Its spot as wide as three Baron's shells: a sloop gets out of it turning hard across its course within half a
+      // second of the glow; slower, or stopping, it is struck
+      dive: {
+        cooldown: [9, 7],
+        from: 60,
+        range: 450,
+        under: 2.8,
+        warn: 2.2,
+        radius: 80,
+        die: 16,
+        missOn: 1,
+        critFrom: 16,
+        critMultiplier: 2,
+        bonus: 4,
+      },
+      // At three quarters, half and a quarter of its hull: wide enough to take in a ship harpooning it from afar
+      ink: { at: [0.75, 0.5, 0.25], radius: 170, spread: 1.5, lasts: 7, sight: 50 },
+      brood: { hull: 'inkling', count: 3, at: 0.5 },
+    },
+    hold: 0,
+    ...BOT_HULL,
+  },
+  // The Inkmother's young (her brood, combat/monsterSkills.ts): faster than a sound sloop, so a captain can't outrun
+  // them, but each goes down to two volleys of harpoon guns I. Weak bites, many of them
+  inkling: {
+    id: 'inkling',
+    line: 'monsters',
+    tier: 1,
+    name: 'Inkling',
+    hp: 45,
+    nature: 'creature',
+    height: 4,
+    radius: 6,
+    hull: { bow: 6, stern: -7, halfBeam: 3.5 },
+    viewRange: 320,
+    maxSpeed: 100,
+    minSpeed: 70,
+    acceleration: 80,
+    deceleration: 100,
+    turnSpeed: 3,
+    ...NO_GUNS,
+    bite: { die: 4, missOn: 1, critFrom: 4, critMultiplier: 2, bonus: 0, reach: 12, reload: 2 },
+    barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -877,6 +1001,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: { cannon: ['cannon1', 'cannon1', 'cannon1'], harpoon: [] },
     bite: null,
     barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -911,6 +1036,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     startingGuns: { cannon: Array<GunId>(6).fill('cannon1'), harpoon: [] },
     bite: null,
     barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -955,6 +1081,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
       critMultiplier: 2,
       bonus: 5,
     },
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -979,6 +1106,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     ...NO_GUNS,
     bite: { die: 8, missOn: 1, critFrom: 8, critMultiplier: 2, bonus: 2, reach: 16, reload: 2.5 },
     barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -1002,6 +1130,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     ...NO_GUNS,
     bite: { die: 10, missOn: 1, critFrom: 10, critMultiplier: 2, bonus: 2, reach: 14, reload: 2 },
     barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },
@@ -1025,6 +1154,7 @@ export const SHIP_CLASSES: Readonly<Record<ShipClassId, ShipClass>> = {
     ...NO_GUNS,
     bite: { die: 20, missOn: 2, critFrom: 19, critMultiplier: 2, bonus: 6, reach: 30, reload: 3 },
     barrage: null,
+    skills: null,
     hold: 0,
     ...BOT_HULL,
   },

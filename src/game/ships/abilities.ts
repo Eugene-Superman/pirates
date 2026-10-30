@@ -6,8 +6,8 @@ import { PERKS, abilityCooldown, abilityUsed } from './talents';
 /**
  * Uses the ship's ability in a slot (0: its level 5 talent, F; 1: its level 25 one, G; 2: its level 50 one, T) if it
  * has one and it has cooled down, not in port or going down: a `talent` event for the client, and what any ability
- * used gives (abilityUsed). A Broadside is loaded for the next volley and cools down from it (combat.ts), not from
- * now: a player who waits for a target would have it back sooner; used again before the volley it is put away, its
+ * used gives (abilityUsed). A Broadside is loaded for the next volley, which waits for every gun in reach to be loaded
+ * (combat.ts), and cools down from it, not from now: a player who waits for a target would have it back sooner; used again before the volley it is put away, its
  * cooldown not started, and its event and what an ability gives come with the volley, so loading it over and over
  * gives nothing. A rocket needs `target` (the unit attacked or picked out) in its range and sight, and flies at the
  * next update, with the game's dice (combat/ordnance.ts); a powder keg is dropped at once; a bombardment's shells are

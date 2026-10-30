@@ -120,7 +120,12 @@ every frame of its animations from every direction (see the turtle below).
 The bots (`src/game/bots/botKinds.ts`) sail hulls of their own, in `SHIP_CLASSES` too: the lines `bots` (fishing boat,
 merchant sloop, smuggler sloop, and the Smuggler Baron's brig, a boss: two masts in its look's `foremast`, a mortar in
 its class's `barrage`) and `monsters` (giant turtle, sea serpent — creatures, with `bite` jaws instead of gun
-slots).
+slots; and the Inkmother, a squid, the starting waters' mini-boss, with its own ways of fighting in its class's
+`skills` (`combat/monsterSkills.ts`: a dive, ink, a brood), and its brood, the inkling, both vector-drawn in
+`monster3d.ts` till they are modelled). The jackal cutter (`jackalCutter`, line `bots`) sails in packs of four (the starting waters' jackals and
+every sea's pack): a small two-masted cutter under rust-red lateen sails with a swivel gun on its rail, vector-drawn
+in `botShip3d.ts` till it is modelled; its model goes to `blender-assets/ships/bots/jackalCutter/`, its hull
+(`bow` 12, `stern` −11, `halfBeam` 4.4) and gun slot measured on it.
 
 The bots' ships are Blender models with atlases, like the players' ships, in `blender-assets/ships/bots/`: the
 fishing boat in three looks (`nets`, `barrels`, `pots`), the merchant sloop in two (`crates`, `bales`), the smuggler

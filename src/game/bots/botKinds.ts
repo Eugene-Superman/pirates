@@ -6,9 +6,10 @@ import { MAP_SQUARES } from '../world/map';
 import { START_ZONE, ZONES, ZONE_IDS, type OuterZoneId, type ZoneId } from '../world/zones';
 
 /** The starting waters' own kinds of bots */
-type StarterKindId = 'fisher' | 'merchant' | 'smuggler' | 'turtle' | 'serpent' | 'baron';
+type StarterKindId =
+  'fisher' | 'merchant' | 'smuggler' | 'turtle' | 'serpent' | 'jackals' | 'inkmother' | 'inkling' | 'baron';
 /** What every other sea's bots are made from (ARCHETYPES) */
-export type ArchetypeKey = 'trader' | 'raider' | 'grazer' | 'pirate' | 'hunter' | 'elite' | 'boss';
+export type ArchetypeKey = 'trader' | 'raider' | 'grazer' | 'pirate' | 'hunter' | 'pack' | 'elite' | 'boss';
 /**
  * A kind of bot, by id: the starting waters' own (`fisher`, `baron`…) and every other sea's, made from the sea and an
  * archetype (`coralCoast.pirate`: zoneKinds)
@@ -41,6 +42,11 @@ export interface BotKind {
   readonly cruise: number;
   /** How many of it sail each square of the map (MAP_SQUARE across) on average: the bigger the world, the more */
   readonly perSquare: number;
+  /**
+   * How many sail together, a pack (bots/brain.ts: they follow the first of them and fight as one), far from the port
+   * (bots/spawner.ts, PACK_SAFE); 1 for one that sails alone
+   */
+  readonly pack: number;
   /** Seconds before a sunk one is replaced */
   readonly respawnTime: number;
   /** Gold the player who sinks it is paid */
@@ -56,17 +62,21 @@ export interface BotKind {
   readonly chest: { readonly chance: number; readonly gold: readonly [number, number] } | null;
   /** The goods its wreck may leave floating (with the chest's gold, if any) */
   readonly cargo: readonly CargoDrop[];
-  /** A boss: one of it, at its lair, with its escort; null for the rest */
+  /** A boss or a mini-boss: one of it, at its lair, with its escort if it has one; null for the rest */
   readonly boss: Boss | null;
 }
 
 /**
  * A boss sails alone in the world, round its `lair` (open water near it), with `escorts` of another kind that follow
- * it and join its fights; none of them comes back on its own, all come back together `respawnTime` after the boss sank
+ * it and join its fights; none of them comes back on its own, all come back together `respawnTime` after the boss sank.
+ * A sea has one boss, and may have mini-bosses: lesser ones, alone at lairs of their own
  */
 export interface Boss {
   readonly lair: Point;
-  readonly escorts: { readonly kind: BotKindId; readonly count: number };
+  /** Its escort; null for one that keeps its lair alone */
+  readonly escorts: { readonly kind: BotKindId; readonly count: number } | null;
+  /** A mini-boss: the players are told it is one, not the sea's boss */
+  readonly mini: boolean;
 }
 
 // The starting waters' bots, balanced against the starter sloop with the guns a new player has (four cannons I, four
@@ -90,6 +100,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     aggroRange: 0,
     cruise: 0.5,
     perSquare: 1,
+    pack: 1,
     respawnTime: 20,
     bounty: 6,
     level: 1,
@@ -113,6 +124,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     aggroRange: 0,
     cruise: 0.55,
     perSquare: 0.75,
+    pack: 1,
     respawnTime: 25,
     bounty: 18,
     level: 3,
@@ -136,6 +148,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     aggroRange: 210,
     cruise: 0.5,
     perSquare: 1,
+    pack: 1,
     respawnTime: 25,
     bounty: 25,
     level: 5,
@@ -160,6 +173,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     aggroRange: 0,
     cruise: 0.6,
     perSquare: 0.75,
+    pack: 1,
     respawnTime: 25,
     bounty: 15,
     level: 2,
@@ -182,6 +196,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     aggroRange: 170,
     cruise: 0.45,
     perSquare: 1,
+    pack: 1,
     respawnTime: 25,
     bounty: 22,
     level: 4,
@@ -193,8 +208,87 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     ],
     boss: null,
   },
+  // Four cutters (ships/shipClasses.ts, jackalCutter) that hunt the far waters together, six packs of them: each sunk
+  // in three or four volleys, but at the start of a fight they hit harder than the Baron. A sloop with its four Cannons
+  // I that only trades broadsides with a pack, still, half a minute's fight, comes out of it with a fifth of its hull at
+  // about level 7, and sinks one time in five at level 5; one that opens fire from beyond their swivel guns' reach and
+  // sinks them one by one as it runs (faster than them till its hull is a quarter gone) keeps most of it
+  jackals: {
+    id: 'jackals',
+    shipClass: 'jackalCutter',
+    tier: 0,
+    hp: null,
+    power: 1,
+    behaviour: 'aggressive',
+    ammo: 'ball1',
+    aggroRange: 220,
+    cruise: 0.5,
+    perSquare: 0.375,
+    pack: 4,
+    respawnTime: 90,
+    bounty: 20,
+    level: 7,
+    xp: 100,
+    chest: { chance: 0.25, gold: [6, 16] },
+    cargo: [
+      { good: 'rum', count: [1, 1], chance: 0.25 },
+      { good: 'moonGlass', count: [1, 1], chance: 0.12 },
+    ],
+    boss: null,
+  },
+  // The starting waters' mini-boss (ships/shipClasses.ts, inkmother): alone in the south-west, as far from the port as
+  // the Baron, between the serpents and him: the harpoons' first hard fight, diving, ink and a brood
+  // (combat/monsterSkills.ts). A monster, so no chest of gold: its moon pearl is the prize (docs/story.md: pearls grow
+  // round the shards a beast swallowed)
+  inkmother: {
+    id: 'inkmother',
+    shipClass: 'inkmother',
+    tier: 0,
+    hp: null,
+    power: 1,
+    behaviour: 'aggressive',
+    ammo: null,
+    aggroRange: 230,
+    cruise: 0.4,
+    perSquare: 0,
+    pack: 1,
+    respawnTime: 180,
+    bounty: 120,
+    level: 6,
+    xp: 500,
+    chest: null,
+    cargo: [
+      { good: 'moonPearl', count: [1, 1], chance: 1 },
+      { good: 'moonGlass', count: [1, 2], chance: 1 },
+    ],
+    boss: { lair: { x: 1500, y: 6500 }, escorts: null, mini: true },
+  },
+  // The Inkmother's brood (ships/shipClasses.ts, inkling): none sails the sea on its own (perSquare 0), three come up
+  // round her at half her hull, once a fight, and go back to the deep with her. Next to nothing for them: they are
+  // there to be got out of the way
+  inkling: {
+    id: 'inkling',
+    shipClass: 'inkling',
+    tier: 0,
+    hp: null,
+    power: 1,
+    behaviour: 'aggressive',
+    ammo: null,
+    aggroRange: 230,
+    cruise: 0.6,
+    perSquare: 0,
+    pack: 1,
+    respawnTime: 180,
+    bounty: 3,
+    level: 4,
+    xp: 15,
+    chest: null,
+    cargo: [],
+    boss: null,
+  },
   // The boss of the starting waters (ships/shipClasses.ts, baronBrig): its lair is far from the port, and it sails
-  // with two smugglers. Its loot is worth a long hunt, and the shipyard asks for it (economy/shipyard.ts)
+  // there with two smugglers and nothing else (nearLair). Its loot is worth a long hunt, and the shipyard asks for it
+  // (economy/shipyard.ts)
   baron: {
     id: 'baron',
     shipClass: 'baronBrig',
@@ -206,6 +300,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
     aggroRange: 270,
     cruise: 0.4,
     perSquare: 0,
+    pack: 1,
     respawnTime: 240,
     bounty: 300,
     level: 8,
@@ -216,7 +311,7 @@ const STARTER_KINDS: Readonly<Record<StarterKindId, BotKind>> = {
       { good: 'moonGlass', count: [2, 3], chance: 1 },
       { good: 'baronsStrongbox', count: [1, 1], chance: 1 },
     ],
-    boss: { lair: { x: 6500, y: 1500 }, escorts: { kind: 'smuggler', count: 2 } },
+    boss: { lair: { x: 6500, y: 1500 }, escorts: { kind: 'smuggler', count: 2 }, mini: false },
   },
 };
 
@@ -256,6 +351,8 @@ interface Archetype {
   readonly aggroRange: number;
   readonly cruise: number;
   readonly perSquare: number;
+  /** How many sail together (BotKind.pack): 1 if left out */
+  readonly pack?: number;
   readonly respawnTime: number;
   /** Where its level lies among the sea's: 0 the first, 1 the last */
   readonly level: number;
@@ -290,6 +387,11 @@ const ARCHETYPES: readonly Archetype[] = [
   // A monster that hunts
   { key: 'hunter', hulls: ['shark', 'seaSerpent'], behaviour: 'aggressive', aggroRange: 190, cruise: 0.45, perSquare: 0.8, respawnTime: 25,
     level: 0.8, hp: 1, damage: 1.15, xp: 1.25, gold: 1, chest: null, cargo: [{ good: 'serpentScale', count: [1, 1], chance: 0.3 }] },
+  // Four cutters that hunt together, as the starting waters' jackals: each sunk in about 4 s by a ship of the tier with
+  // its guns, but a fight with the four of them, traded broadside for broadside, costs it four fifths of its hull; sunk
+  // one by one from beyond their reach, much less
+  { key: 'pack', hulls: ['jackalCutter'], behaviour: 'aggressive', aggroRange: 220, cruise: 0.5, perSquare: 0.375, pack: 4, respawnTime: 90,
+    level: 0.7, hp: 0.5, damage: 0.7, xp: 0.8, gold: 0.8, chest: 0.25, cargo: [{ good: 'rum', count: [1, 1], chance: 0.25 }] },
   // Seldom met: half a minute's fight for a ship of the tier with its guns, half its hull
   { key: 'elite', hulls: ['warship'], behaviour: 'aggressive', aggroRange: 260, cruise: 0.4, perSquare: 0.08, respawnTime: 120,
     level: 0.95, hp: 3, damage: 1.2, xp: 4, gold: 5, chest: 1, cargo: [{ good: 'contraband', count: [2, 3], chance: 1 }] },
@@ -344,6 +446,7 @@ function zoneKind(id: OuterZoneId, index: number, archetype: Archetype): BotKind
     aggroRange: archetype.aggroRange,
     cruise: archetype.cruise,
     perSquare: archetype.perSquare,
+    pack: archetype.pack ?? 1,
     respawnTime: archetype.respawnTime,
     bounty,
     level,
@@ -357,6 +460,7 @@ function zoneKind(id: OuterZoneId, index: number, archetype: Archetype): BotKind
       ? {
           lair: zone.lair,
           escorts: { kind: kindId(id, monster ? MONSTER_ESCORT : escort.key), count: escort.count },
+          mini: false,
         }
       : null,
   };
@@ -382,12 +486,39 @@ export function zoneKinds(zone: ZoneId): readonly BotKind[] {
   return ZONE_KINDS.get(zone) ?? [];
 }
 
-/** How many of a kind sail its sea at once: `perSquare` to every square of the map; a boss, one at its lair */
+/**
+ * How many of a kind sail its sea at once: `perSquare` to every square of the map, in whole packs; a boss, one at its
+ * lair
+ */
 export function botsInSea(kind: BotKind) {
-  return kind.boss ? 1 : Math.round(kind.perSquare * MAP_SQUARES * MAP_SQUARES);
+  if (kind.boss) return 1;
+  return Math.round((kind.perSquare * MAP_SQUARES * MAP_SQUARES) / kind.pack) * kind.pack;
 }
 
-/** The boss of a sea, if it has one */
-export function zoneBoss(zone: ZoneId): BotKind | null {
-  return zoneKinds(zone).find((kind) => kind.boss) ?? null;
+/** A kind of bot that is a boss or a mini-boss */
+export type BossKind = BotKind & { readonly boss: Boss };
+
+const ZONE_BOSSES = new Map<ZoneId, readonly BossKind[]>(
+  ZONE_IDS.map((id) => {
+    const bosses = zoneKinds(id).filter((kind): kind is BossKind => kind.boss !== null);
+    return [id, [...bosses.filter((kind) => !kind.boss.mini), ...bosses.filter((kind) => kind.boss.mini)]];
+  }),
+);
+
+/** A sea's boss and its mini-bosses, each with its lair: the boss first */
+export function zoneBosses(zone: ZoneId): readonly BossKind[] {
+  return ZONE_BOSSES.get(zone) ?? [];
+}
+
+// World units round a boss's lair where no other bot comes into the game or wanders: a captain meets the boss and its
+// escort alone, with nothing else drawn into the fight. Beyond the boss's own wandering (LAIR_SPREAD + WANDER_RADIUS)
+// and a fight round it, by a hostile bot's aggro range or so
+const LAIR_CLEAR = 1100;
+
+/**
+ * Whether a point is in the waters of a sea's boss or mini-boss (LAIR_CLEAR round its lair), where only it and its
+ * escort sail
+ */
+export function nearLair(zone: ZoneId, x: number, y: number) {
+  return zoneBosses(zone).some(({ boss: { lair } }) => Math.hypot(x - lair.x, y - lair.y) < LAIR_CLEAR);
 }

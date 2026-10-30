@@ -1,19 +1,23 @@
 import { applyMastery, captainBonus } from '../account/mastery';
+import { WEAPON_IDS } from '../combat/weapons';
 import type { GameState } from '../GameState';
 import { SAVE_VERSION, loadShip, saveShip, type SavedShip } from '../save';
+import { OUTFIT_SLOTS } from '../ships/outfit';
 import { Ship } from '../ships/Ship';
 import { SHIP_CLASSES, type ShipClassId } from '../ships/shipClasses';
 import { levelOf } from '../ships/talents';
 import { seaOpenTo } from '../world/gates';
-import type { Player } from './player';
+import { fitFromHold, type Player } from './player';
 import { spend } from '../records/stats';
+import { fitOutfit } from './shop';
 import { isGoalShip, termsMet, tierTerms } from './shipyard';
 
 /**
- * A player's ships. They sail one; the others are laid up in port as they were left (guns, ammo, outfit, experience
- * and talents, cargo, hull), kept as plain data in `player.fleet`. Ships are bought and changed in port, at the
- * shipyard. The ship sailed keeps the player's ship id whichever it is, so what the game ties to that id (the player,
- * their lost cargo) stays theirs
+ * A player's ships. They sail one; the others are laid up in port as they were left (guns, outfit, experience and
+ * talents, cargo, hull), kept as plain data in `player.fleet`. The ammo is the player's: it goes with the ship they
+ * sail, so the same kind is never split between two ships. Ships are bought and changed in port, at the shipyard. The
+ * ship sailed keeps the player's ship id whichever it is, so what the game ties to that id (the player, their lost
+ * cargo) stays theirs
  */
 
 /** The level of a ship laid up in port, for the shipyard's list */
@@ -29,9 +33,18 @@ export function fitsSea(state: GameState, id: ShipClassId) {
   return seaOpenTo(state.world.zone, SHIP_CLASSES[id].tier);
 }
 
-/** Puts `next` at the helm in port in place of the player's ship, which is laid up with everything on it */
+/**
+ * Puts `next` at the helm in port in place of the player's ship, which is laid up with everything on it but the ammo:
+ * that goes with the player, at hand and loaded as it was, with what `next` carries (a new ship's starting ammo) added
+ * to the same kind's
+ */
 function changeShip(state: GameState, player: Player, next: Ship) {
   const old = state.ship;
+  for (const weapon of WEAPON_IDS) {
+    next.loaded[weapon] = old.loaded[weapon];
+    next.ammoBar[weapon] = [...old.ammoBar[weapon]];
+  }
+  next.takeAmmo(old);
   player.fleet.push(saveShip(old));
   const { mooring } = state.world.port;
   next.x = mooring.x;
@@ -44,18 +57,33 @@ function changeShip(state: GameState, player: Player, next: Ship) {
 }
 
 /**
+ * Takes every gun and piece of outfit off the player's ship in port into their hold, as the loadout and the workshop
+ * take each off: for another ship of theirs to be fitted with
+ */
+function unloadGear(state: GameState, player: Player) {
+  const { ship } = state;
+  for (const weapon of WEAPON_IDS) {
+    ship.guns[weapon].forEach((_, slot) => fitFromHold(player, ship, weapon, slot, null));
+  }
+  for (const slot of OUTFIT_SLOTS) fitOutfit(state, player, slot, null);
+}
+
+/**
  * Buys a ship the player works towards (`isGoalShip`: of the next tier, of their line or of any, the first time) at the
  * shipyard and takes its helm: in port, of a tier that fits the sea, with every term of the Captain's path met, for
  * its tier's price. It comes new, at level 1, with no guns (the player fits theirs from the hold) and its class's
- * starting ammo. False if it can't
+ * starting ammo, added to the player's. `unload`: the guns and outfit of the ship it replaces go into the hold first, to be fitted on it (the
+ * client asks, the first time, so a new captain learns that they are a ship's own); else they stay on that ship, laid
+ * up. False if it can't
  */
-export function buyShip(state: GameState, player: Player, id: ShipClassId) {
+export function buyShip(state: GameState, player: Player, id: ShipClassId, unload = false) {
   // The goal's first: online the id comes from a player, and may be anything
   if (!isGoalShip(state, player, id) || !state.ship.docked || !fitsSea(state, id)) return false;
   const terms = tierTerms(SHIP_CLASSES[id].tier);
   if (!terms) return false;
   if (!termsMet(state, player) || player.gold < terms.price) return false;
   spend(player, terms.price);
+  if (unload) unloadGear(state, player);
   changeShip(state, player, new Ship(SHIP_CLASSES[id], player.shipId));
   return true;
 }

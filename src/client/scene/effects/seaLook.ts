@@ -84,6 +84,10 @@ export interface SurfaceLook {
   readonly mark: MarkLook;
   /** Round a boss that fights the player: a red light in the water, pulsing faster */
   readonly boss: MarkLook;
+  /** Round a unit picked out, fired at, or that the story asks the player to sink: the same, in its aura's colour */
+  readonly aura: AuraWaterLook;
+  /** A monster's ink: where it will come up from a dive, and its clouds */
+  readonly ink: InkLook;
   /** The Seam's storm at the map's edges, and a gate's whirlpool */
   readonly seam: SeamLook;
   readonly vortex: VortexLook;
@@ -142,6 +146,39 @@ export interface MarkLook {
 }
 
 /**
+ * A unit's aura (Auras.ts): a light in the water round it as the mark's, with no pillar; its colour is the aura's, by
+ * what the unit is to the player, and its rings spread quicker round the target fired at
+ */
+export interface AuraWaterLook extends Omit<MarkLook, 'color'> {
+  /** Seconds a ring takes to spread round the target the ship fires at */
+  readonly firingPeriod: number;
+}
+
+/**
+ * A monster's ink (combat/monsterSkills.ts): the spot it will come up at from a dive, lit as a boss's shell's spot
+ * (its shape and bend) in the ink's own dark light; and its clouds on the water, the sea gone dark under them, with
+ * the Moon's light faint deep in them (docs/story.md: the Inkmother swallowed a shard of it)
+ */
+export interface InkLook {
+  /** The spot's light, how much it turns the water its colour and lightens it over the sky, its glints' brightness
+   * and sharpness */
+  readonly glow: number;
+  readonly under: number;
+  readonly over: number;
+  readonly glints: number;
+  readonly glintSharpness: number;
+  /** The clouds: the ink's colour, how much of the sea it hides at its thickest (0..1), how frayed its edge is (its
+   * radii), and world units a copy of the foam's lace that frays it spans */
+  readonly color: number;
+  readonly dark: number;
+  readonly fray: number;
+  readonly laceTile: number;
+  /** The light deep in it, playing with the caustics, and how bright */
+  readonly lightColor: number;
+  readonly light: number;
+}
+
+/**
  * The Seam (docs/story.md: the walls of storm between the seas) at the sea's map's edges, its foot in the water: the
  * waves rougher and darker towards it, whitewater churning where its wall stands (SeamWalls.ts), broken foam beyond.
  * World units
@@ -161,29 +198,46 @@ export interface SeamLook {
   readonly churn: number;
 }
 
+/** A set of a whirlpool's arms: how many (whole), and radians a second they turn on with the water (back if less than 0) */
+export interface VortexArms {
+  readonly count: number;
+  readonly drift: number;
+}
+
 /**
- * A gate to another sea (world/gates.ts) in the water: a whirlpool, its arms of foam winding in to a dark funnel, the
- * waves curling round it, its eye lit with the Seam's light. Distances in the gate's radii
+ * A gate to another sea (world/gates.ts) in the water: a whirlpool, its water running in along log spirals to a dark
+ * funnel, faster nearer its middle, arms of foam on them, whitewater round the funnel's lip, its eye lit with the Seam's
+ * light and that light spiralling down into it. Distances in the gate's radii
  */
 export interface VortexLook {
   /** How far out it turns the water, and how far its funnel reaches */
   readonly reach: number;
   readonly funnel: number;
-  /** How much darker the funnel's water is, and how steep it looks: slope units at its middle */
+  /** How much darker the funnel's water is, and how steep its walls look: slope units at their steepest */
   readonly dark: number;
-  readonly slope: number;
+  readonly steep: number;
   /** Radians the waves curl round it at its edge (three times that at its middle) */
   readonly curl: number;
-  /** Its arms of foam: how many (whole), how tightly they wind (radians an e-fold of the radius), radians a second they
-   * turn, and e-folds of the radius a second their foam draws in by */
-  readonly arms: number;
+  /** How tightly its spirals wind: radians round it an e-fold of the radius */
   readonly twist: number;
+  /** Radians a second its water goes round at the gate's radius; how much faster nearer the middle: as 1 / r to this
+   * (a real whirlpool's is 2), the water's speed along a spiral as r to 1 less it */
   readonly spin: number;
-  readonly flow: number;
-  /** Copies of the foam's lace an arm's turn round it (whole), and an e-fold of the radius; how much foam */
+  readonly pull: number;
+  /** Its arms: two sets of different counts on the same spirals, so the arms are of every width, merging and parting as
+   * the sets turn on at their own paces (slowly: the water itself runs along them); how high the ridges they ride on
+   * are, which the light catches */
+  readonly arms: readonly [VortexArms, VortexArms];
+  readonly ridges: number;
+  /** The foam on them: copies of its texture round the spirals (whole) and along them, a unit of r to the pull; how
+   * much foam */
   readonly laceRound: number;
-  readonly laceIn: number;
+  readonly laceAlong: number;
   readonly foam: number;
+  /** The whitewater round the funnel's lip: its radius and width; within `throat`, the foam is gone down the hole */
+  readonly rim: number;
+  readonly rimWidth: number;
+  readonly throat: number;
   /** The eye's light: an open gate's, one shut to the ship's tier; its size (radii), brightness, how much of it
    * breathes and radians a second it does */
   readonly glow: number;
@@ -192,6 +246,12 @@ export interface VortexLook {
   readonly bright: number;
   readonly breathe: number;
   readonly breath: number;
+  /** Its light spiralling down into the eye: how bright (of the eye's), how many arms (whole), how tightly they wind
+   * (radians an e-fold of the radius) and radians a second they turn */
+  readonly spiral: number;
+  readonly spiralArms: number;
+  readonly spiralTwist: number;
+  readonly spiralSpin: number;
 }
 
 /** Flat color of the sea: the screen behind the scene, seen until the wave maps have loaded */
@@ -282,6 +342,32 @@ export const SEA_LOOK: SurfaceLook = {
     glints: 1.6,
     glintSharpness: 260,
   },
+  aura: {
+    under: 0.7,
+    over: 0.3,
+    bend: 0.14,
+    pool: 4.5,
+    ringWidth: 0.11,
+    ringReach: 1.2,
+    ringPeriod: 2.6,
+    firingPeriod: 1.1,
+    breath: 2.6,
+    glints: 1.6,
+    glintSharpness: 260,
+  },
+  ink: {
+    glow: 0x5a30d8,
+    under: 0.75,
+    over: 0.35,
+    glints: 1.4,
+    glintSharpness: 260,
+    color: 0x0c0718,
+    dark: 0.9,
+    fray: 0.35,
+    laceTile: 90,
+    lightColor: 0x7d5cff,
+    light: 0.22,
+  },
   seam: {
     reach: 520,
     foot: 28,
@@ -293,23 +379,34 @@ export const SEA_LOOK: SurfaceLook = {
     churn: 18,
   },
   vortex: {
-    reach: 1.8,
-    funnel: 0.85,
+    reach: 2.2,
+    funnel: 0.8,
     dark: 0.72,
-    slope: 0.55,
-    curl: 1.2,
-    arms: 5,
-    twist: 3,
-    spin: 0.9,
-    flow: 0.25,
+    steep: 0.45,
+    curl: 1,
+    twist: 2.6,
+    spin: 0.8,
+    pull: 1.5,
+    arms: [
+      { count: 7, drift: -0.12 },
+      { count: 11, drift: 0.07 },
+    ],
+    ridges: 0.12,
     laceRound: 2,
-    laceIn: 1.2,
-    foam: 0.85,
+    laceAlong: 1.3,
+    foam: 0.9,
+    rim: 0.5,
+    rimWidth: 0.12,
+    throat: 0.17,
     glow: 0xa66bff,
     shut: 0xff7055,
-    eye: 0.17,
-    bright: 0.55,
+    eye: 0.15,
+    bright: 0.7,
     breathe: 0.25,
     breath: 2,
+    spiral: 0.8,
+    spiralArms: 3,
+    spiralTwist: 2,
+    spiralSpin: 2.5,
   },
 };

@@ -1,5 +1,19 @@
-import { SHIP_CLASSES, ZONES, goalShips, type GameState, type Quest, type ShipGoal } from '../../game';
+import { SHIP_CLASSES, ZONES, goalShips, type GameState, type Quest, type QuestGrade, type ShipGoal } from '../../game';
 import { t } from '../i18n/i18n';
+
+/** How the tavern shows a quest's grade: its name and what it means (English, for t()), in its colour */
+export const GRADE_LOOKS: Readonly<
+  Record<QuestGrade, { readonly name: string; readonly about: string; readonly color: number }>
+> = {
+  easy: { name: 'Easy', about: 'Its prey leaves you be till you attack it', color: 0x6fd06f },
+  hard: { name: 'Hard', about: 'Its prey attacks whoever comes near', color: 0xffa64d },
+  elite: {
+    name: 'Elite',
+    about: 'One strong foe, or a pack: come with the hull whole and every gun fitted',
+    color: 0xb57cff,
+  },
+  epic: { name: 'Epic', about: "The sea's boss, with its escort and its tricks", color: 0xff5a4a },
+};
 
 /** A name to start a sentence with */
 function capital(s: string) {

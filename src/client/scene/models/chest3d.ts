@@ -1,4 +1,4 @@
-import { CHEST_TIME, LOST_CARGO_TIME, type Chest } from '../../../game';
+import type { Chest } from '../../../game';
 import { footprint, type Painter3D } from '../../render/Painter3D';
 
 const COLORS = {
@@ -24,13 +24,18 @@ const MARKER = { height: 9, flag: 3.4 } as const;
 const SIZE = { along: 8, across: 6, height: 4.2, lid: 1.8 }; // world units
 const BOB = { height: 0.6, speed: 2.2, rock: 0.12 }; // world units, radians per second, radians
 /** Seconds before a chest sinks, when it starts to blink */
-export const CHEST_BLINK = 4;
+const CHEST_BLINK = 4;
 // A chest just dropped throws up a ring of foam that spreads and fades: seconds, world units
 const SPLASH = { time: 1.2, from: 4, to: 16, width: 1.4 };
 
 /** Seconds since a chest was dropped into the sea */
 export function chestAge(chest: Chest, time: number) {
-  return time - (chest.expiresAt - (chest.lostBy !== null ? LOST_CARGO_TIME : CHEST_TIME));
+  return time - chest.droppedAt;
+}
+
+/** Whether a chest is blinked out now: it blinks in its last seconds before it sinks, never while kept for someone */
+export function blinkedOut(chest: Chest, time: number) {
+  return chest.expiresAt !== null && chest.expiresAt - time < CHEST_BLINK && Math.sin(time * 10) < 0;
 }
 
 /** A ring of foam where the chest floats, and a splash spreading from where it fell. Drawn with the sea */
@@ -58,8 +63,7 @@ export function drawChestWater(p: Painter3D, chest: Chest, time: number) {
  * It blinks in its last seconds before it sinks
  */
 export function drawChest(p: Painter3D, chest: Chest, time: number) {
-  const left = chest.expiresAt - time;
-  if (left < CHEST_BLINK && Math.sin(time * 10) < 0) return;
+  if (blinkedOut(chest, time)) return;
   if (chest.gold === 0) {
     drawCrates(p, chest, time);
     return;

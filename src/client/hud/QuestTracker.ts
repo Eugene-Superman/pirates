@@ -1,9 +1,8 @@
 import { Container, Graphics, Rectangle, type Text } from 'pixi.js';
 import {
-  MAX_QUESTS,
-  mostOf,
   questLimit,
   QUESTS,
+  SHIP_CLASSES,
   SPEAKERS,
   STORY_CHAPTERS,
   captainsPath,
@@ -13,10 +12,11 @@ import {
   shipGoal,
   shipQuests,
   storyStep,
+  tavernOpen,
+  ZONES,
   type ActiveQuest,
   type GameState,
   type PathStepId,
-  type QuestId,
   type StoryStep,
 } from '../../game';
 import type { Slot } from '../storage/Store';
@@ -37,6 +37,8 @@ const QUEST = { height: 27, gap: 5 } as const; // pixels: a quest's line and met
 const METER = { y: 18, height: 4 } as const; // pixels: a quest's thin meter, under its title
 const DONE_Y = 15; // pixels: the word that a quest is done, in place of its meter
 const ABANDON = { size: 16, cross: 3 } as const; // pixels: the button that abandons a quest, half its cross
+const OTHERS = { height: 16, chevron: 7 } as const; // pixels: the line that folds the other ships' quests, its chevron
+const SHIP_NAME_GAP = 2; // pixels under an other ship's name, over its quests
 const STEP_GAP = 3; // pixels under each step of the path
 const SECTION_GAP = 9; // pixels above and below the divider between the sections
 const DIVIDER_MIDDLE = 64; // pixels: the divider's painted star, across
@@ -47,13 +49,24 @@ const GOLD = 0xffcf3f;
 /** The tracker's parts, each folded by a click on its header */
 const SECTIONS = ['story', 'quests', 'goal'] as const;
 type Section = (typeof SECTIONS)[number];
+/** What folds: the sections, and the other ships' quests under the ship sailed's, folded till the player opens them */
+type Fold = Section | 'others';
 
 /** What the tracker asks the HUD to do */
 export interface TrackerActions {
   /** Asks the player a question before what can't be undone; `onYes` runs if they agree */
   readonly ask: (question: Question, onYes: () => void) => void;
-  /** Gives a quest up */
-  readonly dropQuest: (id: QuestId) => void;
+  /** Gives a quest of one of the player's ships up, done or not */
+  readonly dropQuest: (quest: ActiveQuest) => void;
+}
+
+/** The line that folds the other ships' quests: how many they are, and a chevron, down while they are unfolded */
+interface OthersLine {
+  readonly container: Container;
+  readonly label: Text;
+  readonly chevron: Graphics;
+  /** Whether the chevron was drawn unfolded; null before the first frame */
+  drawnOpen: boolean | null;
 }
 
 /** A section's header: its title, a count, and a chevron at the right end, down while it is unfolded */
@@ -68,7 +81,10 @@ interface Header {
   fitted: string;
 }
 
-/** A quest's line: its title and count, a thin meter of how far it has got (or a word that it is done), and ✕ */
+/**
+ * A quest's line: its title and count, a thin meter of how far it has got (or a word that it is done, and where it is
+ * turned in), and ✕
+ */
 interface QuestRow {
   readonly container: Container;
   readonly title: Text;
@@ -82,24 +98,30 @@ interface QuestRow {
   painted: string;
 }
 
-/** What the player is asked before a quest is given up: the tavern and the tracker ask the same */
+/** What the player is asked before a quest is given up, done or not: the tavern and the tracker ask the same */
 export function abandonQuestion(quest: ActiveQuest): Question {
   const { count } = QUESTS[quest.id];
+  const title = questTitle(QUESTS[quest.id]);
   return {
     title: t('Abandon the quest?'),
-    text: t('"{title}": {kills} of {count} so far. The count is lost, but the tavern will offer the quest again.', {
-      title: questTitle(QUESTS[quest.id]),
-      kills: quest.kills,
-      count,
-    }),
+    text: questDone(quest)
+      ? t('"{title}" is done but not turned in: its reward is lost, but the tavern will offer the quest again.', {
+          title,
+        })
+      : t('"{title}": {kills} of {count} so far. The count is lost, but the tavern will offer the quest again.', {
+          title,
+          kills: quest.kills,
+          count,
+        }),
     yes: t('Abandon'),
   };
 }
 
-function loadFolded(saved: unknown): Record<Section, boolean> {
-  const folded = { story: false, quests: false, goal: false };
+function loadFolded(saved: unknown): Record<Fold, boolean> {
+  const folded = { story: false, quests: false, goal: false, others: true };
   if (typeof saved !== 'object' || saved === null) return folded;
   for (const section of SECTIONS) folded[section] = Reflect.get(saved, section) === true;
+  folded.others = Reflect.get(saved, 'others') !== false;
   return folded;
 }
 
@@ -113,7 +135,8 @@ interface StoryLine {
  * The tracker in the top right corner, a plate in the night look: the story, its chapter in the header, the step the
  * player is on and its objectives (one just met lit a moment), or the word to come back to port where someone waits;
  * the quests the ship sailed has taken, each a line with a thin meter of how far it has got (a done one in green, to
- * turn in at the tavern) and a button to give it up, asked first, and how many the other ships have; and the Captain's
+ * turn in at the tavern of its sea) and a button to give it up, done or not, asked first; and under them how many the
+ * other ships have, a click on which unfolds them by ship, dim, each given up from here too; and the Captain's
  * path, the ship the player works towards and the steps still to do towards it, how many are done in its header (a
  * step just done stays a moment, lit, then folds away). A click on a section's header folds it to that line; the
  * browser keeps which are folded
@@ -138,10 +161,15 @@ export class QuestTracker {
   private readonly quests: Header;
   private readonly questsTitle: string;
   private readonly goal: Header;
-  private readonly rows: readonly QuestRow[];
+  /** The quests' rows, the ship sailed's then the other ships' unfolded, made as many as a frame needs */
+  private readonly rows: QuestRow[] = [];
+  /** The other ships' names over their quests, made as many as a frame needs */
+  private readonly shipNames: Text[] = [];
   private readonly empty = text('', 11, NIGHT.dim, { fontStyle: 'italic', wordWrap: true, wordWrapWidth: INNER });
-  /** How many quests the player's other ships have taken: they wait for those ships */
-  private readonly elsewhere = text('', 11, NIGHT.dim, { fontStyle: 'italic', wordWrap: true, wordWrapWidth: INNER });
+  /** What it says with no quests: where to take them, or, while the story keeps the tavern shut, that it will open */
+  private readonly emptyText: { readonly open: string; readonly shut: string };
+  /** How many quests the player's other ships have taken, folding them: they wait for those ships */
+  private readonly others: OthersLine;
   private readonly divider = nightDivider(INNER, DIVIDER_MIDDLE);
   private readonly steps: Text[] = [];
   private readonly list = new Container();
@@ -149,7 +177,7 @@ export class QuestTracker {
   private readonly abandonHint: TooltipText;
   /** The row whose ✕ is under the pointer */
   private hovered: QuestRow | null = null;
-  private readonly folded: Record<Section, boolean>;
+  private readonly folded: Record<Fold, boolean>;
   private readonly kept: Slot;
   private readonly actions: TrackerActions;
   /** Game time each step of the path was done, while it is lit */
@@ -170,12 +198,15 @@ export class QuestTracker {
     this.quests = this.header('quests');
     this.goal = this.header('goal');
     this.questsTitle = t('Quests');
-    show(this.empty, t('No quests: take bounties at the tavern in port'));
-    this.rows = Array.from({ length: MAX_QUESTS + mostOf('quests') }, () => this.row());
+    this.emptyText = {
+      open: t('No quests: take bounties at the tavern in port'),
+      shut: t('No quests: the tavern opens to you further along the story'),
+    };
+    this.others = this.othersLine();
     this.storyTitle.x = 2;
     this.list.position.set(INSET, 0);
     this.list.addChild(this.story.container, this.storyTitle, this.storyDivider);
-    this.list.addChild(this.quests.container, ...this.rows.map((r) => r.container), this.empty, this.elsewhere);
+    this.list.addChild(this.quests.container, this.empty, this.others.container);
     this.list.addChild(this.divider, this.goal.container);
     this.lit.visible = false;
     this.container.addChild(this.panel, this.lit, this.list, this.tooltip.container);
@@ -207,28 +238,52 @@ export class QuestTracker {
     this.paintHeader(this.quests, !this.folded.quests);
     y += HEADER.height + 3;
     const questsOpen = !this.folded.quests;
-    this.rows.forEach((row, i) => {
-      const quest = questsOpen ? quests[i] : undefined;
-      row.quest = quest ?? null;
-      row.container.visible = quest !== undefined;
-      if (!quest) return;
+    let rows = 0;
+    const lay = (quest: ActiveQuest, sailed: boolean) => {
+      const row = this.rowAt(rows++);
+      row.quest = quest;
+      row.container.visible = true;
       row.container.y = y;
-      this.fill(row, quest);
+      this.fill(row, quest, sailed, sailed && QUESTS[quest.id].zone === state.world.zone);
       y += QUEST.height + QUEST.gap;
-    });
-    if (this.hovered && !this.hovered.quest) this.hovered = null;
+    };
+    if (questsOpen) for (const quest of quests) lay(quest, true);
     this.empty.visible = questsOpen && quests.length === 0;
     if (this.empty.visible) {
+      show(this.empty, tavernOpen(state, player) ? this.emptyText.open : this.emptyText.shut);
       this.empty.y = y;
       y += this.empty.height + QUEST.gap;
     }
-    const elsewhere = player.quests.length - quests.length;
-    this.elsewhere.visible = questsOpen && elsewhere > 0;
-    if (this.elsewhere.visible) {
-      show(this.elsewhere, t('Quests of your other ships: {n}', { n: elsewhere }));
-      this.elsewhere.y = y;
-      y += this.elsewhere.height + QUEST.gap;
+    // The other ships' quests, by ship: given up from here, so the player needn't take a ship's helm and sail back to
+    // its quest's sea only to let the quest go
+    const others = player.quests.filter((quest) => !quests.includes(quest));
+    const { others: fold } = this;
+    fold.container.visible = questsOpen && others.length > 0;
+    let names = 0;
+    if (fold.container.visible) {
+      const open = !this.folded.others;
+      show(fold.label, t('Quests of your other ships: {n}', { n: others.length }));
+      if (fold.drawnOpen !== open) {
+        fold.drawnOpen = open;
+        drawChevron(fold.chevron.clear(), OTHERS.chevron, open);
+      }
+      fold.container.y = y;
+      y += OTHERS.height + QUEST.gap;
+      for (const ship of open ? new Set(others.map((quest) => quest.ship)) : []) {
+        const name = this.shipNameAt(names++);
+        show(name, t(SHIP_CLASSES[ship].name));
+        name.visible = true;
+        name.y = y;
+        y += name.height + SHIP_NAME_GAP;
+        for (const quest of others) if (quest.ship === ship) lay(quest, false);
+      }
     }
+    for (let i = rows; i < this.rows.length; i++) {
+      this.rows[i].quest = null;
+      this.rows[i].container.visible = false;
+    }
+    for (let i = names; i < this.shipNames.length; i++) this.shipNames[i].visible = false;
+    if (this.hovered && !this.hovered.quest) this.hovered = null;
 
     // With no ship to buy next (the last of a line, a masterwork) there is no goal: only the quests are left
     const goal = shipGoal(state, player);
@@ -404,6 +459,47 @@ export class QuestTracker {
     drawChevron(header.chevron.clear(), HEADER.chevron, open);
   }
 
+  /** The line that folds the other ships' quests, a click on which folds or unfolds them */
+  private othersLine(): OthersLine {
+    const container = new Container();
+    const label = text('', 11, NIGHT.dim, { fontStyle: 'italic' });
+    label.anchor.set(0, 0.5);
+    label.position.set(2, OTHERS.height / 2);
+    const chevron = new Graphics();
+    chevron.position.set(INNER - HEADER.chevron / 2 - 2, OTHERS.height / 2);
+    container.addChild(label, chevron);
+    container.eventMode = 'static';
+    container.cursor = 'pointer';
+    container.hitArea = new Rectangle(0, 0, INNER, OTHERS.height);
+    container.on('pointertap', () => {
+      playTap();
+      this.folded.others = !this.folded.others;
+      this.kept.set({ ...this.folded });
+    });
+    return { container, label, chevron, drawnOpen: null };
+  }
+
+  /** The quests' row `i`, made the first time a frame needs that many */
+  private rowAt(i: number) {
+    while (this.rows.length <= i) {
+      const row = this.row();
+      this.rows.push(row);
+      this.list.addChild(row.container);
+    }
+    return this.rows[i];
+  }
+
+  /** The other ships' name `i`, made the first time a frame needs that many */
+  private shipNameAt(i: number) {
+    while (this.shipNames.length <= i) {
+      const name = text('', 11, NIGHT.dim, { fontWeight: 'bold' });
+      name.x = 2;
+      this.shipNames.push(name);
+      this.list.addChild(name);
+    }
+    return this.shipNames[i];
+  }
+
   /** A quest's line, filled by `fill` with the quest it shows */
   private row(): QuestRow {
     const container = new Container();
@@ -414,7 +510,8 @@ export class QuestTracker {
     count.position.set(INNER - ABANDON.size - 8, 1);
     const meter = new Graphics();
     meter.position.set(2, METER.y);
-    const done = text(t('Done: turn it in at the tavern'), 10, UI.good, { fontWeight: 'bold' });
+    // Where it is turned in, as `fill` finds it
+    const done = text('', 10, UI.good, { fontWeight: 'bold' });
     done.position.set(2, DONE_Y);
     const row: QuestRow = {
       container,
@@ -445,22 +542,30 @@ export class QuestTracker {
     return row;
   }
 
-  /** A row as its quest stands now */
-  private fill(row: QuestRow, quest: ActiveQuest) {
-    const { count } = QUESTS[quest.id];
+  /**
+   * A row as its quest stands now. sailed: the ship sailed's, whose done ones are lit green (another ship's wait dim
+   * for it, as the port's marks do); here: the ship sailed's of this sea, which this port's tavern takes in once done
+   */
+  private fill(row: QuestRow, quest: ActiveQuest, sailed: boolean, here: boolean) {
+    const { count, zone } = QUESTS[quest.id];
     const done = questDone(quest);
+    const lit = done && sailed;
     show(row.count, `${quest.kills}/${count}`);
-    tint(row.count, done ? UI.good : NIGHT.dim);
+    tint(row.count, lit ? UI.good : NIGHT.dim);
     row.meter.visible = !done;
     row.done.visible = done;
-    // Done, it is turned in at the tavern, not given up
-    row.abandon.container.visible = !done;
-    const key = `${quest.id}:${quest.kills}`;
+    const key = `${quest.ship}:${quest.id}:${quest.kills}:${sailed}:${here}`;
     if (key === row.painted) return;
     row.painted = key;
     row.title.text = questTitle(QUESTS[quest.id]);
     clip(row.title, row.count.x - Math.ceil(row.count.width) - 8 - row.title.x);
-    tint(row.title, done ? UI.good : THEME.text);
+    tint(row.title, lit ? UI.good : THEME.text);
+    // Turned in only at the tavern of its sea, by its own ship
+    row.done.text = here
+      ? t('Done: turn it in at the tavern')
+      : t('Done: turn it in at {zone}', { zone: t(ZONES[zone].name) });
+    clip(row.done, INNER - ABANDON.size - 8 - row.done.x);
+    tint(row.done, lit ? UI.good : NIGHT.dim);
     const width = INNER - ABANDON.size - 10;
     drawNightMeter(row.meter.clear(), width, METER.height, quest.kills / count, THEME.brass);
   }
@@ -469,7 +574,7 @@ export class QuestTracker {
   private abandon(row: QuestRow) {
     const { quest } = row;
     if (!quest) return;
-    this.actions.ask(abandonQuestion(quest), () => this.actions.dropQuest(quest.id));
+    this.actions.ask(abandonQuestion(quest), () => this.actions.dropQuest(quest));
   }
 
   /** The plate made again at a new height; its edge lit gold while a step is lit */

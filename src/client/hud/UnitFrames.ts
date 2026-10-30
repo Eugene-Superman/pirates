@@ -1,7 +1,16 @@
-import { Circle, Container, Graphics, Sprite, type Text } from 'pixi.js';
+import {
+  CanvasTextMetrics,
+  Circle,
+  Container,
+  FillGradient,
+  Graphics,
+  Sprite,
+  Text,
+  TextStyle,
+  type TextStyleOptions,
+} from 'pixi.js';
 import {
   BOT_KINDS,
-  WEAPONS,
   WRECK_TIME,
   cargoCount,
   findUnit,
@@ -19,8 +28,17 @@ import type { Selection } from '../input/selection';
 import { HullPortrait } from '../scene/models/portrait';
 import { CaptainPortrait } from './CaptainPortrait';
 import { MINIMAP_BUTTONS } from './iconAtlas';
-import { NIGHT, NIGHT_SPOT, drawNightMeter, drawPlateEdge, moonButton, nightPlate } from './nightTheme';
-import { THEME, subheading } from './theme';
+import {
+  NIGHT,
+  NIGHT_SPOT,
+  drawNightMeter,
+  drawPlateEdge,
+  moonButton,
+  moonButtonEnd,
+  moonLabel,
+  nightPlate,
+} from './nightTheme';
+import { BRASS_FILL, THEME, subheading } from './theme';
 import { Tile, UI, clip, doubloon, goldCoin, playTap, show, text, tint, whole, xpStar } from './ui';
 import { t } from '../i18n/i18n';
 
@@ -34,6 +52,87 @@ const HALO: readonly (readonly [number, number])[] = [
 ];
 const HALO_COLOR = 0xa9c8ff;
 const COLORS = { gold: 0xffcf3f, doubloons: 0xffb877, xp: 0x5aa8ff } as const;
+
+/**
+ * The level's badge, a small medallion on the ring: a dark line round a bevelled brass rim (`rim` pixels of its
+ * radius), domed glass inside, the night's blue at rest and gold while a talent waits; its glint, an ellipse of light
+ * high on the glass (its middle, half width and half height, in the glass's radius, and how bright at rest and lit)
+ */
+const BADGE = {
+  rim: 2.5,
+  glint: { y: -0.48, width: 0.6, height: 0.32, rest: 0.14, lit: 0.34 },
+  font: 1.1, // the level's size, in the badge's radius
+} as const;
+/** The gold light round the badge while a talent waits: rings out from its rim, pixels wide and how solid */
+const BADGE_HALO: readonly (readonly [number, number])[] = [
+  [9, 0.1],
+  [5.5, 0.18],
+  [2.5, 0.32],
+];
+const BADGE_GOLD = 0xffc94a;
+// Lining figures: Georgia's old-style ones, the titles', sit up and down on a badge this small
+const BADGE_FONT = '"Times New Roman", Times, serif';
+
+/** Glass domed under light from above: brightest high on it, darkening out to its edge */
+function dome(stops: readonly (readonly [number, number])[]) {
+  const light = { x: 0.5, y: 0.25 };
+  return new FillGradient({
+    type: 'radial',
+    center: light,
+    innerRadius: 0,
+    outerCenter: light,
+    outerRadius: 0.8,
+    colorStops: stops.map(([offset, color]) => ({ offset, color })),
+    textureSpace: 'local',
+  });
+}
+const BADGE_GLASS = {
+  rest: dome([
+    [0, 0x3d6cb8],
+    [0.55, 0x13306a],
+    [1, 0x050b1a],
+  ]),
+  lit: dome([
+    [0, 0xfff8dc],
+    [0.35, 0xffd76e],
+    [0.75, 0xd0922c],
+    [1, 0x7a4a10],
+  ]),
+};
+
+/** The level's letters: the titles' gold, edged dark, at rest; engraved dark into the gold glass while lit */
+function levelStyle(radius: number, lit: boolean): TextStyleOptions {
+  const font = { fontFamily: BADGE_FONT, fontWeight: 'bold', fontSize: Math.round(radius * BADGE.font) } as const;
+  return lit
+    ? {
+        ...font,
+        fill: THEME.darkText,
+        dropShadow: { color: 0xfff3cf, alpha: 0.6, blur: 0, distance: 1, angle: Math.PI / 2 },
+      }
+    : { ...font, fill: THEME.title, stroke: { color: 0x120a03, width: 3, join: 'round' } };
+}
+
+/** The badge round (0, 0), `radius` pixels to its brass rim's edge, its halo out beyond that while lit */
+function drawBadge(g: Graphics, radius: number, lit: boolean) {
+  if (lit) {
+    for (const [width, alpha] of BADGE_HALO) {
+      g.circle(0, 0, radius + width / 2).stroke({ width, color: BADGE_GOLD, alpha });
+    }
+  }
+  const glass = radius - BADGE.rim;
+  const { glint } = BADGE;
+  return g
+    .circle(0, 0, radius)
+    .stroke({ width: 3, color: NIGHT.rim, alpha: 0.85 })
+    .circle(0, 0, radius)
+    .fill(BRASS_FILL)
+    .stroke({ width: 1, color: lit ? THEME.brassLight : THEME.brassDark })
+    .circle(0, 0, glass)
+    .fill(lit ? BADGE_GLASS.lit : BADGE_GLASS.rest)
+    .stroke({ width: 1, color: NIGHT.rim, alpha: 0.7 })
+    .ellipse(0, glass * glint.y, glass * glint.width, glass * glint.height)
+    .fill({ color: 0xffffff, alpha: lit ? glint.lit : glint.rest });
+}
 
 /**
  * Where a frame's parts are, in pixels from its top left corner: the picture in a gold ring (its middle, its
@@ -67,18 +166,16 @@ const COIN = 6; // pixels: their coins' radius
 // Pixels: the hold's spot at the top right, its painted icon (the minimap's button) and the count after it
 const HOLD = { width: 60, height: 18, icon: 18 } as const;
 
-/** The unit picked out: its hull's picture small, the plate wider for the hint and the Fire button */
-const TARGET: FrameBox = {
-  ring: { x: 28, y: 36, radius: 24, width: 3 },
-  badge: { x: 46, y: 54, radius: 9 },
-  plate: { x: 28, y: 4, width: 302, height: 64 },
-  left: 64,
-  right: 318,
-  nameY: 8,
-  hull: { y: 26, height: 12 },
-};
-const HINT_Y = 43; // pixels: the top of the hint and of the Fire button beside it
-const FIRE = { width: 100, height: 22, label: 11 } as const;
+/**
+ * The unit picked out's frame is the player's (the two side by side, alike): its hull's picture in the ring, its tier
+ * where the player's hold is, its temper under the hull's meter and the Fire button beside it
+ */
+const TARGET = OWN;
+/**
+ * Pixels: the Fire button at the bottom right, its top; at its narrowest, wider for a longer label with `pad` more on
+ * each side of it. Its label is smaller than the windows' buttons' to leave the temper room beside it
+ */
+const FIRE = { y: 48, width: 100, height: 22, label: 10, pad: 2 } as const;
 
 function frameWidth(box: FrameBox) {
   return box.plate.x + box.plate.width;
@@ -104,7 +201,7 @@ class Frame {
   private readonly meter = new Graphics();
   private readonly value = text('', 11, UI.text, { fontWeight: 'bold', stroke: { color: 0x000000, width: 3 } });
   private readonly badge = new Graphics();
-  private readonly level = text('', 11, THEME.text, { fontWeight: 'bold' });
+  private readonly level: Text;
   /** Whether the badge was drawn lit; null before the first frame */
   private badgeLit: boolean | null = null;
   /** Over the plain edge: gold while a talent waits (the player's), red round a hostile unit (a target's) */
@@ -139,6 +236,7 @@ class Frame {
     const cut = new Graphics().circle(0, 0, ring.radius).fill(0xffffff);
     this.picture.mask = cut;
     this.badge.position.set(badge.x - ring.x, badge.y - ring.y);
+    this.level = new Text({ text: '', style: levelStyle(badge.radius, false) });
     this.level.anchor.set(0.5);
     this.level.position.copyFrom(this.badge.position);
     this.ring.addChild(gold, this.picture, cut, this.badge, this.level);
@@ -181,12 +279,9 @@ class Frame {
     show(this.level, `${level}`);
     if (lit === this.badgeLit) return;
     this.badgeLit = lit;
-    tint(this.level, lit ? THEME.darkText : THEME.text);
-    this.badge
-      .clear()
-      .circle(0, 0, this.box.badge.radius)
-      .fill({ color: lit ? THEME.title : NIGHT.glassDark })
-      .stroke({ width: 1.5, color: lit ? THEME.brassLight : THEME.brass });
+    const { radius } = this.box.badge;
+    this.level.style = levelStyle(radius, lit);
+    drawBadge(this.badge.clear(), radius, lit);
   }
 }
 
@@ -209,8 +304,8 @@ export interface FrameActions {
  * (a click on it picks another), the ship's level on a badge on the ring (gold while a talent waits), its name, the
  * hold's icon and count at the top right (a click opens the hold), its hull and experience, the gold and the doubloons
  * and whether it is repairing, in combat, in port or sunk (a click on the rest opens the statistics); and at the top
- * the unit they picked out with a click, smaller: its hull's picture, its level, name, temper and tier, its hull, what
- * hurts it, and a button to fire at it (a click on the rest of a bot's opens the bestiary on its kind)
+ * the unit they picked out with a click, in a frame like it: its hull's picture, its level, name and tier, its hull,
+ * its temper and a button to fire at it (a click on the rest of a bot's opens the bestiary on its kind)
  */
 export class UnitFrames {
   static readonly WIDTH = frameWidth(OWN);
@@ -235,11 +330,8 @@ export class UnitFrames {
   private readonly holdIcon = new Sprite();
   private readonly holdCount = text('', 11, THEME.text, { fontWeight: 'bold' });
   private readonly target = new Frame(TARGET);
-  private readonly tag = text('', 11, NIGHT.dim, { fontWeight: 'bold' });
-  private readonly note = text('', 10, NIGHT.dim, {
-    wordWrap: true,
-    wordWrapWidth: TARGET.right - TARGET.left - FIRE.width - 8,
-  });
+  private readonly tier = text('', 11, NIGHT.dim, { fontWeight: 'bold' });
+  private readonly temper = text('', 11, NIGHT.dim, { fontWeight: 'bold' });
   private readonly fire: { readonly tile: Tile; readonly text: Text };
   /** The hulls' pictures made for the units picked out so far, by class: each waits for its art once */
   private readonly hulls = new Map<ShipClassId, HullPortrait>();
@@ -262,17 +354,23 @@ export class UnitFrames {
     this.portraitButton(actions.openPortraits);
 
     const target = this.target.container;
-    this.fire = moonButton(FIRE.width, FIRE.height, t('Fire  (Space)'), actions.toggleFire, FIRE.label);
-    this.fire.tile.container.position.set(TARGET.right + 2 - FIRE.width, HINT_Y);
+    // As wide as the longer of its two labels in the language picked: they swap as it fires and stops
+    const labels = [t('Fire  (Space)'), t('Cease fire  (Esc)')];
+    const style = new TextStyle(moonLabel(FIRE.label));
+    const widest = Math.max(...labels.map((label) => CanvasTextMetrics.measureText(label, style).width));
+    const fireWidth = Math.max(FIRE.width, Math.ceil(widest) + (moonButtonEnd(FIRE.height) + FIRE.pad) * 2);
+    this.fire = moonButton(fireWidth, FIRE.height, labels[0], actions.toggleFire, FIRE.label);
+    this.fire.tile.container.position.set(TARGET.right + 2 - fireWidth, FIRE.y);
     // The frame under it opens the bestiary: not on this click
     this.fire.tile.container.on('pointertap', (e) => e.stopPropagation());
     target.on('pointertap', () => {
       if (this.targetKind) actions.openBestiary(this.targetKind);
     });
-    this.tag.anchor.set(1, 0.5);
-    this.tag.position.set(TARGET.right, TARGET.nameY + NAME_SIZE * 0.6);
-    this.note.position.set(TARGET.left, HINT_Y + 1);
-    target.addChild(this.tag, this.note, this.fire.tile.container);
+    this.tier.anchor.set(1, 0.5);
+    this.tier.position.set(TARGET.right, TARGET.nameY + NAME_SIZE * 0.6);
+    this.temper.anchor.set(0, 0.5);
+    this.temper.position.set(TARGET.left, FIRE.y + FIRE.height / 2);
+    target.addChild(this.tier, this.temper, this.fire.tile.container);
     this.container.addChild(own, target);
   }
 
@@ -419,30 +517,29 @@ export class UnitFrames {
     this.targetKind = unit?.bot?.kind ?? null;
     this.target.container.cursor = this.targetKind ? ('magnifier' satisfies CursorId) : 'default';
     if (!unit) return;
-    // Another player's ship: no bot's temper to show
-    let tag = t('Player');
-    let tagColor: number = NIGHT.dim;
+    // Another player's ship: no bot's temper or tier to show
+    let temper = t('Player');
+    let temperColor: number = NIGHT.dim;
+    let tier = '';
     let alarm: number | null = null;
     let level = unit.level;
     if (unit.bot) {
       const hostile = isHostile(unit, ship.id);
-      tag = unit.bot.foe === ship.id ? t('Attacking you') : hostile ? t('Aggressive') : t('Neutral');
-      // Its tier beside its temper: a ship of a higher tier earns little for it
+      temper = unit.bot.foe === ship.id ? t('Attacking you') : hostile ? t('Aggressive') : t('Neutral');
+      // Its tier beside its name: a ship of a higher tier earns little for it
       const kind = BOT_KINDS[unit.bot.kind];
-      tag = `${tag} · ${t('Tier {tier}', { tier: kind.tier })}`;
+      tier = t('Tier {tier}', { tier: kind.tier });
       level = kind.level;
-      tagColor = hostile ? UI.hostile : UI.good;
+      temperColor = hostile ? UI.hostile : UI.good;
       alarm = hostile ? UI.hostile : null;
     }
-    show(this.tag, tag);
-    tint(this.tag, tagColor);
-    this.target.setName(t(unit.shipClass.name), Math.ceil(this.tag.width));
+    show(this.temper, temper);
+    tint(this.temper, temperColor);
+    show(this.tier, tier);
+    this.target.setName(t(unit.shipClass.name), Math.ceil(this.tier.width));
     this.target.setHull(unit.hp, unit.maxHp, alarm);
     this.target.setLevel(level, false);
     this.showHull(unit.shipClass.id);
-    const best = unit.nature === 'creature' ? WEAPONS.harpoon : WEAPONS.cannon;
-    const what = unit.nature === 'creature' ? 'Creature' : 'Ship';
-    show(this.note, t('{what}: {weapon} do full damage', { what: t(what), weapon: t(best.name).toLowerCase() }));
     const firing = ship.attackTarget === unit.id;
     this.fire.tile.setLook({ pressed: firing });
     show(this.fire.text, firing ? t('Cease fire  (Esc)') : t('Fire  (Space)'));

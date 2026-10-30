@@ -161,7 +161,8 @@ export class WorldChart {
     const here = ZONES[state.world.zone];
     this.pointArrows(here, tier);
     const told = this.hovered ?? this.picked ?? here;
-    const key = `${told.id}:${here.id}:${tier}:${this.picked?.id ?? ''}`;
+    const charted = state.player.charted;
+    const key = `${told.id}:${here.id}:${tier}:${this.picked?.id ?? ''}:${charted.join()}`;
     if (key === this.shown) return;
     this.shown = key;
     for (const { zone, tile, frame } of this.nodes) {
@@ -173,7 +174,7 @@ export class WorldChart {
     }
     // The jump goes to the sea clicked
     this.jump.tile.setLook({ disabled: (this.picked ?? here) === here });
-    this.describe(told, here, tier);
+    this.describe(told, here, tier, charted.includes(told.id));
   }
 
   /**
@@ -195,8 +196,8 @@ export class WorldChart {
     arrows.end();
   }
 
-  /** The details of a sea, down the column on the right */
-  private describe(zone: Zone, here: Zone, tier: number) {
+  /** The details of a sea, down the column on the right: what sails it only once the player has sailed it (`charted`) */
+  private describe(zone: Zone, here: Zone, tier: number, charted: boolean) {
     for (const child of this.details.removeChildren()) child.destroy({ children: true });
     let y = 0;
     const add = (part: Text, gap = 6) => {
@@ -230,13 +231,27 @@ export class WorldChart {
     y += 10;
 
     add(subheading(t('What sails it'), 15), 4);
+    if (!charted) {
+      add(text(t('Unknown: no ship of yours has sailed it yet'), 12, THEME.dim), 2);
+      return;
+    }
     for (const bot of zoneKinds(zone.id)) add(text(`• ${botLine(bot)}`, 12, bot.boss ? BOSS_COLOR : THEME.text), 2);
   }
 }
 
-/** A kind of bot in a line: its hull, its level, how it behaves, and whether it is the sea's boss */
+/**
+ * A kind of bot in a line: its hull, its level, how it behaves, whether it is the sea's boss or a mini-boss, and its
+ * packs
+ */
 function botLine(bot: BotKind) {
   const name = t(SHIP_CLASSES[bot.shipClass].name);
-  const temper = bot.boss ? t('boss') : bot.behaviour === 'aggressive' ? t('aggressive') : t('neutral');
-  return `${name} · ${t('Lv {level}', { level: bot.level })} · ${temper}`;
+  const temper = bot.boss
+    ? bot.boss.mini
+      ? t('mini-boss')
+      : t('boss')
+    : bot.behaviour === 'aggressive'
+      ? t('aggressive')
+      : t('neutral');
+  const pack = bot.pack > 1 ? ` · ${t('in packs of {n}', { n: bot.pack })}` : '';
+  return `${name} · ${t('Lv {level}', { level: bot.level })} · ${temper}${pack}`;
 }

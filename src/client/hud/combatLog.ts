@@ -1,5 +1,6 @@
 import {
   AMMO,
+  FEATS,
   GOODS,
   GOOD_IDS,
   GUNS,
@@ -20,6 +21,7 @@ import {
 } from '../../game';
 import { t } from '../i18n/i18n';
 import { questTitle } from './questText';
+import { featRung, prizeLine } from './rewardText';
 
 /**
  * What an entry is about: damage the player did or took, a unit they sank, their own ship going down, a repair, gold,
@@ -121,6 +123,7 @@ function means(strike: Strike) {
   const n = strike.dice.length;
   if (strike.source === 'bite') return t('a bite');
   if (strike.source === 'shell') return t('a mortar shell');
+  if (strike.source === 'arms') return t('its arms, coming up');
   if (strike.source === 'rocket') return t('a rocket, as {n} cannon|a rocket, as {n} cannons', { n });
   if (strike.source === 'keg') return t('a powder keg, as {n} cannon|a powder keg, as {n} cannons', { n });
   if (strike.source === 'bombard') return t('a mortar shell, as {n} cannon|a mortar shell, as {n} cannons', { n });
@@ -206,7 +209,9 @@ export class CombatLog {
               ? t('{who} bit you', { who })
               : strike.source === 'shell'
                 ? t("{who}'s mortar → you", { who })
-                : t('{who} → you', { who });
+                : strike.source === 'arms'
+                  ? t('{who} came up under you', { who })
+                  : t('{who} → you', { who });
           const result = amount === 0 ? t('miss') : `−${amount}${event.critical ? ` ${t('crit!')}` : ''}`;
           this.add('taken', state.time, `${what}: ${result}  ·  ${means(strike)}`, details, tone);
         }
@@ -252,6 +257,26 @@ export class CombatLog {
         this.add('gold', state.time, t('{why}: +{n} gold', { why, n: event.amount }), [], 'plain');
         break;
       }
+      case 'prizes':
+        if (event.shipId === me) {
+          const prizes = event.prizes.map(prizeLine).join(', ');
+          this.add('gold', state.time, t('The first time, besides: {prizes}', { prizes }), [], 'plain');
+        }
+        break;
+      case 'feat':
+        if (event.shipId === me) {
+          const feat = featRung(FEATS[event.feat], event.rung);
+          this.add('level', state.time, t('Feat {feat} reached: its reward waits in the feats', { feat }), [], 'plain');
+        }
+        break;
+      case 'featClaimed':
+        if (event.shipId === me) {
+          const feat = featRung(FEATS[event.feat], event.rung);
+          const points = t("+{n} captain's point|+{n} captain's points", { n: event.points });
+          const reward = [points, ...event.prizes.map(prizeLine)].join(', ');
+          this.add('gold', state.time, t('Feat {feat}: {reward}', { feat, reward }), [], 'plain');
+        }
+        break;
       case 'level':
         if (event.shipId === me)
           this.add('level', state.time, t('Level {level}! A talent to pick (K)', { level: event.level }), [], 'plain');
@@ -260,7 +285,7 @@ export class CombatLog {
         if (event.shipId !== me) break;
         const talent = talentOf(event.talent);
         const name = t(talent.name);
-        // An ability's text without its key and cooldown: "Broadside: the next volley does ×2 damage"
+        // An ability's text without its key and cooldown: "Full sail: +40% speed for 5 s"
         const does = talent.text.replace(/^Ability \([A-Z]\): /, '').replace(/\. Every \d+ s$/, '');
         const what =
           event.amount > 0
@@ -301,9 +326,17 @@ export class CombatLog {
         break;
       case 'barrage':
         if (event.targetId === me) {
-          this.add('taken', state.time, t('The Baron fires his mortar: get out of the marked circles!'), [], 'plain');
+          this.add('taken', state.time, t('The Baron fires his mortar: get out of the red glow!'), [], 'plain');
         }
         break;
+      case 'dive': {
+        const diver = findUnit(state, event.shipId);
+        if (event.targetId === me && diver) {
+          const who = unitName(diver.shipClass.id);
+          this.add('taken', state.time, t('{who} dives at you: turn out of the dark glow!', { who }), [], 'plain');
+        }
+        break;
+      }
       // An objective of the story met; a step done says so with its reward (the gold's line), or here without one
       case 'story': {
         const step = STORY.find((s) => s.id === event.step);

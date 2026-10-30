@@ -12,6 +12,13 @@ const GLINT_LIFT = 0.6;
 // The spots a boss's shells are to land on that the water lights at once (Beacon.ts): it fires four or five a barrage,
 // one barrage at a time
 export const SHELL_LIGHTS = 6;
+// The units' auras the water lights at once (Auras.ts): the one fired at, the one picked out, and the story's prey in
+// sight
+export const AURA_LIGHTS = 8;
+// The spots a monster comes up at from a dive that the water lights at once (Beacon.ts), and its clouds of ink it
+// darkens (combat/monsterSkills.ts): one monster dives at a time, and sheds a cloud for each quarter of its hull
+export const DIVE_LIGHTS = 2;
+export const INK_CLOUDS = 4;
 
 // Every pixel of the screen is a spot on the water: the vertices carry theirs, and the layers' texture coordinates
 // are computed from it, so the waves stay fixed to the water whatever the camera does. Two layers' coordinates share
@@ -117,12 +124,26 @@ uniform vec4 uMark;        // the story's mark's light: how far the waves bend i
 uniform vec4 uMarkLight;   // its brightness in the water and over the reflected sky, its glints' and their sharpness
 uniform vec3 uMarkColor;
 uniform vec3 uMarkNow;     // how much of it shows (0: none), how far its rings have spread (0..1), its breath (radians)
+uniform vec4 uLevel;       // the same round the player's ship at a level reached: its middle, 1 / radius, how much shows
 uniform vec3 uBossOrigin;  // a boss's light round it while it fights the player: its middle (x, y), 1 / its radius;
 uniform vec4 uBoss;        // the rest of it as the mark's
 uniform vec4 uBossLight;
 uniform vec3 uBossColor;
 uniform vec3 uBossNow;
-uniform vec4 uShells[${SHELL_LIGHTS}]; // the same on the spots its shells are to land on: middle, 1 / radius, how much shows
+uniform vec4 uShells[${SHELL_LIGHTS}]; // its light on the spots its shells are to land on, with no rings (shellLight):
+                                       // middle, 1 / radius, how much shows
+uniform vec4 uAuras[${AURA_LIGHTS}];      // the units' auras: middle, 1 / radius, how much shows
+uniform vec4 uAuraLooks[${AURA_LIGHTS}];  // each one's colour, how far its rings have spread (0..1)
+uniform vec4 uAura;        // their shape and light as the mark's; their breath (radians)
+uniform vec4 uAuraLight;
+uniform float uAuraBreath;
+uniform vec4 uDives[${DIVE_LIGHTS}];  // the spots a monster comes up at, as a shell's (shellLight): middle, 1 / radius, how much
+uniform vec4 uDiveLight;   // shows; their light, as a boss's: under, over, glints, their sharpness
+uniform vec3 uDiveColor;
+uniform vec4 uInks[${INK_CLOUDS}];   // clouds of ink: middle, 1 / radius, how much shows
+uniform vec4 uInk;         // how dark at its thickest, how frayed its edge (radii), its light's brightness, 1 / the lace's tile
+uniform vec3 uInkColor;
+uniform vec3 uInkLight;    // the light deep in it, playing with the caustics
 uniform vec4 uSeam;       // the sea's map: its width and height; how far in from its edge the Seam's storm reaches, and
                            // how wide the whitewater at the wall's foot is (world units)
 uniform vec4 uSeamWater;   // the storm: how much steeper its waves, how much of its colour, its whitewater's foam,
@@ -131,13 +152,18 @@ uniform vec3 uSeamColor;
 uniform vec2 uSeamChurn;   // world units the whitewater's foam has drifted, kept to its tile
 uniform vec4 uGate;        // the gate nearest the camera: its middle (x, y), 1 / its radius, how much of it shows (0: none)
 uniform vec4 uVortex;      // its whirlpool, in the gate's radii: how far it turns the water, how far its funnel reaches;
-                           // how much darker the funnel's water is, how steep it looks
-uniform vec4 uVortexArms;  // its arms of foam: how many, how tightly they wind (radians an e-fold of the radius); copies
-                           // of the foam an arm's turn, and an e-fold of the radius
-uniform vec4 uVortexNow;   // radians the arms have turned; how far the foam has drawn in (0..1); radians the waves curl
-                           // round it at its edge; the eye's size (radii)
+                           // how much darker the funnel's water is, how steep its walls look at their steepest
+uniform vec4 uVortexArms;  // its arms of foam: how many in each of the two sets; how tightly the spirals wind (radians
+                           // an e-fold of the radius); how high the ridges the arms ride on are
+uniform vec4 uVortexLace;  // the foam laid along the spirals: copies of it round them (whole), copies along them a unit
+                           // of the radius to the pull; the pull; how much foam
+uniform vec4 uVortexRim;   // the whitewater round the funnel's lip: its radius and width; the radius the foam is gone
+                           // down the hole within; radians the waves curl round it at its edge
+uniform vec4 uVortexGlow;  // the eye's size; the light spiralling down into it: how bright, how many arms (whole), how
+                           // tightly they wind
+uniform vec4 uVortexNow;   // how far the foam has run along (0..1); radians each set of arms has turned on; radians the
+                           // light's spiral has
 uniform vec4 uVortexEye;   // the eye's light (rgb), and how bright, breathing
-uniform float uVortexFoam; // the arms' foam
 
 // A number in 0..1 for a cell of a grid, the same every frame (a hash without sine: no float error on big ids)
 float hash(vec2 p) {
@@ -191,42 +217,113 @@ float waterLight(vec2 at, vec4 shape, vec3 now, vec2 slope, out float pool) {
   return light;
 }
 
-// A gate to another sea: a whirlpool round its middle. The waves' slope turned round it, more the nearer its middle,
-// and tilted down into its funnel, so the light on the water shows its hollow; its arms of foam, log spirals winding in
-// to its middle and turning, the foam's lace laid along them and drawn in. funnel: how deep in it is (1 at its
-// middle); eye: its light. Returns the arms' foam
-float whirlpool(inout vec2 slope, out float funnel, out float eye) {
+// A spot a boss's shot is to land on: no rings, a pool of its light lit all across its blast, brightest in the middle
+// and fading out beyond it, its edge bent by the waves. shell: its middle, 1 / its light's radius, how much shows
+float shellLight(vec4 shell, vec2 slope) {
+  if (shell.w <= 0.0) return 0.0;
+  float r = length((vPlace - shell.xy) * shell.z + slope * uBoss.x);
+  return (1.0 - smoothstep(0.4, 1.0, r)) * (0.7 + 0.3 * exp(-r * r * 6.0)) * shell.w;
+}
+
+// A monster's clouds of ink: how thick the ink is here (0..1), the thickest of them, their edges frayed by the foam's
+// lace and bent by the waves
+float inkClouds(vec2 slope) {
+  float shown = 0.0;
+  for (int i = 0; i < ${INK_CLOUDS}; i++) shown = max(shown, uInks[i].w);
+  // The foam's lace read only while there is ink: most seas never have any, and this runs for every pixel of the sea
+  if (shown <= 0.0) return 0.0;
+  float ink = 0.0;
+  float fray = (texture(uFoamMap, vPlace * uInk.w).r - 0.5) * uInk.y;
+  for (int i = 0; i < ${INK_CLOUDS}; i++) {
+    vec4 cloud = uInks[i];
+    if (cloud.w <= 0.0) continue;
+    float r = length((vPlace - cloud.xy) * cloud.z + slope * uBoss.x) + fray;
+    ink = max(ink, (1.0 - smoothstep(0.6, 1.0, r)) * cloud.w);
+  }
+  return ink * uInk.x;
+}
+
+// A gate to another sea: a whirlpool round its middle. Its water runs in along log spirals, psi = angle + twist * ln r:
+// the streamlines of a vortex drawing in, which stay put while the water runs along them, faster nearer the middle as a
+// real whirlpool's does (and never wound tighter, however long it turns). On them two sets of arms of foam, of different
+// counts, so the arms are of every width, merging and parting as the sets turn on at their own slow paces; the foam's
+// streaks laid along the spirals and its clumps running in on them; whitewater round the funnel's lip. The waves turned
+// round it and the funnel's walls and the arms' ridges in the water's slope, so the light shows its hollow. funnel: how
+// deep in it is (1 at its middle); glow: the eye's light and its spiral going down; held: how much it holds the water
+// (no whitecaps there). Returns its foam
+float whirlpool(inout vec2 slope, out float funnel, out float glow, out float held) {
   funnel = 0.0;
-  eye = 0.0;
+  glow = 0.0;
+  held = 0.0;
   if (uGate.w <= 0.0) return 0.0;
   vec2 p = (vPlace - uGate.xy) * uGate.z;
   float r = length(p);
-  if (r >= uVortex.x) return 0.0;
-  float reach = (1.0 - smoothstep(0.45 * uVortex.x, uVortex.x, r)) * uGate.w;
-  funnel = pow(1.0 - smoothstep(0.0, uVortex.y, r), 1.5) * uGate.w;
-  float curl = uVortexNow.z * reach * (1.0 + 2.0 * funnel);
+  float reach = uVortex.x;
+  if (r >= reach) return 0.0;
+  float rr = max(r, 0.01);
+  vec2 outward = p / rr;
+  vec2 around = vec2(-outward.y, outward.x);
+  held = (1.0 - smoothstep(0.3 * reach, reach, r)) * uGate.w;
+  float x = min(r / uVortex.y, 1.0);
+  float fall = 1.0 - x * x * (3.0 - 2.0 * x);
+  funnel = fall * sqrt(fall) * uGate.w;
+
+  // The waves turned round it, calmer down the funnel, and its walls: its depth falling as fall squared, steepest a
+  // third of the way out (where fall * x * (1 - x) is 0.165)
+  float curl = uVortexRim.w * held * (1.0 + 2.0 * funnel);
   float c = cos(curl);
   float s = sin(curl);
-  slope = vec2(c * slope.x - s * slope.y, s * slope.x + c * slope.y) + p / max(r, 0.04) * uVortex.w * funnel;
+  slope = vec2(c * slope.x - s * slope.y, s * slope.x + c * slope.y) * (1.0 - 0.5 * funnel);
+  slope += outward * uVortex.w * fall * x * (1.0 - x) / 0.165 * uGate.w;
 
-  float rr = max(r, 0.02);
-  float lnr = log(rr);
-  float wind = lnr * uVortexArms.y + uVortexNow.x;
-  float inward = lnr * uVortexArms.w + uVortexNow.y;
   // The angle round it cut on its -x side, and again on its +x side
   float pi = 3.14159265359;
   float left = atan(p.y, p.x + 1e-5);
   float right = atan(-p.y, -p.x - 1e-5) + pi;
-  float arms = pow(0.5 + 0.5 * cos(left * uVortexArms.x + wind), 3.0);
-  // A turn round it moves the lace by whole copies (the arms times the copies an arm's), so the two cuts give the same
-  // lace; each is taken away from its cut, where the texture's own blur across the jump would show as a seam
-  float copies = uVortexArms.z / (2.0 * pi);
-  float lace1 = texture(uFoamMap, vec2((left * uVortexArms.x + wind) * copies, inward)).r;
-  float lace2 = texture(uFoamMap, vec2((right * uVortexArms.x + wind) * copies, inward)).r;
-  float lace = mix(lace2, lace1, 0.5 + 0.5 * p.x / rr);
-  eye = exp(-r * r / (uVortexNow.w * uVortexNow.w)) * uGate.w;
-  // Thinning down the funnel's walls, none in the eye: the water falls away there
-  return arms * smoothstep(0.25, 0.6, lace) * reach * smoothstep(0.15, 0.5, r) * uVortexFoam;
+  float lnr = log(rr);
+  float wind = lnr * uVortexArms.z;
+  float psi = left + wind;
+
+  // The arms, and the ridges they ride on: across the spirals (along psi's gradient, mostly outward), lower for more
+  // arms so the water's slope stays the same whatever their count
+  float a = psi * uVortexArms.x + uVortexNow.y;
+  float b = psi * uVortexArms.y + uVortexNow.z;
+  float waveA = 0.5 + 0.5 * cos(a);
+  float waveB = 0.5 + 0.5 * cos(b);
+  float armA = waveA * waveA * waveA * waveA;
+  float armB = waveB * waveB * waveB * waveB * waveB * waveB;
+  float arms = min(1.0, armA + 0.75 * armB);
+  float rise = -2.0 * waveA * waveA * waveA * sin(a) * uVortexArms.x
+    - 2.25 * waveB * waveB * waveB * waveB * waveB * sin(b) * uVortexArms.y;
+  float throat = smoothstep(uVortexRim.z, uVortexRim.z + 0.15, r);
+  slope += (around + uVortexArms.z * outward) * rise / uVortexArms.y * uVortexArms.w * held * throat;
+
+  // The foam along the spirals: its streaks (the texture's x) laid along them, a turn round it whole copies of it, so
+  // the two cuts give the same foam; each is taken away from its cut, where the texture's own blur across the jump
+  // would show as a seam. It runs along as r to the pull goes down: in, faster nearer the middle
+  float copies = uVortexLace.x / (2.0 * pi);
+  float along = pow(rr, uVortexLace.z) * uVortexLace.y + uVortexNow.x;
+  vec4 lace1 = texture(uFoamMap, vec2(along, psi * copies));
+  vec4 lace2 = texture(uFoamMap, vec2(along, (right + wind) * copies));
+  vec4 lace = mix(lace2, lace1, 0.5 + 0.5 * p.x / rr);
+  // Thin far out, on the arms (the foam's own pattern only frays them: nearer the middle its streaks are finer than a
+  // pixel, its blur even), in clumps running in along them, whitewater round the lip; none down the hole
+  float outer = 1.0 - smoothstep(0.35 * reach, reach, r);
+  // Squared by hand: GLSL's pow is undefined for a negative base, which this is inside the lip
+  float lip = (r - uVortexRim.x) / uVortexRim.y;
+  float rim = exp(-lip * lip);
+  float clumps = 0.55 + 1.1 * (lace.g - 0.5);
+  float amount = (outer * (0.05 + 0.85 * arms) * clumps * (1.0 - 0.4 * funnel) + rim * 0.4) * throat;
+  // Soft-edged, see-through between the lace's strands
+  float foam = smoothstep(1.0 - amount, 1.25 - amount, 0.7 * lace.b + 0.3 * lace.r);
+  foam *= (0.55 + 0.45 * smoothstep(0.15, 0.6, lace.r)) * (0.45 + 0.55 * outer);
+
+  // The eye deep in the funnel, and its light spiralling down into it
+  float eye = uVortexGlow.x;
+  float spiral = 0.5 + 0.5 * cos(left * uVortexGlow.z + lnr * uVortexGlow.w + uVortexNow.w);
+  float down = exp(-r * r / (4.0 * eye * eye)) * smoothstep(0.02, 0.12, r);
+  glow = (exp(-r * r / (eye * eye)) + uVortexGlow.y * spiral * spiral * spiral * down) * uGate.w;
+  return foam * uVortexLace.w * uGate.w;
 }
 
 // A map's slope turned back from the layer's texture to the world
@@ -256,8 +353,9 @@ void main() {
   float crest = a.b + (b.b + c.b - 1.0) * uCrest.w + (d.b - 0.5) * gust;
   slope *= 1.0 + uSeamWater.x * storm;
   float funnel;
-  float eye;
-  float swirl = whirlpool(slope, funnel, eye);
+  float glow;
+  float held;
+  float swirl = whirlpool(slope, funnel, glow, held);
   vec3 n = normalize(vec3(-slope, 1.0));
 
   // Deeper and shallower water in broad patches, and the shadows of clouds drifting over it
@@ -287,20 +385,40 @@ void main() {
   float glass = glassLight(core) * mix(uGlass.w, 1.0, depth);
   float bent = 0.5 + 1.2 * caustic;
   color += (uGlassHalo * glass * bent + uGlassColor * core * 0.7 * mix(uGlass.w, 1.0, depth)) * uGlass.z;
-  // The story's mark's, and a boss's, the caustics playing in them: the water turned gold or red, not lightened, which
-  // would whiten its blue
+  // The story's mark's (and the same round the ship at a level), and a boss's, the caustics playing in them: the water
+  // turned gold or red, not lightened, which would whiten its blue
   float pool;
   float mark = waterLight(vGlow.zw, uMark, uMarkNow, slope, pool);
+  float levelPool;
+  mark += waterLight((vPlace - uLevel.xy) * uLevel.z, uMark, vec3(uLevel.w, uMarkNow.yz), slope, levelPool);
+  pool += levelPool;
   color = mix(color, uMarkColor * (0.75 + 0.9 * caustic), clamp(mark * uMarkLight.x, 0.0, 1.0));
   float bossPool;
   float boss = waterLight((vPlace - uBossOrigin.xy) * uBossOrigin.z, uBoss, uBossNow, slope, bossPool);
   for (int i = 0; i < ${SHELL_LIGHTS}; i++) {
-    vec4 shell = uShells[i];
-    float shellPool;
-    boss += waterLight((vPlace - shell.xy) * shell.z, uBoss, vec3(shell.w, uBossNow.yz), slope, shellPool);
+    float shellPool = shellLight(uShells[i], slope);
+    boss += shellPool;
     bossPool += shellPool;
   }
   color = mix(color, uBossColor * (0.75 + 0.9 * caustic), clamp(boss * uBossLight.x, 0.0, 1.0));
+  // Where a monster will come up: lit as a shell's spot, in the ink's own dark light
+  float dive = 0.0;
+  for (int i = 0; i < ${DIVE_LIGHTS}; i++) dive += shellLight(uDives[i], slope);
+  color = mix(color, uDiveColor * (0.6 + 0.9 * caustic), clamp(dive * uDiveLight.x, 0.0, 1.0));
+  // The units' auras, each its own colour: where two meet, the water takes both by how much each lights it
+  vec3 auraTint = vec3(0.0);
+  vec3 auraGlints = vec3(0.0);
+  float aura = 0.0;
+  for (int i = 0; i < ${AURA_LIGHTS}; i++) {
+    vec4 at = uAuras[i];
+    vec4 look = uAuraLooks[i];
+    float auraPool;
+    float light = waterLight((vPlace - at.xy) * at.z, uAura, vec3(at.w, look.w, uAuraBreath), slope, auraPool);
+    auraTint += look.rgb * light;
+    auraGlints += look.rgb * auraPool;
+    aura += light;
+  }
+  color = mix(color, auraTint / max(aura, 0.001) * (0.75 + 0.9 * caustic), clamp(aura * uAuraLight.x, 0.0, 1.0));
 
   // The sky, reflected more where the water turns away from the camera (Fresnel)
   float facing = max(dot(n, uView), 0.0);
@@ -316,6 +434,8 @@ void main() {
   // Their light again over the sky, which would hide the most of it, and its glitter on the ripples over it
   color += uMarkColor * (mark * uMarkLight.y + pow(toSun, uMarkLight.w) * pool * uMarkLight.z);
   color += uBossColor * (boss * uBossLight.y + pow(toSun, uBossLight.w) * bossPool * uBossLight.z);
+  color += uDiveColor * (dive * uDiveLight.y + pow(toSun, uDiveLight.w) * dive * uDiveLight.z);
+  color += auraTint * uAuraLight.y + pow(toSun, uAuraLight.w) * auraGlints * uAuraLight.z;
 
   // Sparks of moonlight over the glass, here and there, twinkling: on top of the reflected sky, as glitter is
   vec2 fine = vGlow.xy * uGlassSpark.z;
@@ -325,17 +445,27 @@ void main() {
   color += uGlassColor * step(1.0 - uGlassSpark.y, s) * twinkle * speck * min(1.0, glass * 2.5) * uGlassSpark.x;
 
   // The whirlpool's hollow dark under the sky too, and the gate's eye lit deep in it
-  color *= 1.0 - uVortex.z * 0.8 * funnel * funnel;
-  color += uVortexEye.rgb * eye * uVortexEye.a;
+  color *= 1.0 - uVortex.z * 0.8 * funnel;
+  vec3 eyeLight = uVortexEye.rgb * glow * uVortexEye.a;
+  color += eyeLight;
 
-  // Whitecaps on the chop's crests in the gusts, frayed by the foam's lace and thinned in its patches
+  // A monster's ink over all of it, the sky it would reflect too: dark, a faint light deep in it
+  float ink = inkClouds(slope);
+  color = mix(color, uInkColor + uInkLight * uInk.z * (0.4 + caustic), ink);
+
+  // Whitecaps on the chop's crests in the gusts, frayed by the foam's lace and thinned in its patches: none in the
+  // whirlpool, whose own foam runs round with it
   vec4 lace = texture(uFoamMap, vGustFoam.zw);
   float foam = smoothstep(uFoam.x, uFoam.y, d.b) * gust * smoothstep(0.3, 0.75, lace.r) * smoothstep(0.1, 0.5, lace.g);
+  foam *= 1.0 - held;
   // Whitewater churning at the Seam's foot
   float foot = 1.0 - smoothstep(0.0, uSeam.w, abs(edge));
   vec4 churn = texture(uFoamMap, (vPlace + uSeamChurn) * uSeamWater.w);
   float white = foot * smoothstep(0.3, 0.65, churn.r) * uSeamWater.z;
-  finalColor = vec4(mix(color, uFoamColor, max(max(foam * uFoam.z, white), swirl)), 1.0);
+  color = mix(color, uFoamColor, max(foam * uFoam.z, white) * (1.0 - ink));
+  // The whirlpool's foam in the shadow of its funnel, the eye's light on it
+  vec3 swirlColor = uFoamColor * (1.0 - 0.55 * funnel) + eyeLight * 0.8;
+  finalColor = vec4(mix(color, swirlColor, swirl * (1.0 - ink)), 1.0);
 }
 `;
 
@@ -401,12 +531,25 @@ function seaUniforms() {
     uMarkLight: vec4(),
     uMarkColor: vec3(),
     uMarkNow: vec3(),
+    uLevel: vec4(),
     uBossOrigin: vec3(),
     uBoss: vec4(),
     uBossLight: vec4(),
     uBossColor: vec3(),
     uBossNow: vec3(),
     uShells: { value: new Float32Array(4 * SHELL_LIGHTS), type: 'vec4<f32>' as const, size: SHELL_LIGHTS },
+    uAuras: { value: new Float32Array(4 * AURA_LIGHTS), type: 'vec4<f32>' as const, size: AURA_LIGHTS },
+    uAuraLooks: { value: new Float32Array(4 * AURA_LIGHTS), type: 'vec4<f32>' as const, size: AURA_LIGHTS },
+    uAura: vec4(),
+    uAuraLight: vec4(),
+    uAuraBreath: { value: 0, type: 'f32' as const },
+    uDives: { value: new Float32Array(4 * DIVE_LIGHTS), type: 'vec4<f32>' as const, size: DIVE_LIGHTS },
+    uDiveLight: vec4(),
+    uDiveColor: vec3(),
+    uInks: { value: new Float32Array(4 * INK_CLOUDS), type: 'vec4<f32>' as const, size: INK_CLOUDS },
+    uInk: vec4(),
+    uInkColor: vec3(),
+    uInkLight: vec3(),
     uSeam: vec4(),
     uSeamWater: vec4(),
     uSeamColor: vec3(),
@@ -414,9 +557,11 @@ function seaUniforms() {
     uGate: vec4(),
     uVortex: vec4(),
     uVortexArms: vec4(),
+    uVortexLace: vec4(),
+    uVortexRim: vec4(),
+    uVortexGlow: vec4(),
     uVortexNow: vec4(),
     uVortexEye: vec4(),
-    uVortexFoam: { value: 0, type: 'f32' as const },
   });
 }
 
@@ -438,12 +583,18 @@ export interface WaterGate {
   readonly open: boolean;
 }
 
-/** A light in the water: the story's mark's or a boss's (Beacon.ts), world units; `shown` 0..1 as it fades */
+/** A light in the water: the story's mark's, a level's or a boss's (Beacon.ts), world units; `shown` 0..1 as it fades */
 export interface WaterLight {
   readonly x: number;
   readonly y: number;
   readonly radius: number;
   readonly shown: number;
+}
+
+/** A unit's aura in the water (Auras.ts): its light in its own colour (0..1 a channel), its rings `rings` of the way out */
+export interface WaterAura extends WaterLight {
+  readonly color: readonly [number, number, number];
+  readonly rings: number;
 }
 
 /** The whitecaps' foam drifts with the chop it breaks on */
@@ -455,10 +606,11 @@ const FOAM_LAYER: PatchLayer = { tile: SEA_LOOK.foamTile, turn: SEA_LOOK.chop.tu
  * deeper and shallower patches, light playing on the floor of the shallows, cloud shadows drifting over it, reflected
  * sky, sun glitter and sheen, whitecaps in the gusts, and the Moon's light from below: moon glass glowing up from the
  * seabed here and there, breathing, with sparks of moonlight over it (made up in the shader, no map); and where the
- * story sends the player, a pool of gold light in the water with rings of it spreading, bent by the waves, and a red
- * one round a boss that fights them; towards the map's edges the Seam's storm, whitewater at the foot of its wall
- * (SeamWalls.ts); and at a gate to another sea a whirlpool, arms of foam winding in to a dark funnel, its eye lit. How
- * it looks is a set of numbers (SEA_LOOK, seaLook.ts).
+ * story sends the player, a pool of gold light in the water with rings of it spreading, bent by the waves (the same
+ * round their ship at a level reached, and in their auras' colours round the units picked out, fired at or that it asks
+ * them to sink), and a red one round a boss that fights them; towards the map's edges the
+ * Seam's storm, whitewater at the foot of its wall (SeamWalls.ts); and at a gate to another sea a whirlpool, arms of
+ * foam winding in to a dark funnel, its eye lit. How it looks is a set of numbers (SEA_LOOK, seaLook.ts).
  * Hidden until its maps have loaded: the flat sea color shows till then. WebGL only (Pixi's default renderer)
  */
 export function createSeaSurface(): SeaSurface {
@@ -568,19 +720,33 @@ function applyLook(sea: SeaSurface) {
   u.uBoss.set([boss.bend, boss.pool, boss.ringWidth, boss.ringReach]);
   u.uBossLight.set([boss.under, boss.over, boss.glints, boss.glintSharpness]);
   u.uBossColor.set(rgb(boss.color));
+  const { aura } = look;
+  u.uAura.set([aura.bend, aura.pool, aura.ringWidth, aura.ringReach]);
+  u.uAuraLight.set([aura.under, aura.over, aura.glints, aura.glintSharpness]);
+  const { ink } = look;
+  u.uDiveLight.set([ink.under, ink.over, ink.glints, ink.glintSharpness]);
+  u.uDiveColor.set(rgb(ink.glow));
+  u.uInk.set([ink.dark, ink.fray, ink.light, 1 / ink.laceTile]);
+  u.uInkColor.set(rgb(ink.color));
+  u.uInkLight.set(rgb(ink.lightColor));
   const { seam, vortex } = look;
   u.uSeam.set([WORLD_WIDTH, WORLD_HEIGHT, seam.reach, seam.foot]);
   u.uSeamWater.set([seam.rough, seam.dark, seam.foam, 1 / seam.foamTile]);
   u.uSeamColor.set(rgb(seam.color));
-  u.uVortex.set([vortex.reach, vortex.funnel, vortex.dark, vortex.slope]);
-  u.uVortexArms.set([vortex.arms, vortex.twist, vortex.laceRound, vortex.laceIn]);
-  u.uVortexFoam = vortex.foam;
+  u.uVortex.set([vortex.reach, vortex.funnel, vortex.dark, vortex.steep]);
+  u.uVortexArms.set([vortex.arms[0].count, vortex.arms[1].count, vortex.twist, vortex.ridges]);
+  u.uVortexLace.set([vortex.laceRound, vortex.laceAlong, vortex.pull, vortex.foam]);
+  u.uVortexRim.set([vortex.rim, vortex.rimWidth, vortex.throat, vortex.curl]);
+  u.uVortexGlow.set([vortex.eye, vortex.spiral, vortex.spiralArms, vortex.spiralTwist]);
 }
 
 /**
  * screenWidth/Height: pixels; the camera must already be set for this frame. light: the story's mark's, if any;
  * bossLight: round a boss that fights the player, if any; shellLights: on the spots its shells are to land on, null
- * where none shows (SHELL_LIGHTS at most); gate: the gate nearest the camera, if any
+ * where none shows (SHELL_LIGHTS at most); levelLight: the mark's round the player's ship at a level reached, if any;
+ * auras: round the units marked, null where none shows (AURA_LIGHTS at most); gate: the gate nearest the camera, if any;
+ * diveLights: on the spots a monster will come up at, null where none shows (DIVE_LIGHTS at most); inks: the clouds of
+ * ink in sight (INK_CLOUDS at most)
  */
 export function updateSeaSurface(
   sea: SeaSurface,
@@ -591,7 +757,11 @@ export function updateSeaSurface(
   light: WaterLight | null,
   bossLight: WaterLight | null,
   shellLights: readonly (WaterLight | null)[],
+  levelLight: WaterLight | null,
+  auras: readonly (WaterAura | null)[],
   gate: WaterGate | null,
+  diveLights: readonly (WaterLight | null)[],
+  inks: readonly WaterLight[],
 ) {
   if (!sea.mesh.visible) return;
   const u = sea.uniforms;
@@ -625,6 +795,8 @@ export function updateSeaSurface(
   const { mark } = SEA_LOOK;
   if (light) u.uMarkOrigin.set([light.x, light.y, 1 / light.radius]);
   u.uMarkNow.set([light?.shown ?? 0, (time / mark.ringPeriod) % 1, (time * mark.breath) % turn]);
+  if (levelLight) u.uLevel.set([levelLight.x, levelLight.y, 1 / levelLight.radius, levelLight.shown]);
+  else u.uLevel[3] = 0;
   const { boss } = SEA_LOOK;
   if (bossLight) u.uBossOrigin.set([bossLight.x, bossLight.y, 1 / bossLight.radius]);
   u.uBossNow.set([bossLight?.shown ?? 0, (time / boss.ringPeriod) % 1, (time * boss.breath) % turn]);
@@ -633,12 +805,42 @@ export function updateSeaSurface(
     if (shell) u.uShells.set([shell.x, shell.y, 1 / shell.radius, shell.shown], i * 4);
     else u.uShells[i * 4 + 3] = 0;
   }
+  for (let i = 0; i < AURA_LIGHTS; i++) {
+    const aura = auras[i];
+    if (!aura) {
+      u.uAuras[i * 4 + 3] = 0;
+      continue;
+    }
+    u.uAuras.set([aura.x, aura.y, 1 / aura.radius, aura.shown], i * 4);
+    u.uAuraLooks.set([...aura.color, aura.rings], i * 4);
+  }
+  u.uAuraBreath = (time * SEA_LOOK.aura.breath) % turn;
+  for (let i = 0; i < DIVE_LIGHTS; i++) {
+    const dive = diveLights[i];
+    if (dive) u.uDives.set([dive.x, dive.y, 1 / dive.radius, dive.shown], i * 4);
+    else u.uDives[i * 4 + 3] = 0;
+  }
+  for (let i = 0; i < INK_CLOUDS; i++) {
+    const cloud = inks.at(i);
+    if (cloud && cloud.radius > 0) u.uInks.set([cloud.x, cloud.y, 1 / cloud.radius, cloud.shown], i * 4);
+    else u.uInks[i * 4 + 3] = 0;
+  }
   const { seam, vortex } = SEA_LOOK;
   const churn = (time * seam.churn) % seam.foamTile;
   u.uSeamChurn.set([churn, churn * 0.6]);
   if (gate) u.uGate.set([gate.x, gate.y, 1 / gate.radius, 1]);
   else u.uGate[3] = 0;
-  u.uVortexNow.set([(time * vortex.spin) % turn, (time * vortex.flow) % 1, vortex.curl, vortex.eye]);
+  // The water runs in along the spirals: r to the pull goes down at spin * pull / twist a second, so it goes round at
+  // `spin` at the gate's radius. A set of arms or the light's spiral turned on by an angle is psi less that angle, so
+  // its phase goes back by its count times it
+  const run = (vortex.spin * vortex.pull) / vortex.twist;
+  const [armsA, armsB] = vortex.arms;
+  u.uVortexNow.set([
+    (time * run * vortex.laceAlong) % 1,
+    (-time * armsA.drift * armsA.count) % turn,
+    (-time * armsB.drift * armsB.count) % turn,
+    (-time * vortex.spiralSpin * vortex.spiralArms) % turn,
+  ]);
   const breath = 1 - vortex.breathe + vortex.breathe * Math.sin(time * vortex.breath);
   u.uVortexEye.set([...rgb(gate?.open === false ? vortex.shut : vortex.glow), vortex.bright * breath]);
 

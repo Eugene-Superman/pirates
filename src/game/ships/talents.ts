@@ -29,9 +29,9 @@ export {
  * starter sloop's and a tier 1 ship's 10, a tier 6 ship's 60). Every ship levels on its own: a new one starts at 1
  */
 export const MAX_LEVEL = 60;
-// XP from each level to the next, 1→2 first, to level 20: minutes for the first ones, the starting waters' bots take a
-// sloop to about level 8 (kills are worth less once the ship has outgrown the bots, xpForKill), the rest is for
-// stronger seas. Beyond it, the higher tiers' levels, each step LATE_STEP more than the one before
+// XP from each level to the next, 1→2 first, to level 20: minutes for the first ones, the starting waters' bots take
+// the starter sloop to its last, 10 (every kill pays it in full, xpForKill), the rest is for stronger seas. Beyond it,
+// the higher tiers' levels, each step LATE_STEP more than the one before
 const FIRST_STEPS = [
   200, 350, 550, 800, 1100, 1450, 1850, 2300, 2800, 3400, 4000, 4700, 5400, 6200, 7000, 7900, 8800, 9800, 10800,
 ];
@@ -64,20 +64,48 @@ export function levelOf(xp: number, maxLevel: number) {
 // Share of a bot's XP a ship of the next tier up earns for it: one bought sails on to the next sea. Two tiers or more
 // up, a single point
 const TIER_ABOVE_SHARE = 0.25;
+/**
+ * By the levels, of a bot of the ship's tier or the one below: all its XP to a ship up to `all` levels above it, half
+ * up to `half`, a quarter beyond
+ */
+export const XP_BY_LEVELS = { all: 3, half: 5 } as const;
+
+/**
+ * What of a bot's XP a ship earns by the tiers and the levels, and why (xpForKill; the bestiary tells it): `by` the
+ * starter sloop or a bot of a higher tier (all of it), one two tiers or more below the ship (a single point), one a
+ * tier below (TIER_ABOVE_SHARE, then by the levels) or of its own tier (by the levels). `tier` and `levels`: the share
+ * each leaves; `over`: how many levels the ship is above the bot
+ */
+export interface KillXpShare {
+  readonly by: 'starter' | 'higherTier' | 'farBelow' | 'tierBelow' | 'sameTier';
+  readonly tier: number;
+  readonly levels: number;
+  readonly over: number;
+}
+
+export function killXpShare(bot: { tier: number; level: number }, ship: { tier: number; level: number }): KillXpShare {
+  const over = ship.level - bot.level;
+  if (ship.tier === 0) return { by: 'starter', tier: 1, levels: 1, over };
+  if (bot.tier > ship.tier) return { by: 'higherTier', tier: 1, levels: 1, over };
+  if (bot.tier < ship.tier - 1) return { by: 'farBelow', tier: 0, levels: 1, over };
+  const levels = over <= XP_BY_LEVELS.all ? 1 : over <= XP_BY_LEVELS.half ? 0.5 : 0.25;
+  return bot.tier < ship.tier
+    ? { by: 'tierBelow', tier: TIER_ABOVE_SHARE, levels, over }
+    : { by: 'sameTier', tier: 1, levels, over };
+}
 
 /**
  * XP for sinking a bot whose kind is worth `xp` (bots/botKinds.ts). Every ship counts its levels from 1 again, so a
  * bot is weighed by the tier of its sea first: one of a lower tier pays a ship a quarter (a tier below) or a point
- * (further down), one of a higher tier all of it. Of the ship's own tier, by the levels: all of it to a ship up to
- * three levels above the bot, half up to five, a quarter beyond. A strong ship gets little for the weak ones
+ * (further down), one of a higher tier all of it. Of the ship's own tier, by the levels (XP_BY_LEVELS). A strong ship
+ * gets little for the weak ones. The starter sloop (tier 0) is a new player's first hours: every bot pays it all of
+ * it, so it levels fast
  */
 export function xpForKill(xp: number, bot: { tier: number; level: number }, ship: { tier: number; level: number }) {
-  if (bot.tier > ship.tier) return xp;
-  if (bot.tier < ship.tier - 1) return 1;
-  const over = ship.level - bot.level;
-  const share = over <= 3 ? 1 : over <= 5 ? 0.5 : 0.25;
-  const below = bot.tier < ship.tier ? TIER_ABOVE_SHARE : 1;
-  return Math.max(1, Math.round(xp * share * below));
+  const share = killXpShare(bot, ship);
+  if (share.by === 'starter' || share.by === 'higherTier') return xp;
+  if (share.by === 'farBelow') return 1;
+  return Math.max(1, Math.round(xp * share.levels * share.tier));
 }
 
 /** The levels that offer a choice of two signature talents instead of a talent point: every fifth, to the last */
@@ -128,8 +156,13 @@ export const PERKS = {
   fullSail: { speed: 1.4, time: 5 },
   /** Damage to a target that isn't in combat: Ambush */
   ambush: 1.4,
-  /** More damage for every volley in a row at the same target, up to `most` volleys: Relentless */
-  relentless: { boost: 0.05, most: 5 },
+  /**
+   * More damage for every round in a row at the same target (Ship.fireRun: every gun in reach fired), up to `most`
+   * rounds: Relentless. The run is over `lapse` seconds without a volley at it: longer than the slowest cannon's reload
+   * and the slowest harpoon gun's together (2.6 + 3.6 s), so a weapon picked just before a volley, its guns' reloads
+   * started over, keeps it
+   */
+  relentless: { boost: 0.05, most: 5, lapse: 8 },
   /** Share of the hull the ability mends when used: Grog rations */
   grog: 0.08,
   /** Under this health (percent), damage is `boost` times: Last stand */
@@ -231,10 +264,10 @@ const hundred = (share: number) => Math.round(share * 1000) / 10;
 
 // prettier-ignore
 export const SIGNATURES: Readonly<Record<SignatureId, SignatureTalent>> = {
-  broadside: signature('broadside', 5, 'Broadside', `Ability (F): the next volley does ×${PERKS.broadside} damage. Every ${PERKS.cooldown} s`, true),
+  broadside: signature('broadside', 5, 'Broadside', `Ability (F): the next volley waits till every gun in reach is loaded, then fires them all at once for ×${PERKS.broadside} damage. Every ${PERKS.cooldown} s`, true),
   fullSail: signature('fullSail', 5, 'Full sail', `Ability (F): +${percent(PERKS.fullSail.speed - 1)} speed for ${PERKS.fullSail.time} s. Every ${PERKS.cooldown} s`, true),
   ambush: signature('ambush', 10, 'Ambush', `+${percent(PERKS.ambush - 1)} damage to a target that isn't in a fight: the first volley`),
-  relentless: signature('relentless', 10, 'Relentless', `+${percent(PERKS.relentless.boost)} damage for every volley in a row at one target, up to +${percent(PERKS.relentless.boost * PERKS.relentless.most)}`),
+  relentless: signature('relentless', 10, 'Relentless', `+${percent(PERKS.relentless.boost)} damage for every volley in a row at one target, up to +${percent(PERKS.relentless.boost * PERKS.relentless.most)}; with guns of different reloads, a volley once all of them have fired`),
   seasonedCrew: signature('seasonedCrew', 15, 'Seasoned crew', `Broadside and Full sail are ready every ${PERKS.seasoned} s, not ${PERKS.cooldown}`),
   grogRations: signature('grogRations', 15, 'Grog rations', `Using an ability mends ${percent(PERKS.grog)} of the hull`),
   lastStand: signature('lastStand', 20, 'Last stand', `+${percent(PERKS.lastStand.boost - 1)} damage while your hull is under ${PERKS.lastStand.below}%`),

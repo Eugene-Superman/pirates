@@ -23,14 +23,15 @@ paths:
   body raised out of the water, as `SerpentSprite` lays them), or its vector model until then or without one, fitted
   to its box by uniform scale.
   Until their atlases load, the bots' ships (`botShip3d.ts`, a look per class; the seas' pirate brig, warship and
-  flagship have only that, for now), the sea monsters (`serpent3d.ts`, `turtle3d.ts`; the seas' crab, shark and
-  kraken are only `monster3d.ts`'s simple models, for now), the chests (`chest3d.ts`), the port (`port3d.ts`, its island drawn as an island) and the islands
+  flagship and the packs' jackal cutter have only that, for now), the sea monsters (`serpent3d.ts`, `turtle3d.ts`; the seas' crab, shark and
+  kraken, and the starting waters' Inkmother and her brood, are only `monster3d.ts`'s simple models, for now; a monster under
+  water, diving, is its dark shape gliding at its foe with bubbles over it, `drawDiveWater`), the chests (`chest3d.ts`), the port (`port3d.ts`, its island drawn as an island) and the islands
   (`island3d.ts`, also those with no painting) are drawn as vector models; those files also draw the monsters' and
   chests' water. A painting is never stretched onto its island: the island takes the painting's beach as its coast
   (`paintedCoasts.json` in `game/world/`), so what ships run into is drawn.
 - `scene/effects/` — client-only decorations with their own state (foam, target marker, ship fire and smoke,
   the sinking animation, shot effects, the sea surface, the fog of war, bots' wrecks, serpents' trails, the repair,
-  a level reached, a boss's barrage marks). They may use `Math.random`.
+  a level reached, a boss's barrage marks, the units' auras). They may use `Math.random`.
 - `scene/cameraControl.ts` — how the camera keeps up with the ship: it glides after it, the ship in the middle of the
   screen; turned to what the story shows, then back.
 - `hud/` — screen-space Pixi `Text`/`Container`, not projected; `ui.ts` holds the shared colors, `Tile` (a clickable
@@ -38,9 +39,9 @@ paths:
   and `HudWindow` (a window over the game: the dim behind it, its panel, its close button, Escape, scaled to fit the
   screen; in the `WindowLook` it is given; one with a `ScrollBand`, the talent tree's, is scaled only to the screen's
   width and cut to its height, its `body` scrolling in the band with the mouse wheel or a bar and its `foot` moved up;
-  a window of one size whose parts scroll on their own, the loadout's slots and hold, puts each in a `ScrollPane`; every scroll bar, the band's and the port's lists' too, is `ScrollPane.ts`'s `ScrollBar`). `theme.ts` is the windows' theme, dark wood under a brass frame: its
+  a window of one size whose parts scroll on their own, the loadout's slots and hold, the bestiary's bot picked, puts each in a `ScrollPane`; every scroll bar, the band's and the port's lists' too, is `ScrollPane.ts`'s `ScrollBar`). `theme.ts` is the windows' theme, dark wood under a brass frame: its
   panel, `BRASS` tiles (a `TileStyle`: the tabs), cards, icon slots, meters (`drawMeter`), the painted gold
-  cross every window closes with (`crossButton`: a `WindowLook`'s close, the settings', the sea chart's in its slot) and
+  cross every window closes with (`crossButton`: a `WindowLook`'s close, the loadout's taking a gun off; the sea chart lays the same `ornament('cross')` in its slot) and
   `THEMED_WINDOW`; the bestiary and the world chart wear it. A window casts a shadow; nothing on the
   main screen does (`nightPlate` has none). `nightTheme.ts` is
   the other look a window may wear (`NIGHT_WINDOW`: the same rim and Close, `panelFrame`, round deep blue and the
@@ -48,7 +49,7 @@ paths:
   (`nightCorners`; a window's own, `nightWindowCorners`) and dividers (`nightDivider`), a window's header (`nightHeader`: the painted star before its title, the divider under them) and a board with its emblem and heading (`nightBoard`, `nightEmblem`), what the talent tree and the mastery share (`TREE_COLORS`, `DIM_TINT`, `takenGlow`), from the painted pieces `ornaments.ts` hands out by name (`ornament(id, fit)`: a sprite dressed
   once the atlas has loaded, scaled alike both ways to a width or height, mirrored for another corner; `nightSky`);
   the captain's mastery, the talent tree, the feats, the loadout, the hold, the statistics (its ships' tabs cards of
-  blue glass, `NIGHT_TAB`, lit while their page shows), the portraits (`PortraitPicker`), the port's windows (`PortScreen`'s buildings, a `HudWindow` each, and `ItemInfo`) and the question (`ConfirmDialog`)
+  blue glass, `NIGHT_TAB`, lit while their page shows), the portraits (`PortraitPicker`), the settings (`SettingsPanel`: the player's on one board, the developer's on another under it; the language a `Select`, a list unfolding over the rows under it, folded first by Escape), the port's windows (`PortScreen`'s buildings, a `HudWindow` each, and `ItemInfo`) and the question (`ConfirmDialog`)
   wear it; the harbour's frame is a `nightPanel` drawn larger round its picture (`HarbourView`'s `FRAME.scale`, so its
   rim reads on a picture shrunk to the screen), its corner pieces over the picture, the port's name on a
   `nightPlaque`. Plainer, the plates and the tracker at the top and the chat (`UnitFrames`, `QuestTracker`,
@@ -72,7 +73,7 @@ paths:
   so ammo and items are dragged onto it and off it (each window's `dragLayer`, and the bar's, over everything). The parts own no place of their own: they are given it.
   `input/` — turns pointer and key events into game method calls; the unit picked out with a click (`selection.ts`)
   is client state, which the game only hears of when the player attacks it. The HUD windows that Escape closes (the
-  sea chart, the world chart, the bestiary, the portraits, the statistics, the feats, the captain's mastery, the hold, the talents, the loadout, the port with an item's window
+  sea chart, the world chart, the bestiary, the portraits, the statistics, a feat's reward claimed over the feats, the feats, the captain's mastery, the hold, the talents, the loadout, the port with an item's window
   over it, the settings, the layout editor under them; and over them all the question before what can't be undone, one `ConfirmDialog` for the
   whole HUD, in the night look, the port's included)
   listen on `window` in the order the HUD makes them, top-most first and all before `keyboardInput` is bound (the
@@ -112,9 +113,10 @@ paths:
 - Immediate mode: `scene.clear()` and a full redraw every frame via `Painter3D`.
   Everything in the scene is drawn **only through `Painter3D`**, never directly into `Graphics` (otherwise there is no projection or lighting).
   The exceptions are things projected elsewhere: the sprites of ships, monsters and chests with their water masks,
-  the port's pictures (`PortSprites`), the islands' paintings (`IslandSprites`), the fog puffs (`FogClouds`) and the sky's clouds and their shadows
-  (`SkyClouds`), all made for this camera; the pillars of light and their motes (`Beacon`: the story's gold, a boss's and its shells' red; soft textures
-  made in a canvas, placed at projected points); the shader
+  the port's pictures (`PortSprites`), the islands' paintings (`IslandSprites`), all made for this camera; the pillars of light and their motes (`Beacon`: the story's gold, round the player's ship too at a level reached,
+  a boss's and its shells' red; soft textures made in a canvas, placed at projected points); the level-up's glow
+  (`LevelUpEffect.glow`: the ship's sprite turned gold and blurred under it, the scene's one Pixi filter, drawn only
+  while it shows); the shader
   meshes (`seaSurface.ts`, `fogOfWar.ts`, `Wake.ts`, the water round a wreck in `Sinking.ts`, the Seams' walls in
   `SeamWalls.ts`), whose vertices are
   projected with `Camera3D` every frame; and what stays the same size at every zoom, drawn in screen pixels at a
@@ -151,11 +153,11 @@ There is no z-buffer, so order is everything. In `SceneView.update`:
    (`storyMark3d.ts`: where the story sends the player, its buoy; its light in the water is the sea's shader's, the
    pillar over it a `Beacon`'s, over the fog) → range rings (the
    picked weapon's shortest and longest reach, dashed, running round) → units' water (a serpent's body under the surface,
-   a turtle's, a monster's; a gold ring round what the story asks the player to sink, `storyMark3d.ts`) → bubbles over
-   bots' wrecks → chests' foam rings → powder kegs' foam and the ring of their blast (`keg3d.ts`) → repair rings → the
-   level-up's glow and rings → a Royal standard's light round the ship (`standard3d.ts`) → the target lock ring, then
-   the selection ring → shot ripples → a boss's barrage marks and a player's bombardment's (`BarrageMarks`, red and
-   gold) → projectile shadows → target marker (where the ship can see; beyond, it goes over the fog, see below).
+   a turtle's, a monster's) → bubbles over
+   bots' wrecks → a monster diving, its shape gliding at its foe and the bubbles over it (`drawDiveWater`) → chests'
+   foam rings → powder kegs' foam and the ring of their blast (`keg3d.ts`) → repair rings → a Royal standard's light round the ship (`standard3d.ts`) → the units' auras as rings, only
+   till the sea's maps load (`Auras.drawWater`; then they are the sea shader's light) → shot ripples → a boss's barrage and a player's bombardment, the shadows of their shot (`BarrageMarks`; a
+   bombardment's spot a soft gold glow, a boss's the sea's red light) → projectile shadows → target marker (where the ship can see; beyond, it goes over the fog, see below).
    There is no drawn ship shadow: it is baked into the sprite.
 3. Volumetric objects (islands' hills and palms, or the slices of their paintings (`IslandSprites`), bots' ships and
    monsters, bots' wrecks going down, chests, powder kegs afloat, the port's
@@ -171,12 +173,13 @@ draw it separately after sorting.
 A sprite can't go inside a `Graphics`, so the scene is layers in `container`, bottom to top:
 sea surface mesh → the Seams' walls the camera looks towards (`SeamWalls.back`: behind the sea) → wake mesh → wreck
 water mesh → the red `Beacon` round a boss that fights the player (under the ships, so its pillar rises behind
-the masts instead of washing the hull out) → the red `ShellBeacons` over the spots its shells are to land on (as many
-as the sea's shader lights, `SHELL_LIGHTS`) → `layers` → the Seams' walls between the camera and the sea (`SeamWalls.front`, a curtain seen through,
-clearer round the player's ship) → the sky clouds' shadows → fog of war mesh (haze and
-mist) → fog puffs → `markerLayer` (the target marker where the ship can't see) → the story's `Beacon` (the pillar of light
-over where the story sends the player, and its motes, over the port's pictures and the fog: seen from afar) → the sky's
-clouds → `overlay` (the
+the masts instead of washing the hull out) → the red `SpotBeacons` over the spots its shells are to land on (as many
+as the sea's shader lights, `SHELL_LIGHTS`) → the ink-dark `SpotBeacons` over where a monster will come up from a dive
+(`DIVE_LIGHTS`) → the gold `Beacon` round the player's ship at a level reached
+(`LevelUpEffect.light`, under the ships as the boss's) → `layers` → the Seams' walls between the camera and the sea (`SeamWalls.front`, a curtain seen through,
+clearer round the player's ship) → fog of war mesh (haze and
+mist) → `markerLayer` (the target marker where the ship can't see) → the story's `Beacon` (the pillar of light
+over where the story sends the player, and its motes, over the port's pictures and the fog: seen from afar) → `overlay` (the
 navigation debug drawings) → `hpBars` (the units' hit point bars, with a red border on a bot hostile to the player) →
 `arrows` (the story's painted gold arrows, `IconSprites`: round the ship towards where it sends the player off the
 screen, over what it asks them to sink) → the damage numbers, over everything.
@@ -184,11 +187,11 @@ screen, over what it asks them to sink) → the damage numbers, over everything.
 farther than the first sprite), then for each sprite far to near its own layers (a ship: its sprite, its `waterMask`,
 its fire over it; a serpent: its pieces; a slice of the port's pictures or of an island's) and a `Graphics` segment of the vector-drawn
 objects between it and the next sprite, opened only when there are some (`drawLayers`, segments reused frame to
-frame). The player's ship's layers end with `fireLayer`: flames, then smoke, then shot effects nearer than the ship,
-the repair's crosses, the level-up's light and the barrage's falling shells.
+frame). The player's ship's layers: the level-up's gold glow, its sprite, the hull lit gold over it (`LevelUpEffect`'s
+`glow` and `shine`, shown only at a level), its `waterMask`, then `fireLayer`: flames, then smoke, then shot effects
+nearer than the ship, the repair's crosses, the level-up's sparks and the barrage's falling shells.
 The fog lies over everything on the water, so beyond the view the islands, the port and the wakes are hazed like the
-sea; units inside the fog are not drawn at all. The sky's clouds (`SkyClouds`) drift over it all, high above the
-sea, their shadows over everything under the fog.
+sea; units inside the fog are not drawn at all.
 `draw` receives the painter of its layer — draw with it, not with `this.painter`. Nothing is drawn for a sprite until
 its `intact` atlas has loaded (the vector model stands in for a bot, a monster or a chest).
 
@@ -269,19 +272,29 @@ its `intact` atlas has loaded (the vector model stands in for a bot, a monster o
   `glass`, the Moon's light from below (docs/story.md: its shards glow on the seabed): made up in the shader with no
   map, a shard in some cells of a grid, each its own size and breath, its light bent by the caustics, sparks over it.
   A cell's shard is picked by its whole place in the world (`uGlassCell`), so it stays put as the camera moves. And its
-  `mark`, where the story sends the player (`Beacon.water`): a pool of gold light, rings of it spreading, bent by
+  `mark`, where the story sends the player (`Beacon.water`; the same round the player's ship at a level reached, `uLevel`): a pool of gold light, rings of it spreading, bent by
   the waves, the water turned gold rather than lightened (light added onto its blue whitens it); and its `boss`, the
   same in red round a boss while it fights the player, pulsing faster, and on every spot its shells are to land on
-  (`ShellBeacons.water`, an array of `SHELL_LIGHTS` uniforms, `uShells`). Its `seam`, the storm
+  as a pool with no rings, brighter as the shot comes down (`SpotBeacons.water`, an array of `SHELL_LIGHTS` uniforms,
+  `uShells`, `shellLight`). Its `ink`: the same pool in the ink's dark violet where a monster will come up from a dive
+  (`uDives`, `DIVE_LIGHTS`), and its clouds of ink over all of it, the sky it reflects too, dark, their edges frayed by
+  the foam's lace, a faint light deep in them (`inkClouds`, `uInks`, `INK_CLOUDS`, no whitecaps over them). Its `aura`, the same with no pillar round the
+  target fired at, the unit picked out and the story's prey (`Auras.water`, `AURA_LIGHTS` of them, `uAuras` and
+  `uAuraLooks`: each its own colour, gold for the prey, else red, green or blue by how the unit stands to the player,
+  and its own rings, quicker round the target while the ship fires; where two meet the water takes both). Its `seam`, the storm
   at the map's edges, where the Seams' walls stand (`SeamWalls.ts`, the sea's ripples running up their faces): a gust
   everywhere and steeper waves, darker water, whitewater at the walls' foot. Its `vortex`, the gate nearest the
-  camera (one at a time: they stand at the map's far sides) as a whirlpool: the waves' slope turned round it and
-  tilted into its funnel, arms of foam along log spirals, the foam's lace laid along them in coordinates round it
-  (taken twice, its angle cut on either side, each used away from its cut: no seam where the angle wraps), its eye lit.
+  camera (one at a time: they stand at the map's far sides) as a whirlpool: its water running in along log spirals that
+  stay put (a vortex's streamlines), its foam running along them faster nearer its middle, so it is never a picture
+  turned whole nor wound ever tighter; two sets of arms of different counts on them, turning on slowly at their own
+  paces; the foam's streaks laid along the spirals in coordinates round it (taken twice, its angle cut on either side,
+  each used away from its cut: no seam where the angle wraps), whitewater round the funnel's lip, no whitecaps in it;
+  the waves' slope turned round it, tilted into its funnel and ridged by the arms; its eye lit, its light spiralling
+  down into it.
   Pixi compiles a shader as GLSL ES 3.00 only when its source says `#version 300 es`, else as GLSL ES 1.00: these are
   written for 1.00 (`texture`, `in`/`out` mapped by Pixi), so no `textureGrad`, `dFdx` or other 3.00-only call. The fog starts at
-  `ship.viewRange`; hiding its layers in the HUD changes only the picture, never what the ship can see or shoot
-  (`ship.canSee` in the game).
+  `ship.viewRange` and is always drawn: the settings can't hide it. What the ship can see or shoot is the game's
+  (`ship.canSee`).
 
 ## Shot effects (`effects/ShotEffects.ts`)
 
@@ -294,10 +307,10 @@ its `intact` atlas has loaded (the vector model stands in for a bot, a monster o
 - The `damage` and `repair` events are `DamageNumbers`': a number floating up over the unit, small and red (paler for
   the wrong weapon for the target, a deeper red with a minus on the player's own ship, "Miss"; critical hits only in
   the combat log), green for a repair step (with its gold cost), gold with its coin for gold paid (a bounty over the
-  wreck, a chest or a quest over the ship); for the player's ship also the experience earned with its star, a level reached, an
+  wreck, a chest or a quest over the ship); for the player's ship also the experience earned with its star, a level or a feat's rung reached, an
   ability used, goods hauled aboard and a full hold. A newer number never hides under an older one: the older is
-  pushed up over it, never back down. A fixed pool of labels reused round-robin. `LevelUpEffect` is the level's light round the
-  ship; `BarrageMarks` the spots a boss's shells will land on (`state.shells`), red rings filling in as they come down.
+  pushed up over it, never back down. A fixed pool of labels reused round-robin. `LevelUpEffect` is the level's: the story's gold
+  light round the ship (a `Beacon`, its pool in the sea's shader), the ship glowing gold, sparks winding up round it; `BarrageMarks` a boss's grapeshot (`state.shells`): a canister's balls coming down from its side, fanning out over the spot, each with its shadow darkening on the water and a spout of its own (`shellSplash`) as it lands, one after another; the sea lights the spot red, brighter as they near (`SpotBeacons`, `shellLight`), no rings. A player's bombardment's shell comes down alone onto a soft gold glow.
 
 ## Bots, wrecks and the repair (`effects/Wrecks.ts`, `effects/Trails.ts`, `effects/RepairEffect.ts`)
 

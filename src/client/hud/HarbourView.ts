@@ -14,7 +14,8 @@ import { MINIMAP_BUTTONS } from './iconAtlas';
 import { NIGHT, moonButton, moonLabel, nightPanel, nightPlaque, nightWindowCorners } from './nightTheme';
 import type { GuideTarget } from './StoryGuide';
 import { THEME, TITLE_STYLE } from './theme';
-import { UI, goldCoin, playTap, show, whole } from './ui';
+import { ornament } from './ornaments';
+import { UI, doubloon, goldCoin, playTap, show, whole } from './ui';
 import { t } from '../i18n/i18n';
 import type { CursorId } from '../input/cursor';
 
@@ -23,7 +24,7 @@ import type { CursorId } from '../input/cursor';
 const ART = `${import.meta.env.BASE_URL}sprites/port`;
 
 /** The port's buildings, each opening a window of its own (PortScreen) */
-export type BuildingId = 'tavern' | 'market' | 'workshop' | 'shipyard' | 'arsenal' | 'guild' | 'auction';
+export type BuildingId = 'tavern' | 'market' | 'galleon' | 'workshop' | 'shipyard' | 'arsenal' | 'guild' | 'auction';
 
 export interface Building {
   readonly id: BuildingId;
@@ -32,15 +33,20 @@ export interface Building {
   readonly about: string;
   /** The pointer over its medallion: what is done there; a closed one's, a button's */
   readonly cursor: CursorId | 'pointer';
+  /** Sells for doubloons: its medallion draws the eye (a warmer light, stars twinkling round it), the doubloon on it
+   * until it is painted */
+  readonly premium?: boolean;
 }
 
 export const BUILDINGS: readonly Building[] = [
   { id: 'tavern', name: 'Tavern', about: 'Bounties: sink what they ask and come back for the gold', cursor: 'seal' },
+  { id: 'market', name: 'Market', about: 'Buys the goods and loot in your hold, for gold', cursor: 'exchange' },
   {
-    id: 'market',
-    name: 'Market',
-    about: 'Buys the goods in your hold, and sells items for doubloons',
+    id: 'galleon',
+    name: 'Golden Galleon',
+    about: 'Rare wares for doubloons: scrolls, charms, flags and more',
     cursor: 'exchange',
+    premium: true,
   },
   {
     id: 'workshop',
@@ -68,15 +74,21 @@ const SHIP_SPOT = [0.77, 0.5] as const;
 interface HarbourArt {
   readonly picture: { readonly file: string; readonly w: number; readonly h: number };
   readonly medallions: { readonly file: string; readonly size: number };
-  /** Where each building stands on the picture (shares of its width and height), and its medallion's place in the row */
-  readonly buildings: Readonly<Record<string, { readonly at: readonly [number, number]; readonly medallion: number }>>;
+  /**
+   * Where each building stands on the picture (shares of its width and height), and its medallion's place in the row:
+   * none while it isn't painted yet
+   */
+  readonly buildings: Readonly<
+    Partial<Record<string, { readonly at: readonly [number, number]; readonly medallion?: number }>>
+  >;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-// harbour.json is plain JSON, so it is checked rather than trusted
+// harbour.json is plain JSON, so it is checked rather than trusted. A building it doesn't have (one newer than the
+// picture) stands at its FALLBACK spot
 function isHarbourArt(value: unknown): value is HarbourArt {
   if (!isRecord(value) || !isRecord(value.picture) || !isRecord(value.medallions) || !isRecord(value.buildings))
     return false;
@@ -89,12 +101,13 @@ function isHarbourArt(value: unknown): value is HarbourArt {
     typeof medallions.size === 'number' &&
     BUILDINGS.every(({ id }) => {
       const spot = buildings[id];
+      if (spot === undefined) return true;
       return (
         isRecord(spot) &&
         Array.isArray(spot.at) &&
         spot.at.length === 2 &&
         spot.at.every((n) => typeof n === 'number') &&
-        typeof spot.medallion === 'number'
+        (spot.medallion === undefined || typeof spot.medallion === 'number')
       );
     })
   );
@@ -108,6 +121,7 @@ const FALLBACK: Readonly<Record<BuildingId, readonly [number, number]>> = {
   auction: [0.14, 0.5],
   workshop: [0.28, 0.5],
   market: [0.42, 0.5],
+  galleon: [0.17, 0.7],
   tavern: [0.56, 0.5],
   guild: [0.5, 0.25],
   arsenal: [0.72, 0.7],
@@ -134,6 +148,29 @@ const GLOW = { alpha: 0.32, pulse: 0.1, speed: 2.4 }; // the light behind a meda
 // A medallion that calls the player to it (the ship's, while the guns wait in the hold): its light brighter, breathing
 // faster, and the medallion with it
 const CALL = { pulse: 0.55, speed: 4.2, grow: 0.08 } as const;
+// A building that sells for doubloons (its `premium`): its light warmer, never quite out (`base`) and breathing
+// deeper, fading out to `reach` medallion radii in `rings`; painted stars twinkling over its top, `stars` of them
+// `size` picture pixels tall at most (the small ones `small` of it), `orbit` medallion radii out, spread between the
+// angles `from` and `to` (radians, the screen's y down: negative is up), `twinkle` a second; its name a lighter gold;
+// and the doubloon on its stand-in, its radius in the medallion's, on the painted medallions' navy
+const PREMIUM = {
+  glow: 0xffb347,
+  base: 0.5,
+  pulse: 0.55,
+  speed: 2.8,
+  reach: 1.7,
+  rings: 8,
+  stars: 5,
+  size: 64,
+  small: 0.65,
+  orbit: 1.45,
+  from: -Math.PI * 0.94,
+  to: -Math.PI * 0.06,
+  twinkle: 2.2,
+  label: 0xffe08a,
+  coin: 0.74,
+  back: 0x1b3266,
+} as const;
 // The note over Set sail while the story keeps the ship in port: its letters (picture pixels), how far over the
 // button's middle, its pill's padding; and how long it flashes after Set sail was refused (seconds)
 const HELD = { size: 26, above: 74, pad: 22, flash: 1.2 } as const;
@@ -163,23 +200,40 @@ class Medallion {
   private readonly face = new Container();
   private readonly sprite = new Sprite();
   private readonly glow = new Graphics();
-  private readonly fallback = new Graphics();
+  /** Until the medallions' picture loads, or its own is painted */
+  private readonly stand = new Container();
   private readonly label: Text;
   private readonly about = new Container();
   private readonly badge = new Container();
   private readonly badgeText: Text;
+  /** A premium one's stars over it, each in a container of its own that twinkles (the painted star's own scale fits it) */
+  private readonly stars: Container[] = [];
+  private readonly premium: boolean;
   private grow = 0;
   hovered = false;
   /** Calling the player to it: brighter and breathing */
   calling = false;
 
-  constructor(building: Pick<Building, 'name' | 'about' | 'cursor'>, onTap: () => void) {
+  constructor(building: Pick<Building, 'name' | 'about' | 'cursor' | 'premium'>, onTap: () => void) {
     const r = MEDALLION / 2;
-    this.glow.circle(0, 0, r * 1.32).fill({ color: COLORS.gold });
+    this.premium = building.premium === true;
+    if (this.premium) {
+      // Discs one over another, each a little wider and as faint: bright at the rim, fading out to nothing
+      for (let i = 1; i <= PREMIUM.rings; i++) {
+        const radius = r * (1 + ((PREMIUM.reach - 1) * i) / PREMIUM.rings);
+        this.glow.circle(0, 0, radius).fill({ color: PREMIUM.glow, alpha: 0.22 });
+      }
+    } else this.glow.circle(0, 0, r * 1.32).fill({ color: COLORS.gold });
     this.glow.alpha = 0;
     const shadow = new Graphics().circle(3, 6, r * 1.02).fill({ color: 0x000000, alpha: 0.4 });
-    // Until the medallions' picture loads: a plain one, so the building can be opened all the same
-    this.fallback.circle(0, 0, r).fill({ color: NIGHT.well }).stroke({ width: 6, color: COLORS.gold });
+    // A plain one, so the building can be opened all the same; a premium one shows the doubloon it takes
+    this.stand.addChild(
+      new Graphics()
+        .circle(0, 0, r)
+        .fill({ color: this.premium ? PREMIUM.back : NIGHT.well })
+        .stroke({ width: 6, color: COLORS.gold }),
+    );
+    if (this.premium) this.stand.addChild(doubloon(r * PREMIUM.coin));
     this.sprite.anchor.set(0.5);
     this.sprite.visible = false;
     // A count or a mark on the top right: something waits there (a bounty to turn in, a ship to buy)
@@ -192,7 +246,20 @@ class Medallion {
     this.badge.addChild(dot, this.badgeText);
     this.badge.position.set(r * 0.72, -r * 0.72);
     this.badge.visible = false;
-    this.face.addChild(this.glow, shadow, this.fallback, this.sprite, this.badge);
+    this.face.addChild(this.glow, shadow, this.stand, this.sprite, this.badge);
+    if (this.premium) {
+      for (let i = 0; i < PREMIUM.stars; i++) {
+        const angle = PREMIUM.from + ((PREMIUM.to - PREMIUM.from) * i) / (PREMIUM.stars - 1);
+        const star = new Container();
+        // Big and small in turn, the big ones at the ends and over the top
+        star.addChild(
+          ornament(i % 2 === 0 ? 'star4' : 'star4Small', { height: PREMIUM.size * (i % 2 === 0 ? 1 : PREMIUM.small) }),
+        );
+        star.position.set(Math.cos(angle) * r * PREMIUM.orbit, Math.sin(angle) * r * PREMIUM.orbit);
+        this.stars.push(star);
+        this.face.addChild(star);
+      }
+    }
 
     this.label = new Text({ text: t(building.name), style: LABEL_STYLE });
     this.label.anchor.set(0.5, 0);
@@ -236,7 +303,7 @@ class Medallion {
     this.sprite.texture = texture;
     this.sprite.width = this.sprite.height = MEDALLION * 1.04;
     this.sprite.visible = true;
-    this.fallback.visible = false;
+    this.stand.visible = false;
   }
 
   /** A mark over it, or none (empty) */
@@ -247,14 +314,23 @@ class Medallion {
 
   update(dt: number, time: number) {
     this.grow += ((this.hovered ? 1 : 0) - this.grow) * Math.min(1, dt * EASE);
-    // Breathing faintly, so the eye finds them; lit under the pointer
-    const breath = 0.5 + 0.5 * Math.sin(time * (this.calling ? CALL.speed : GLOW.speed));
+    // Breathing faintly, so the eye finds them (a premium one less faintly); lit under the pointer
+    const look = this.calling ? CALL : this.premium ? PREMIUM : GLOW;
+    const breath = 0.5 + 0.5 * Math.sin(time * look.speed);
     const call = this.calling ? CALL.grow * breath : 0;
     this.face.scale.set(1 + (HOVER_SCALE - 1) * this.grow + call);
-    this.glow.alpha = GLOW.alpha * this.grow + (this.calling ? CALL.pulse : GLOW.pulse) * breath;
-    const fill = this.hovered ? COLORS.labelHover : COLORS.label;
+    const base = this.premium && !this.calling ? PREMIUM.base : 0;
+    this.glow.alpha = Math.min(1, base + GLOW.alpha * this.grow + look.pulse * breath);
+    const fill = this.hovered ? COLORS.labelHover : this.premium ? PREMIUM.label : COLORS.label;
     if (this.label.style.fill !== fill) this.label.style.fill = fill;
     this.about.visible = this.hovered;
+    // Each star at a phase of its own, so they never all flare at once
+    this.stars.forEach((star, i) => {
+      const twinkle = 0.5 + 0.5 * Math.sin(time * PREMIUM.twinkle + i * 2.4);
+      star.scale.set(0.7 + 0.35 * twinkle);
+      star.alpha = 0.55 + 0.45 * twinkle;
+      star.rotation = 0.25 * Math.sin(time * 0.7 + i);
+    });
   }
 }
 
@@ -437,10 +513,12 @@ export class HarbourView {
     this.size = { width: PICTURE.width, height: Math.round((PICTURE.width * art.picture.h) / art.picture.w) };
     const { size } = art.medallions;
     for (const { id } of BUILDINGS) {
-      const spot = art.buildings[id];
+      // Not painted yet: its stand-in stays
+      const medallion = art.buildings[id]?.medallion;
+      if (medallion === undefined) continue;
       const texture = new Texture({
         source: sheet.source,
-        frame: new Rectangle(spot.medallion * size, 0, size, size),
+        frame: new Rectangle(medallion * size, 0, size, size),
       });
       this.textures.set(id, texture);
       this.medallions.get(id)?.setTexture(texture);

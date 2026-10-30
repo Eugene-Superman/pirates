@@ -6,6 +6,7 @@ import {
   buyOutfit,
   buyShip,
   choosePortrait,
+  claimFeat,
   dropQuest,
   findUnit,
   fitFromHold,
@@ -15,7 +16,6 @@ import {
   giveGold,
   giveLevels,
   isAfloat,
-  orderRepair,
   repairInPort,
   resetTalents,
   seePrologue,
@@ -28,14 +28,15 @@ import {
   swapQuickSlots,
   throwOverboard,
   takeHelm,
+  takeBounty,
   takePassive,
-  takeQuest,
   takeTalent,
   tellStory,
+  toggleRepair,
   turnInQuest,
   useAbility,
+  type ActiveQuest,
   type Game,
-  type QuestId,
   type ZoneId,
 } from '../game';
 import { Sounds, type SoundName } from './audio/Sounds';
@@ -47,7 +48,6 @@ import { bindKeyboardInput } from './input/keyboardInput';
 import { bindPointerInput } from './input/pointerInput';
 import { Selection } from './input/selection';
 import type { GpuInfo } from './render/gpu';
-import type { FogLayer } from './scene/effects/fogOfWar';
 import type { NavDebug } from './scene/effects/navDebug';
 import { isLang, lang as langPicked, setLang, startingLang, type Lang } from './i18n/i18n';
 import { SceneView } from './scene/SceneView';
@@ -106,75 +106,73 @@ export class GameClient {
         store.set('view', this.view.settings);
       };
     };
-    const { ship } = game.state;
-    // Given up at the tavern or from the quest tracker, at sea too, once the player has said yes
-    const giveUpQuest = (id: QuestId) => {
-      dropQuest(game.state, game.state.player, id);
-      this.sounds.ui('quest');
+    // The ship sailed now, read at each action: another may be bought or taken in port
+    const ship = () => game.state.ship;
+    // Given up at the tavern or from the quest tracker, at sea too and another ship's, once the player has said yes
+    const giveUpQuest = (quest: ActiveQuest) => {
+      if (dropQuest(game.state.player, quest.ship, quest.id)) this.sounds.ui('quest');
     };
     // The HUD's buttons act through the game's methods like any player action (the damage ones are for testing)
     this.hud = new Hud(
       {
-        setHealth: (health) => ship.setHealth(health),
-        changeHealth: (delta) => ship.setHealth(ship.health + delta),
-        // Zoom, range rings and how the fog looks are view state, not game state: they go to the scene,
+        setHealth: (health) => ship().setHealth(health),
+        changeHealth: (delta) => ship().setHealth(ship().health + delta),
+        // Zoom, range rings and the debug drawings are view state, not game state: they go to the scene,
         // the game never knows about them
         setZoom: view((level: number) => this.view.setZoom(level)),
         toggleRanges: view(() => this.view.toggleRanges()),
-        toggleFog: view((layer: FogLayer) => this.view.toggleFog(layer)),
-        toggleSky: view(() => this.view.toggleSky()),
         toggleDebug: view((kind: NavDebug) => this.view.toggleDebug(kind)),
         toggleSound: () => this.sounds.toggle(),
         changeVolume: (steps) => this.sounds.changeVolume(steps),
-        setWeapon: (weapon) => ship.setWeapon(weapon),
-        ceaseFire: () => ship.ceaseFire(),
+        setWeapon: (weapon) => ship().setWeapon(weapon),
         toggleFire: () => {
           const { id } = this.selection;
           if (id === null) return;
-          if (ship.attackTarget === id) ship.ceaseFire();
-          else ship.attack(id);
+          if (ship().attackTarget === id) ship().ceaseFire();
+          else ship().attack(id);
         },
-        repair: () => this.cue(orderRepair(game.state, ship)),
+        repair: () => this.cue(toggleRepair(game.state, ship())),
         dropQuest: giveUpQuest,
         choosePortrait: (portrait) => this.cue(choosePortrait(game.state.player, portrait), 'equip'),
         // The loadout: guns from the hold, bought in port
-        fitGun: (weapon, slot, gun) => this.cue(fitFromHold(game.state.player, ship, weapon, slot, gun), 'equip'),
-        loadAmmo: (ammo) => ship.loadAmmo(ammo),
+        fitGun: (weapon, slot, gun) => this.cue(fitFromHold(game.state.player, ship(), weapon, slot, gun), 'equip'),
+        swapGuns: (weapon, from, to) => this.cue(ship().swapGuns(weapon, from, to), 'equip'),
+        loadAmmo: (ammo) => ship().loadAmmo(ammo),
         setAmmoSlot: (weapon, index, ammo) => {
-          ship.setAmmoSlot(weapon, index, ammo);
+          ship().setAmmoSlot(weapon, index, ammo);
           this.sounds.ui('equip');
         },
         // Goods thrown overboard, at sea or in port: they splash down and sink
-        throwCargo: (good, count) => this.cue(throwOverboard(ship, good, count), 'splash'),
+        throwCargo: (good, count) => this.cue(throwOverboard(ship(), good, count), 'splash'),
         // The items bought for doubloons, put on the skill bar's quick slots from the hold, anywhere
         setQuickSlot: (slot, item) => this.cue(setQuickSlot(game.state.player, slot, item), 'equip'),
         swapQuickSlots: (from, to) => this.cue(swapQuickSlots(game.state.player, from, to), 'equip'),
-        changeMaxSpeed: (delta) => ship.tuneSpeeds(delta, 0),
-        changeMinSpeed: (delta) => ship.tuneSpeeds(0, delta),
-        changeViewRange: (delta) => ship.tuneViewRange(delta),
+        changeMaxSpeed: (delta) => ship().tuneSpeeds(delta, 0),
+        changeMinSpeed: (delta) => ship().tuneSpeeds(0, delta),
+        changeViewRange: (delta) => ship().tuneViewRange(delta),
         addGold: (amount) => giveGold(game.state.player, amount),
         addDoubloons: (amount) => giveDoubloons(game.state.player, amount),
-        changeLevel: (delta) => this.cue(giveLevels(game.state, ship, delta)),
+        changeLevel: (delta) => this.cue(giveLevels(game.state, ship(), delta)),
         skipStory: () => this.cue(skipStoryStep(game.state, game.state.player)),
         // The story: a conversation heard out moves it on, as any player's action does (online, a command)
         tellStory: (key) => tellStory(game.state, game.state.player, key),
         seePrologue: () => seePrologue(game.state.player),
         // Talents: picked anywhere, forgotten at the shipwright's
-        learnTalent: (id) => this.cue(takeTalent(ship, id), 'talent'),
+        learnTalent: (id) => this.cue(takeTalent(ship(), id), 'talent'),
         resetTalents: () => this.cue(resetTalents(game.state, game.state.player), 'quest'),
         // The captain's mastery: taken anywhere, forgotten in port
         takePassive: (id) => this.cue(takePassive(game.state, game.state.player, id), 'talent'),
         forgetMastery: () => this.cue(forgetMastery(game.state, game.state.player), 'quest'),
+        // A feat's reward, claimed anywhere: the doubloons ring
+        claimFeat: (id) => this.cue(claimFeat(game.state, game.state.player, id), 'coins'),
         useAbility: (slot) => this.useAbility(slot),
         newGame: () => this.newGame(),
         logOut: () => this.logOut(),
         setLanguage: (lang) => this.setLanguage(lang),
-        toggleWorld: () => this.hud.toggleWorld(),
-        toggleBestiary: () => this.hud.toggleBestiary(),
         editLayout: () => this.hud.editLayout(),
       },
       app.screen,
-      ship.shipClass,
+      ship().shipClass,
       this.view.mapAxes,
       {
         name: game.state.world.port.name,
@@ -190,14 +188,15 @@ export class GameClient {
           repairInPort: () => this.cue(repairInPort(game.state, game.state.player), 'repair'),
           buyOutfit: (id) => this.cue(buyOutfit(game.state, game.state.player, id), 'coins'),
           fitOutfit: (slot, id) => this.cue(fitOutfit(game.state, game.state.player, slot, id), 'equip'),
-          takeQuest: (id) => this.cue(takeQuest(game.state, game.state.player, id), 'quest'),
+          // The story keeps the tavern shut till it brings the player home from the Baron's waters
+          takeQuest: (id) => this.cue(takeBounty(game.state, game.state.player, id), 'quest'),
           turnInQuest: (id) => this.cue(turnInQuest(game.state, game.state.player, id)),
           dropQuest: giveUpQuest,
           sellCargo: (good) => this.cue(sellCargo(game.state, game.state.player, good)),
           buyItem: (id, count) => this.cue(buyItem(game.state, game.state.player, id, count), 'coins'),
-          // The HUD and the ship's sprite are made for one class of ship: a ship changed reloads the page with it
-          buyShip: (id) => this.reloadIf(buyShip(game.state, game.state.player, id)),
-          takeHelm: (index) => this.reloadIf(takeHelm(game.state, game.state.player, index)),
+          // The new ship at the helm in port: the scene and the HUD follow it from the next frame on
+          buyShip: (id, unload) => this.cue(buyShip(game.state, game.state.player, id, unload), 'coins'),
+          takeHelm: (index) => this.cue(takeHelm(game.state, game.state.player, index), 'equip'),
         },
       },
       {
@@ -212,9 +211,9 @@ export class GameClient {
       (zone) => this.travel(zone),
     );
     app.stage.addChild(this.view.container, this.hud.container);
-    bindPointerInput(app, this.view, ship, this.selection, this.hover, game.state.world.port);
+    bindPointerInput(app, this.view, game.state, this.selection, this.hover);
     bindCursor(app, this.view, game.state, this.hover);
-    bindKeyboardInput(ship, this.selection, {
+    bindKeyboardInput(game.state, this.selection, {
       toggleLoadout: () => this.hud.toggleLoadout(),
       toggleLog: () => this.hud.toggleLog(),
       toggleMap: () => this.hud.toggleMap(),
@@ -225,7 +224,7 @@ export class GameClient {
       toggleWorld: () => this.hud.toggleWorld(),
       toggleBestiary: () => this.hud.toggleBestiary(),
       useAbility: (slot) => this.useAbility(slot),
-      repair: () => this.cue(orderRepair(game.state, ship)),
+      repair: () => this.cue(toggleRepair(game.state, ship())),
     });
   }
 
@@ -256,8 +255,6 @@ export class GameClient {
         {
           zoom: this.view.zoom,
           ranges: this.view.rangesShown,
-          fog: this.view.fogShown,
-          sky: this.view.skyIsShown,
           debug: this.view.debugShown,
           sound: this.sounds.settings,
           renderer: this.renderer,
@@ -309,15 +306,6 @@ export class GameClient {
     void this.store.written().then(() => window.location.assign(landing()));
   }
 
-  /** If the game changed (a ship bought or changed), keeps the progress and reloads the page, which is made for it */
-  private reloadIf(changed: boolean) {
-    if (!changed) return false;
-    this.save();
-    this.store.flush();
-    void this.store.written().then(() => window.location.reload());
-    return true;
-  }
-
   /**
    * Takes the player to another sea: their progress is kept with their ship coming in there (Game.travel), and the page
    * reloads, its game made for that sea
@@ -334,7 +322,9 @@ export class GameClient {
   /** Keeps the language picked and the progress, and reloads the page in it: the HUD's texts are made once */
   private setLanguage(lang: Lang) {
     this.store.set('lang', lang);
-    this.reloadIf(true);
+    this.save();
+    this.store.flush();
+    void this.store.written().then(() => window.location.reload());
   }
 
   /** A unit picked out that sank, or went into the fog, is let go of */

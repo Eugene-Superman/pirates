@@ -1,18 +1,18 @@
-import { Container, type Rectangle, Text } from 'pixi.js';
+import { Container, type Rectangle } from 'pixi.js';
 import { storyFitting, storyTalk, type BotKindId, type GameState, type ShipClass, type ZoneId } from '../../game';
 import type { Selection } from '../input/selection';
 import type { Slot } from '../storage/Store';
 import { Bestiary } from './Bestiary';
-import { ButtonRow } from './ButtonRow';
 import { ChatPanel } from './ChatPanel';
 import type { MapAxes } from './chart';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DialogueBox } from './DialogueBox';
 import { HoldPanel } from './HoldPanel';
 import { HudLayout } from './HudLayout';
-import { LABEL_STYLE, hudItems, type HudActions, type HudItem, type HudWidget, type ViewStatus } from './hudItems';
+import { hudControls, hudMetrics, type HudActions, type HudMetric, type HudWidget, type ViewStatus } from './hudItems';
 import { LayoutEditor } from './LayoutEditor';
 import { LoadoutPanel } from './LoadoutPanel';
+import { FeatReward } from './FeatReward';
 import { FeatsPanel } from './FeatsPanel';
 import { MasteryPanel } from './MasteryPanel';
 import { TalentPanel } from './TalentPanel';
@@ -38,8 +38,7 @@ export type { HudActions, ViewStatus } from './hudItems';
 
 const MARGIN = 16; // pixels from the screen's edge
 const METRIC_GAP = 6; // pixels under a line of text
-const ROW_GAP = 8; // pixels between the button rows
-const LABEL_WIDTH = 84; // pixels: the button rows start after their labels, lined up
+const ROW_GAP = 8; // pixels between the player's plate and the column of items under it
 const FRAMES_GAP = 16; // pixels between the target's frame and the player's, and the tracker
 const BAR_GAP = 30; // pixels above the skill bar (and its status line), for a part of the bottom that would overlap it
 const DIALOGUE_GAP = 40; // pixels between the story's conversation and the skill bar's place under it
@@ -51,27 +50,25 @@ const GUIDE_SAYS = {
   repair: 'Repair the hull: click here (R)',
 } as const;
 
-interface Shown {
-  readonly widget: HudWidget;
-  readonly label: Text | null;
-}
-
 function strings(value: unknown) {
   return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : null;
 }
 
 /**
  * The items on the screen as last saved, plus items added to the game since (not among the saved `known` ones) that
- * are on the screen by default. An old save is a bare list of the shown ones
+ * are on the screen by default; one saved that the game no longer has is left out. An old save is a bare list of the
+ * shown ones
  */
-function loadShown(items: readonly HudItem[], saved: unknown) {
+function loadShown(items: readonly HudMetric[], saved: unknown) {
   const defaults = items.filter((item) => item.onScreen).map((item) => item.id);
+  const ids = new Set(items.map((item) => item.id));
+  const kept = (shown: readonly string[]) => new Set(shown.filter((id) => ids.has(id)));
   const old = strings(saved);
-  if (old) return new Set(old);
+  if (old) return kept(old);
   if (typeof saved === 'object' && saved !== null && 'shown' in saved && 'known' in saved) {
     const shown = strings(saved.shown) ?? [];
     const known = new Set(strings(saved.known) ?? []);
-    return new Set([...shown, ...defaults.filter((id) => !known.has(id))]);
+    return kept([...shown, ...defaults.filter((id) => !known.has(id))]);
   }
   return new Set(defaults);
 }
@@ -84,7 +81,7 @@ function clickGuide(target: GuideTarget | null, says: string, round = false, not
   return target ? { guide: { kind: 'click', target, round, above: true, noteBy } as const, says } : null;
 }
 
-function saveShown(items: readonly HudItem[], ids: ReadonlySet<string>, kept: Slot) {
+function saveShown(items: readonly HudMetric[], ids: ReadonlySet<string>, kept: Slot) {
   kept.set({ shown: [...ids], known: items.map((item) => item.id) });
 }
 
@@ -102,10 +99,11 @@ function saveShown(items: readonly HudItem[], ids: ReadonlySet<string>, kept: Sl
  */
 export class Hud {
   readonly container = new Container();
-  private readonly items: readonly HudItem[];
+  /** What the settings can put on the screen, under the player's plate */
+  private readonly items: readonly HudMetric[];
   private readonly shownIds: Set<string>;
   /** Made the first time an item is shown, then only hidden */
-  private readonly onScreen = new Map<string, Shown>();
+  private readonly onScreen = new Map<string, HudWidget>();
   private readonly column = new Container();
   private readonly settings: SettingsPanel;
   private readonly frames: UnitFrames;
@@ -121,6 +119,8 @@ export class Hud {
   private readonly mastery: MasteryPanel;
   /** The captain's feats (a cup in laurels on the minimap's frame) */
   private readonly feats: FeatsPanel;
+  /** A feat's reward just claimed, over the feats: what it gave and for what */
+  private readonly featReward: FeatReward;
   /** The chat in the bottom left corner, the combat log one of its tabs */
   private readonly chat: ChatPanel;
   /** Where the items on the screen are kept between visits */
@@ -129,7 +129,7 @@ export class Hud {
   private readonly chart: SeaChart;
   /** Every sea (N, or the sea chart's button) */
   private readonly world: WorldChart;
-  /** Every kind of bot of every sea (B, the Seas row's button, or a click on a bot's plate) */
+  /** Every kind of bot of every sea (B, its button on the minimap's frame, or a click on a bot's plate) */
   private readonly bestiary: Bestiary;
   private readonly tracker: QuestTracker;
   /**
@@ -181,7 +181,7 @@ export class Hud {
     this.keptItems = kept.hud;
     this.chat = new ChatPanel(kept.log, screen);
     this.screen = screen;
-    this.items = hudItems(actions);
+    this.items = hudMetrics();
     this.shownIds = loadShown(this.items, kept.hud.get());
     // The windows hear Escape in the order they are made, each leaving alone one another has taken: so the one on
     // top (the last added below) is made first, and one press closes only it. The prologue over them all: once it is
@@ -201,7 +201,12 @@ export class Hud {
     this.chart = new SeaChart(axes, screen, port.name, zone, () => this.toggleWorld());
     this.portraits = new PortraitPicker(screen, actions.choosePortrait);
     this.stats = new StatsPanel(screen);
-    this.feats = new FeatsPanel(screen);
+    // The reward over the feats it is claimed in; its Captain's mastery leaves them for the mastery
+    this.featReward = new FeatReward(screen, () => {
+      this.feats.hide();
+      if (!this.mastery.isOpen) this.mastery.toggle();
+    });
+    this.feats = new FeatsPanel(actions, screen, (id, rung) => this.featReward.open(id, rung));
     this.mastery = new MasteryPanel(actions, screen, (question, onYes) => this.confirm.ask(question, onYes));
     // Items dragged out of the hold drop on the skill bar's quick slots, wherever the player put the bar
     this.hold = new HoldPanel(actions, screen, {
@@ -219,6 +224,7 @@ export class Hud {
     // Made before the keyboard is bound: its Escape (leave port) goes before the one at sea
     this.port = new PortScreen(port.actions, screen, port.name, this.confirm, zone, () => this.loadout.open());
     this.settings = new SettingsPanel(
+      hudControls(actions),
       this.items,
       (id) => this.shownIds.has(id),
       (id) => this.toggle(id),
@@ -285,6 +291,7 @@ export class Hud {
       this.hold.container,
       this.mastery.container,
       this.feats.container,
+      this.featReward.container,
       this.stats.container,
       this.portraits.container,
       this.chart.container,
@@ -380,7 +387,7 @@ export class Hud {
     // The column's items first: where the column ends bounds the chat
     let column = 0;
     let columnWidth = 0;
-    for (const [id, { widget }] of this.onScreen) {
+    for (const [id, widget] of this.onScreen) {
       if (!this.shownIds.has(id)) continue;
       widget.update(frame);
       column += widget.container.height;
@@ -469,7 +476,8 @@ export class Hud {
     this.stats.update(state, frameMs / 1000);
     this.portraits.update(state);
     this.mastery.update(state, frameMs / 1000);
-    this.feats.update(state);
+    this.feats.update(state, frameMs / 1000);
+    this.featReward.update();
     this.chart.update(state);
     this.world.update(state);
     this.bestiary.update(state);
@@ -524,44 +532,29 @@ export class Hud {
     return across && bar.y + bar.height > bottom - height ? bar.y - BAR_GAP : bottom;
   }
 
-  /** Stacks the shown items down the column: texts as they are, controls after their labels */
+  /** Stacks the shown items down the column */
   private layoutColumn() {
     let y = 0;
     let end = 0;
     for (const item of this.items) {
-      const shown = this.shownIds.has(item.id);
       const existing = this.onScreen.get(item.id);
-      if (!shown) {
-        if (existing) {
-          existing.widget.container.visible = false;
-          if (existing.label) existing.label.visible = false;
-        }
+      if (!this.shownIds.has(item.id)) {
+        if (existing) existing.container.visible = false;
         continue;
       }
-      const { widget, label } = existing ?? this.show(item);
+      const widget = existing ?? this.show(item);
       widget.container.visible = true;
-      if (label) {
-        label.visible = true;
-        label.position.set(0, y + (ButtonRow.HEIGHT - label.height) / 2);
-        widget.container.position.set(LABEL_WIDTH, y);
-        end = y + ButtonRow.HEIGHT;
-        y = end + ROW_GAP;
-      } else {
-        widget.container.position.set(0, y);
-        end = y + widget.container.height;
-        y = end + METRIC_GAP;
-      }
+      widget.container.position.set(0, y);
+      end = y + widget.container.height;
+      y = end + METRIC_GAP;
     }
     this.columnEnd = end;
   }
 
-  private show(item: HudItem): Shown {
+  private show(item: HudMetric) {
     const widget = item.create();
-    const label = item.kind === 'control' ? new Text({ text: t(item.label), style: LABEL_STYLE }) : null;
     this.column.addChild(widget.container);
-    if (label) this.column.addChild(label);
-    const shown = { widget, label };
-    this.onScreen.set(item.id, shown);
-    return shown;
+    this.onScreen.set(item.id, widget);
+    return widget;
   }
 }

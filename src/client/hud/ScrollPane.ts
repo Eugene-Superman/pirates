@@ -6,6 +6,8 @@ const BAR = { width: 6, grip: 6 } as const;
 const BAR_COLORS = { track: 0x000000, thumb: 0xd9b45a, edge: 0x5a4320 } as const;
 // A pane's bar, pixels: its thumb's least length, and the room it takes along the pane's right edge
 const PANE_BAR = { thumb: 32, room: BAR.width + BAR.grip } as const;
+/** Pixels a pane's bar takes along its right edge: its content is that much narrower (ScrollPane.inner) */
+export const PANE_BAR_ROOM = PANE_BAR.room;
 const REVEAL_MARGIN = 8; // pixels left above or below what is scrolled into sight
 
 /**

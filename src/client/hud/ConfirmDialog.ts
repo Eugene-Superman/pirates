@@ -1,7 +1,7 @@
 import { Text, type Rectangle } from 'pixi.js';
 import { t } from '../i18n/i18n';
 import { THEME, TITLE_STYLE } from './theme';
-import { NIGHT_CORNER_REACH, NIGHT_WINDOW, moonButton } from './nightTheme';
+import { NIGHT_CORNER_REACH, NIGHT_WINDOW, moonButton, moonButtonEnd } from './nightTheme';
 import { StoryGuide } from './StoryGuide';
 import { HudWindow, show, text, type Tile } from './ui';
 
@@ -13,32 +13,37 @@ const BODY = { top: PAD + 48, gap: 16 } as const; // pixels: the text's top at t
 const BUTTON = { yes: 240, no: 150, height: 34, gap: 16, top: 142, over: 22 } as const;
 
 /**
- * What a dialog asks: its title, a line or two under it, and what its Yes button says; `guided` when the story asks
- * for it, so Yes is lit for a new player
+ * What a dialog asks: its title, a line or two under it, and what its Yes button says; `no`, what its other button
+ * says when it offers a choice of two rather than Cancel; `guided` when the story asks for it, so Yes is lit for a new
+ * player
  */
 export interface Question {
   readonly title: string;
   readonly text: string;
   readonly yes: string;
+  readonly no?: string;
   readonly guided?: boolean;
 }
 
 /**
  * A question over everything else, in the night look, before something that can't be undone (selling an item, a
- * quest given up, a passive or a talent taken): Yes does it, Cancel, the cross, Escape or a click beside it doesn't.
- * Enter says yes. One at a time: a new question replaces an open one. As high as its title and text need. When the
- * story asks for what it asks about, the gold pointer clicks Yes (StoryGuide)
+ * quest given up, a passive or a talent taken, the first ship bought after the starter sloop): Yes does it, Cancel, the
+ * cross, Escape or a click beside it doesn't. A choice of two has its No in place of Cancel, the cross and the rest
+ * still doing nothing. Enter says yes. One at a time: a new question replaces an open one. As high as its title and
+ * text need. When the story asks for what it asks about, the gold pointer clicks Yes (StoryGuide)
  */
 export class ConfirmDialog {
   private readonly window: HudWindow;
   private readonly title: Text;
   private readonly body = text('', 14, THEME.text, { wordWrap: true, wordWrapWidth: TEXT_WIDTH, lineHeight: 20 });
   private readonly yes: { readonly tile: Tile; readonly text: Text };
-  private readonly no: Tile;
+  private readonly no: { readonly tile: Tile; readonly text: Text; readonly resize: (width: number) => void };
   private readonly guide: StoryGuide;
   private guided = false;
   /** What Yes does, while it is open */
   private onYes: (() => void) | null = null;
+  /** What No does, while a choice of two is open; null: it is Cancel */
+  private onNo: (() => void) | null = null;
 
   /** Make it before the windows under it listen for Escape, so it closes first */
   constructor(screen: Rectangle) {
@@ -57,10 +62,15 @@ export class ConfirmDialog {
     this.body.position.set(SIDE, BODY.top);
     this.yes = moonButton(BUTTON.yes, BUTTON.height, '', () => this.confirm(), 14, true);
     this.yes.tile.container.x = width - SIDE - BUTTON.yes;
-    this.no = moonButton(BUTTON.no, BUTTON.height, t('Cancel'), () => this.hide(), 14).tile;
-    this.no.container.x = this.yes.tile.container.x - BUTTON.gap - BUTTON.no;
+    this.no = moonButton(BUTTON.no, BUTTON.height, '', () => this.decline(), 14);
     this.guide = new StoryGuide({ width });
-    this.window.panel.addChild(this.title, this.body, this.no.container, this.yes.tile.container, this.guide.container);
+    this.window.panel.addChild(
+      this.title,
+      this.body,
+      this.no.tile.container,
+      this.yes.tile.container,
+      this.guide.container,
+    );
     window.addEventListener('keydown', (e) => {
       if ((e.code !== 'Enter' && e.code !== 'NumpadEnter') || !this.isOpen || e.defaultPrevented) return;
       this.confirm();
@@ -76,14 +86,19 @@ export class ConfirmDialog {
     return this.window.isOpen;
   }
 
-  /** Asks; `onYes` runs only if the player agrees */
-  ask(question: Question, onYes: () => void) {
+  /**
+   * Asks; `onYes` runs only if the player agrees, and for a choice of two (`question.no`) `onNo` only if they pick the
+   * other
+   */
+  ask(question: Question, onYes: () => void, onNo?: () => void) {
     show(this.title, question.title);
     show(this.body, question.text);
     show(this.yes.text, question.yes);
+    show(this.no.text, question.no ?? t('Cancel'));
     this.guided = question.guided === true;
     this.layout();
     this.onYes = onYes;
+    this.onNo = question.no === undefined ? null : (onNo ?? null);
     this.window.container.visible = true;
     this.window.fit();
   }
@@ -97,15 +112,23 @@ export class ConfirmDialog {
 
   hide() {
     this.onYes = null;
+    this.onNo = null;
     this.window.container.visible = false;
   }
 
-  /** The text under the title and the buttons under the text, the window as high as they need */
+  /**
+   * The text under the title and the buttons under the text, the window as high as they need. No as wide as its words
+   * need (a choice's say more than Cancel), within the row beside Yes
+   */
   private layout() {
     this.body.y = Math.max(BODY.top, this.title.y + this.title.height + BODY.gap);
     const buttons = Math.max(BUTTON.top, this.body.y + this.body.height + BUTTON.over);
+    const needs = Math.ceil(this.no.text.width) + moonButtonEnd(BUTTON.height) * 2;
+    const no = Math.min(TEXT_WIDTH - BUTTON.gap - BUTTON.yes, Math.max(BUTTON.no, needs));
+    this.no.resize(no);
+    this.no.tile.container.x = this.yes.tile.container.x - BUTTON.gap - no;
     this.yes.tile.container.y = buttons;
-    this.no.container.y = buttons;
+    this.no.tile.container.y = buttons;
     this.window.resize(buttons + BUTTON.height + PAD);
   }
 
@@ -113,5 +136,12 @@ export class ConfirmDialog {
     const onYes = this.onYes;
     this.hide();
     onYes?.();
+  }
+
+  /** No: Cancel, or the other answer of a choice of two */
+  private decline() {
+    const onNo = this.onNo;
+    this.hide();
+    onNo?.();
   }
 }

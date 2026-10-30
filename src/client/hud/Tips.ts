@@ -3,12 +3,21 @@ import type { Slot } from '../storage/Store';
 import { t } from '../i18n/i18n';
 import type { Talk, TalkLine } from './DialogueBox';
 
-/** What the bosun tells a new captain the first few times it happens */
-type TipId = 'wrongWeapon' | 'noGuns' | 'notAtHand' | 'noAmmo' | 'lowAmmo' | 'holdFull';
-const TIP_IDS: readonly TipId[] = ['wrongWeapon', 'noGuns', 'notAtHand', 'noAmmo', 'lowAmmo', 'holdFull'];
+/** What the bosun tells a new captain the first time it happens */
+type TipId = 'wrongWeapon' | 'noGuns' | 'notAtHand' | 'noAmmo' | 'lowAmmo' | 'holdFull' | 'dive' | 'ink' | 'brood';
+const TIP_IDS: readonly TipId[] = [
+  'wrongWeapon',
+  'noGuns',
+  'notAtHand',
+  'noAmmo',
+  'lowAmmo',
+  'holdFull',
+  'dive',
+  'ink',
+  'brood',
+];
 
-const TIMES = 3; // times each tip is given, in all: after that the player knows
-const AGAIN = 60; // seconds of play before the same tip is given again
+const TIMES = 1; // times each tip is given, in all: once told, the player knows, and more of it only nags
 const LASTS = 9; // seconds a tip stays at the bottom of the screen, unless Done is pressed
 const LOW_AMMO = 25; // shots of the ammo loaded left, and none other of its weapon aboard: time to think of the arsenal
 
@@ -27,15 +36,13 @@ function weapon(id: WeaponId) {
 
 /**
  * The bosun's tips: a line in the story's conversation box when the player does something the wrong way (cannonballs
- * at a beast, harpoons at a hull) or runs short (no guns fitted, no ammo at hand or left, a full hold), the first few
- * times each happens (TIMES), and never while the story has something to say. How often each was given is kept in
- * the browser, so a New game gives them again
+ * at a beast, harpoons at a hull) or runs short (no guns fitted, no ammo at hand or left, a full hold), the first time
+ * each happens (TIMES), and never while the story has something to say. How often each was given is kept in the
+ * browser, so a New game gives them again
  */
 export class Tips {
   private readonly kept: Slot;
   private readonly given: Record<TipId, number>;
-  /** Game time each was last given */
-  private readonly lastAt = new Map<TipId, number>();
   private current: Talk | null = null;
   /** Counts the tips given, for a key of its own each: the same tip again starts from its first line */
   private serial = 0;
@@ -43,7 +50,17 @@ export class Tips {
   constructor(kept: Slot) {
     this.kept = kept;
     const saved = kept.get();
-    this.given = { wrongWeapon: 0, noGuns: 0, notAtHand: 0, noAmmo: 0, lowAmmo: 0, holdFull: 0 };
+    this.given = {
+      wrongWeapon: 0,
+      noGuns: 0,
+      notAtHand: 0,
+      noAmmo: 0,
+      lowAmmo: 0,
+      holdFull: 0,
+      dive: 0,
+      ink: 0,
+      brood: 0,
+    };
     if (typeof saved === 'object' && saved !== null) {
       for (const id of TIP_IDS) {
         const n: unknown = Reflect.get(saved, id);
@@ -62,7 +79,6 @@ export class Tips {
     if (!due) return null;
     const [id, line] = due;
     this.given[id]++;
-    this.lastAt.set(id, state.time);
     this.kept.set({ ...this.given });
     this.current = { key: `tip:${id}:${this.serial++}`, lines: [line], lasts: LASTS };
     return this.current;
@@ -78,8 +94,7 @@ export class Tips {
   /** The first tip the moment calls for that is still to be given, and its line */
   private due(state: GameState): readonly [TipId, TalkLine] | null {
     const { ship } = state;
-    const may = (id: TipId) =>
-      this.given[id] < TIMES && state.time - (this.lastAt.get(id) ?? -Infinity) >= AGAIN && !ship.isSinking;
+    const may = (id: TipId) => this.given[id] < TIMES && !ship.isSinking;
     const loaded = ship.loaded[ship.weapon];
     for (const event of state.events) {
       if (event.type === 'damage' && event.attackerId === ship.id && !event.full && may('wrongWeapon')) {
@@ -90,6 +105,21 @@ export class Tips {
             ? 'Cannonballs barely scratch a beast, captain: {share}% of their damage. Harpoons do it all: take them ({key}).'
             : 'Harpoons barely scratch a hull, captain: {share}% of their damage. Cannons do it all: take them ({key}).';
         return ['wrongWeapon', bosun(text, { share: OFF_TARGET_SHARE * 100, key: WEAPON_KEYS[better] })];
+      }
+      // A monster's own ways of fighting (the Inkmother's), the first time each is turned on the player
+      if (event.type === 'dive' && event.targetId === ship.id && may('dive')) {
+        return [
+          'dive',
+          bosun(
+            "She's gone under, captain! Where the water glows dark she comes up, her arms all round: turn hard out of it, don't stop.",
+          ),
+        ];
+      }
+      if (event.type === 'surface' && event.radius === 0 && ship.canSee(event.at.x, event.at.y) && may('brood')) {
+        return [
+          'brood',
+          bosun("Her young, captain! They're quicker than us: harpoon them first, or they'll hold us for her."),
+        ];
       }
       if (event.type === 'holdFull' && event.shipId === ship.id && may('holdFull')) {
         return [
@@ -111,6 +141,9 @@ export class Tips {
         }
       }
     }
+    if (ship.inkSight !== null && may('ink')) {
+      return ['ink', bosun("Ink! We're blind in it, captain: sail out of the cloud and we'll see again.")];
+    }
     if (ship.attackTarget === null) return null;
     if (ship.holdReason === 'noGuns' && may('noGuns')) {
       return [
@@ -129,11 +162,19 @@ export class Tips {
       ];
     }
     if (ship.holdReason === 'notAtHand' && may('notAtHand')) {
+      const other = ship.ammoBar[ship.weapon].some((id) => id !== null);
       return [
         'notAtHand',
-        bosun('Nothing at hand for the {weapon}, captain: put some ammo on the bar in the loadout (L).', {
-          weapon: weapon(ship.weapon),
-        }),
+        other
+          ? bosun(
+              '{ammo} is aboard, captain, but not at hand: put it on the bar in the loadout (L), or load the other (Z, X).',
+              {
+                ammo: t(AMMO[loaded].name),
+              },
+            )
+          : bosun('Nothing at hand for the {weapon}, captain: put some ammo on the bar in the loadout (L).', {
+              weapon: weapon(ship.weapon),
+            }),
       ];
     }
     return null;

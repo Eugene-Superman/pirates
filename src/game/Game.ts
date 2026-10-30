@@ -1,10 +1,12 @@
+import { stepFeats } from './account/feats';
 import { WAKE_RANGE, isAwake, nearPlayers, thinkBots } from './bots/brain';
-import { populate, stepPrey, stepSpawns } from './bots/spawner';
+import { populate, seaRoom, stepPrey, stepSpawns, type SeaRoom } from './bots/spawner';
 import { stepBarrages } from './combat/barrage';
 import { stepCombat } from './combat/combat';
+import { stepMonsterSkills } from './combat/monsterSkills';
 import { stepOrdnance } from './combat/ordnance';
 import { stepChests, stepLoot } from './economy/loot';
-import { STARTING_HOLD, newPlayer } from './economy/player';
+import { STARTING_HOLD, chartSea, newPlayer } from './economy/player';
 import type { GameState } from './GameState';
 import { createRandom, streamSeed } from './lib/random';
 import { NavGrid } from './navigation/NavGrid';
@@ -45,6 +47,8 @@ export class Game {
   readonly state: GameState;
   /** Open water and routes round the islands; built once, the world's islands don't move */
   readonly nav: NavGrid;
+  /** Where on the sea a bot may come in, for the spawner to fill it evenly; made once with the sea */
+  private readonly room: SeaRoom;
   /** The dice of combat, seeded: the server and every client roll the same */
   private readonly random: () => number;
   private readonly botRandom: () => number;
@@ -80,13 +84,17 @@ export class Game {
       chests: [],
       projectiles: [],
       shells: [],
+      inks: [],
       kegs: [],
       events: [],
       respawns: [],
       nextId,
       time: 0,
     };
-    populate(this.state, this.nav, this.botRandom);
+    // The player is in this sea: from now on it is charted, whatever their save says (Game.load)
+    chartSea(this.state.player, zone);
+    this.room = seaRoom(this.state, this.nav);
+    populate(this.state, this.nav, this.room, this.botRandom);
   }
 
   /** The player's progress, to keep between games (save.ts) */
@@ -137,9 +145,14 @@ export class Game {
     const islands = state.world.islands.filter((island) =>
       nearPlayers(island.x, island.y, near + island.reach, players),
     );
-    const ships = state.ships.filter((ship) => nearPlayers(ship.x, ship.y, near, players));
+    // A monster under water passes under every hull, and waits there till it comes up (combat/monsterSkills.ts)
+    const ships = state.ships.filter((ship) => !ship.submerged && nearPlayers(ship.x, ship.y, near, players));
     const obstacles: Obstacles = { islands, ships };
     for (const ship of awake) {
+      if (ship.submerged) {
+        ship.speed = 0;
+        continue;
+      }
       const helm: Helm = ship.isSinking
         ? { heading: ship.rotation, speed: 0 }
         : pilot(ship, this.nav, ships, state.time);
@@ -154,10 +167,12 @@ export class Game {
     stepOrdnance(state, this.random);
     stepCombat(state, dt, this.random);
     stepBarrages(state, this.random);
+    // The monsters' dives, ink and brood
+    stepMonsterSkills(state, this.nav, this.random, this.botRandom);
     stepLoot(state, this.lootRandom);
     stepRepairs(state, dt);
     stepChests(state);
-    stepSpawns(state, this.nav, this.botRandom);
+    stepSpawns(state, this.nav, this.room, this.botRandom);
     stepDocking(state);
     stepGates(state);
     this.bringBackWrecks();
@@ -165,8 +180,10 @@ export class Game {
     stepStory(state);
     // The bots the story asks the player to sink, near them: after the story has counted this update's kills
     stepPrey(state, this.nav, this.botRandom);
-    // Last, with every event of the update in
+    // With every event of the update in
     stepStats(state, dt);
+    // Last: the feats' rungs the stats have just reached
+    stepFeats(state);
     this.eventsRead = state.events.length;
   }
 

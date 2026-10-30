@@ -1,6 +1,7 @@
 # Items
 
-The market's second tab, **Buy**, sells items: scrolls, charms, powders, flags and other things a captain takes to sea.
+The **Golden Galleon** in port, a building of its own in the harbour, sells items: scrolls, charms, powders, flags and
+other things a captain takes to sea.
 They are paid in **doubloons only**, never gold: gold is farmed, doubloons are what the game earns on. This file is the
 to-do list for making them work: none of them does anything yet.
 
@@ -18,6 +19,9 @@ to-do list for making them work: none of them does anything yet.
   swap. An item leaves the bar **only** when it is dragged back into the open hold: let go anywhere else, it stays, so
   a slip of the mouse never empties a slot. An item is in one slot at most.
 - A click on a quick slot or its key does **nothing** yet. The tooltip over it says so.
+- Given too: a tavern quest of the starting waters, the first time it is turned in, has some among its prizes
+  (`economy/quests.ts`, `givePrizes` in `economy/prizes.ts`), and so do a feat's rungs, once claimed (`claimFeat`,
+  `account/feats.ts`), so a new player holds a few before buying any.
 - Saved (`SAVE_VERSION` 15): the items and the quick slots.
 - Icons: `public/sprites/icons/items.webp` / `items.json`, cut by `blender-assets/icons/build_item_icons.py` out of
   eight painted sheets (`icons/source/items_1.png` … `items_8.png`, ten items each, each painted twice). The left picture

@@ -6,7 +6,7 @@ import type { Ship } from '../ships/Ship';
 import { nearStoryMark } from '../story/story';
 import { nearGate } from '../world/gates';
 import { nearHarbour } from '../world/port';
-import { BOT_KINDS, type BotKindId } from './botKinds';
+import { BOT_KINDS, nearLair, type BotKind, type BotKindId } from './botKinds';
 
 const WANDER_RADIUS = 350; // world units round its home it wanders
 const PAUSE = [2, 6] as const; // seconds it drifts between two legs of wandering
@@ -19,6 +19,10 @@ const FLEE_DISTANCE = 400; // world units ahead of its foe a bot with no weapon 
 const REAIM_TIME = 0.6; // seconds between two new courses in a fight…
 const REAIM_DISTANCE = 20; // …and world units the new one must move the goal by: each may need a route round an island
 const ESCORT = { distance: 70, slack: 40, every: 1 } as const; // world units off its leader's beam; seconds between courses
+// Where a pack's second, third and fourth sail behind its first, world units along its heading and to starboard: a
+// diamond, close enough that a player who meets one meets them all
+// prettier-ignore
+const PACK_FORMATION: readonly (readonly [number, number])[] = [[-45, 50], [-45, -50], [-90, 0]];
 // World units from a player's ship: a bot farther than that from every player is dormant, waiting where it is (no
 // thinking, no sailing), so a big sea full of bots costs only the bots round the players. Well beyond a player's view
 // range and LEASH: a bot wakes before anyone can see it, and gives up a fight before it falls asleep
@@ -45,10 +49,25 @@ export interface BotMind {
   /** Part of a boss's escort: it doesn't come back on its own when sunk, the boss brings new ones */
   readonly escort: boolean;
   /**
+   * The pack it sails with (botKinds.ts, `pack`), by an id of the game's that no ship has: its mates follow the first
+   * of them afloat and fight as one. Null for one that sails alone
+   */
+  readonly pack: number | null;
+  /**
    * The player's ship it was brought in for, the story's prey (bots/spawner.ts, stepPrey): weaker than its kind, never
    * back once sunk. Null for the rest
    */
   readonly prey: number | null;
+  /**
+   * One of a monster's brood (combat/monsterSkills.ts): its mother is its leader, and it goes back to the deep once
+   * she is gone or calm
+   */
+  readonly young: boolean;
+  /** A monster's own ways of fighting (combat/monsterSkills.ts): game time it may dive again… */
+  diveReadyAt: number;
+  /** …how many of its ink's shares of the hull it has fallen past, a cloud shed for them, and its brood let loose */
+  inks: number;
+  broodLoosed: boolean;
 }
 
 export function newBotMind(
@@ -58,6 +77,8 @@ export function newBotMind(
   time: number,
   leader: number | null = null,
   prey: number | null = null,
+  pack: number | null = null,
+  young = false,
 ): BotMind {
   return {
     kind,
@@ -70,8 +91,29 @@ export function newBotMind(
     aimedAt: -Infinity,
     leader,
     escort: leader !== null,
+    pack,
     prey,
+    young,
+    diveReadyAt: time,
+    inks: 0,
+    broodLoosed: false,
   };
+}
+
+/**
+ * Every pack's ships afloat, by its id, in the order they came into the game: the first leads. One pass over the
+ * ships, so each bot need not look for its mates
+ */
+export function packsAfloat(ships: readonly Ship[]) {
+  const packs = new Map<number, Ship[]>();
+  for (const ship of ships) {
+    const pack = ship.bot?.pack;
+    if (pack === undefined || pack === null || ship.isSinking) continue;
+    const mates = packs.get(pack);
+    if (mates) mates.push(ship);
+    else packs.set(pack, [ship]);
+  }
+  return packs;
 }
 
 /** Whether a ship is a threat to this player: an aggressive bot, or any bot fighting them now */
@@ -92,8 +134,9 @@ export function isAwake(ship: Ship, players: readonly Ship[]) {
 
 /**
  * What every bot awake (`ships`, isAwake) does this update, before the ships steer: it picks its foe (the player who
- * hit it, or for an aggressive one a player who came within its aggro range), then fights it, runs from it, or wanders
- * round its home. Bots never fight bots. The bots' own seeded `random` keeps it the same on the server and every client
+ * hit it, or for an aggressive one a player who came within its aggro range, or the one its boss or a mate of its pack
+ * fights), then fights it, runs from it, follows its boss or the first of its pack, or wanders round its home. Bots
+ * never fight bots. The bots' own seeded `random` keeps it the same on the server and every client
  */
 export function thinkBots(
   state: GameState,
@@ -102,6 +145,7 @@ export function thinkBots(
   nav: NavGrid,
   random: () => number,
 ) {
+  const packs = packsAfloat(state.ships);
   for (const ship of ships) {
     const mind = ship.bot;
     if (!mind || ship.isSinking) continue;
@@ -113,28 +157,62 @@ export function thinkBots(
       const foe = state.ships.find((s) => s.id === leaderFoe);
       if (foe && !foe.isSinking && !foe.docked) engage(mind, foe, state.time);
     }
+    const mates = mind.pack === null ? undefined : packs.get(mind.pack);
+    if (mates && mind.foe === null) joinPack(state, ship, mind, mates);
     const foe = pickFoe(state, players, ship, mind);
     if (foe) fight(state.time, ship, mind, foe);
-    else if (leader && !leader.isSinking) follow(state.time, ship, mind, leader);
-    else wander(state, nav, ship, mind, random);
+    else if (leader && !leader.isSinking) {
+      follow(state.time, ship, mind, leader, -ESCORT.distance / 2, ESCORT.distance * mind.circle);
+    } else if (mates && mates[0] !== ship) {
+      // The first of the pack wanders; the rest keep their places behind it, the second the first place
+      const [along, across] = PACK_FORMATION[(mates.indexOf(ship) - 1) % PACK_FORMATION.length];
+      follow(state.time, ship, mind, mates[0], along, across);
+    } else wander(state, nav, ship, mind, random);
   }
 }
 
-/** An escort keeps off its leader's beam, on its own side, a little faster than the leader cruises */
-function follow(time: number, ship: Ship, mind: BotMind, leader: Ship) {
+/**
+ * A pack fights as one: a calm member takes on the foe a mate fights, if that foe is within LEASH of it. Farther, it
+ * would only chase a fight its mates are giving up, and take it up again for them as they did
+ */
+function joinPack(state: GameState, ship: Ship, mind: BotMind, mates: readonly Ship[]) {
+  for (const mate of mates) {
+    const id = mate.bot?.foe ?? null;
+    if (mate === ship || id === null) continue;
+    const foe = state.ships.find((s) => s.id === id);
+    if (!foe || foe.isSinking || foe.docked || Math.hypot(foe.x - ship.x, foe.y - ship.y) > LEASH) continue;
+    engage(mind, foe, state.time);
+    return;
+  }
+}
+
+/**
+ * An escort keeps off its leader's beam, on its own side, and a pack's mate its place behind the first: `along` its
+ * heading and `across` to starboard of it, world units. A little faster than the leader cruises
+ */
+function follow(time: number, ship: Ship, mind: BotMind, leader: Ship, along: number, across: number) {
   ship.pursuing = false;
   // The throttle is set with each leg, not every update: set here, it would undo the cruise until the next leg
   if (time < mind.nextLegAt) return;
   mind.nextLegAt = time + ESCORT.every;
-  const side = leader.rotation + (Math.PI / 2) * mind.circle;
-  const x = leader.x + Math.cos(side) * ESCORT.distance - Math.cos(leader.rotation) * ESCORT.distance * 0.5;
-  const y = leader.y + Math.sin(side) * ESCORT.distance - Math.sin(leader.rotation) * ESCORT.distance * 0.5;
+  const cos = Math.cos(leader.rotation);
+  const sin = Math.sin(leader.rotation);
+  const x = leader.x + cos * along - sin * across;
+  const y = leader.y + sin * along + cos * across;
   if (Math.hypot(ship.x - x, ship.y - y) < ESCORT.slack) {
     ship.throttle = BOT_KINDS[mind.kind].cruise;
     return;
   }
   ship.throttle = 1;
   steerTo(ship, x, y);
+}
+
+/**
+ * How near an aggressive bot of a kind notices a player's ship and attacks it, world units: its aggro range, nearer
+ * with the ship's stealth (Dark lanterns, the captain's Ghost of the sea). The bestiary tells it
+ */
+export function noticeRange(kind: BotKind, ship: Ship) {
+  return kind.aggroRange * (1 - ship.bonus.stealth);
 }
 
 function pickFoe(state: GameState, players: readonly Ship[], ship: Ship, mind: BotMind): Ship | null {
@@ -152,8 +230,7 @@ function pickFoe(state: GameState, players: readonly Ship[], ship: Ship, mind: B
       // In port, a player is out of the fight; and left alone while their crew watches something (the story)
       if (other.isSinking || other.docked || other.parley) continue;
       const distance = Math.hypot(other.x - ship.x, other.y - ship.y);
-      // A captain with the Ghost of the sea is noticed only nearer
-      if (distance <= kind.aggroRange * (1 - other.bonus.stealth) && distance <= nearest) {
+      if (distance <= noticeRange(kind, other) && distance <= nearest) {
         nearest = distance;
         engage(mind, other, time);
       }
@@ -228,12 +305,13 @@ function steerTo(ship: Ship, x: number, y: number) {
 }
 
 /**
- * Leg after leg to open water round its home (never into the harbour, by a gate or by a story's mark), at cruising
- * speed, with a pause in between
+ * Leg after leg to open water round its home (never into the harbour, by a gate or by a story's mark, nor into a
+ * boss's waters but for the boss and its escort), at cruising speed, with a pause in between
  */
 function wander(state: GameState, nav: NavGrid, ship: Ship, mind: BotMind, random: () => number) {
   const { time } = state;
-  ship.throttle = BOT_KINDS[mind.kind].cruise;
+  const kind = BOT_KINDS[mind.kind];
+  ship.throttle = kind.cruise;
   if (mind.wandering) {
     if (ship.target) return;
     // There (or stuck on the way): drift for a while
@@ -249,12 +327,13 @@ function wander(state: GameState, nav: NavGrid, ship: Ship, mind: BotMind, rando
     mind.home.y + Math.sin(angle) * distance,
     routeClearance(ship),
   );
-  const { port, gates, marks } = state.world;
+  const { port, gates, marks, zone } = state.world;
   if (
     !spot ||
     nearHarbour(port, spot.x, spot.y) ||
     nearGate(gates, spot.x, spot.y) ||
-    nearStoryMark(marks, spot.x, spot.y)
+    nearStoryMark(marks, spot.x, spot.y) ||
+    (!kind.boss && !mind.escort && nearLair(zone, spot.x, spot.y))
   ) {
     mind.nextLegAt = time + PAUSE[0];
     return;
