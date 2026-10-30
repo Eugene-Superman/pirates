@@ -5,23 +5,27 @@ Click on the sea and the ship sails there, steering around islands. Bots (ships 
 aggressive) roam the sea; the player fights them with cannons and harpoons and repairs between fights (for gold).
 Kills pay gold and experience (each ship's own level, up to ten a tier, 60 at tier 6, and talents: each ship its own tree,
 longer and more tangled up a line, and a signature talent every five levels to 60, from 25 a second ability, a rocket or a powder keg, from 50 a third, a bombardment or a Royal standard) and leave chests and goods to haul aboard; the port in the middle of the map, a picture of the harbour
-with its buildings to click, has a tavern (bounty quests), a market (the goods sold, and items bought for doubloons
-only: scrolls, charms, flags, put on the skill bar's quick slots, what they do still to come: docs/items.md), a workshop
+with its buildings to click, has a tavern (bounty quests), a market (the goods sold, for gold), the Golden Galleon at anchor in
+the harbour, a building of its own so players find it (items bought for doubloons only: scrolls, charms, flags, put on
+the skill bar's quick slots, what they do still to come: docs/items.md), a workshop
 (the ship's outfit, repair), a shipyard and an arsenal (guns, ammo); a guild hall and an auction house wait for the
 online part.
-A boss, the Smuggler Baron, holds a corner of the sea. Past the starting waters lie fourteen more seas, one to three a
+A boss, the Smuggler Baron, holds a corner of the sea, and a mini-boss, the Inkmother (a squid grown huge on moon
+glass that dives and comes up under a captain who keeps away, clouds the water with ink and lets its brood loose),
+another. Past the starting waters lie fourteen more seas, one to three a
 tier of ship (each its own map, bots and boss, reached through gates at its edges; a world chart shows them all), some
 65 hours from the starter sloop to a tier 6 ship at level 60. A new player sees a prologue (the Moon fell into the sea:
 docs/story.md), picks their captain's face and is led by the story through the starting waters (the sloop's guns in
 the hold to fit first, the ship kept in port till they are and the loadout showing how), conversations and steps that
 teach the game, where it sends them always in gold on the minimap and the sea chart, what they are to sink marked gold
-and brought in near them, the bosun's tips the first few times something goes wrong, to a tier 1 ship of any line, the story's end
-there; only the European line's, the Royal
+and brought in near them, the bosun's tips the first time something goes wrong, the tavern opened to them only once they are
+home from scouting the Baron and a bounty and the workshop shown then, to a tier 1 ship of any line, the story's end there; only the European line's, the Royal
 Herald, is built yet. Then the Captain's path leads to the next of its line: the Salamander, tier 2, the Peregrine,
 tier 3, the Crowned Lion, tier 4, the Black Eagle, tier 5, and the Sovereign of the Seas, tier 6 and last; the shipyard
 shows every line's ships, the rest planned for later. The European line is the yardstick the others are balanced against:
 each tier beats two ships of the tier below. Over all their ships, a captain grows their mastery: passives for every
-ship they sail, in seven specializations, paid with points from every tenth level of every ship and from feats.
+ship they sail, in seven specializations, paid with points from every tenth level of every ship and from feats (each
+rung of a feat's ladder a reward the player claims: points, doubloons and items; the last rungs are to give ships).
 Camera: classic 2:1 isometric pseudo-3D (no perspective) — the target look of the game.
 The site opens on a landing (the game's calling card for search engines, with an email and password sign-in that for
 now lets anyone aboard); the game itself is at `/play/`.
@@ -80,12 +84,14 @@ src/
                        player's progress along it (player.story); what is to be told now (storyTalk) and told
                        (tellStory, seePrologue: the player's actions); the objectives counted from the update's
                        events (stepStory); its places on the map (StoryMark: placed on open water like the gates, no
-                       bot near them; the harbour while it asks the player home, or to sell its goods there); what
+                       bot near them; the harbour while it asks the player home, or for the market, the tavern or the
+                       workshop); what
                        it asks them to sink (storyTargets) and the prey brought in for it (storyPrey); where it sends
                        them now, its mark
                        or the nearest of its prey (storyGoal); the guns it asks for that wait in the hold
                        (storyFitting), the ship kept in port till they are fitted (setSail: leaving port through the
-                       story); the Baron watched through the fog
+                       story); the tavern shut till it brings the player home from the Baron's waters (tavernOpen;
+                       takeBounty: a quest taken through the story); the Baron watched through the fog
                        while the bosun tells of him, the ship left alone meanwhile (storyWatch: Ship.spotted, parley)
     world/zones.ts     the seas (ZONES): each one's tier, levels, islands' seed, boss's lair, description, its gates to
                        the sea before and after it, its place on the world chart; START_ZONE (the starting waters)
@@ -109,7 +115,8 @@ src/
                        tier, and the masterworks bought with doubloons) and their ships, built (a class) or planned (a
                        name, a role, provisional figures and how it is got: SHIP_SOURCES), for the shipyard: lineShip
     ships/damage.ts    hull health scale (0–100 %) and the damage stages derived from it
-    ships/repair.ts    the repair skill: 2 % of the hull a second out of combat, paid in gold (1 for 10 hull)
+    ships/repair.ts    the repair skill: 2 % of the hull a second out of combat, paid in gold (1 for 10 hull), stopped
+                       at will (the step under way lost: never sooner for stopping and starting again)
     ships/outfit.ts    the ship's outfit: sails, hull planking or plating, a rudder, a lookout's gear, a piece to a
                        slot, in three tiers, each with sidegrades; what they add to the class's speed, turning, hull
                        and sight (grownStats)
@@ -136,31 +143,50 @@ src/
                        at the target, slowing it; a powder keg dropped astern, blowing up round the foe that comes
                        near; a bombardment's shells along the target's course),
                        units.ts (anything that can be fired at, by id: ships for now), combat.ts (fire locks,
-                       volleys of the guns loaded and in reach, homing projectiles, monsters' bites, damage)
+                       volleys of the guns loaded and in reach, homing projectiles, monsters' bites, damage),
+                       monsterSkills.ts (a monster's own ways of fighting, the Inkmother's, in two phases: diving at
+                       a foe out of its arms' reach and coming up under it where the water was marked, its arms
+                       striking all round, out of every shot's way meanwhile; clouds of ink that blind a crew in them
+                       and hide what is in them, Ship.canSee; its brood let loose at half its hull, gone back to the
+                       deep with it)
     bots/              botKinds.ts (kinds of bots: hull, neutral or aggressive, how many to a map square, respawn
-                       time, loot; a boss with its lair and escort; the starting waters' own, and every other sea's
+                       time, loot; a boss with its lair and escort, or a mini-boss alone at its own (zoneBosses), their waters kept clear
+                       of the rest (nearLair); a pack's size: the jackals' four cutters, every sea's pack; the starting waters' own, and every other sea's
                        made from archetypes scaled to its tier and levels: hull, power (damage ×), XP, gold: zoneKinds; how many sail a sea: botsInSea), brain.ts (what a bot does: wander, attack, fight
-                       back or run, give up, follow its boss; only bots near a player are awake), spawner.ts (the
-                       first bots, and sunk ones replaced near where they sailed, where no player sees; a boss at its
-                       lair with its escort; the story's prey, stepPrey: what the player's step asks them to sink,
-                       brought in near them out of sight, weaker than its kind, a player's own)
-    items/             items.ts (the market's items, for doubloons only: eighty of them in ten groups, each its name,
+                       back or run, give up, follow its boss or the first of its pack, a pack fighting as one; only bots near a player are awake), spawner.ts (the
+                       first bots, spread evenly, and sunk ones replaced near where they sailed, in the emptiest water
+                       there (SeaRoom: the sea's room for them, so not by coasts or a boss's waters), where no player
+                       sees, the sooner the more players hunt there; a boss at its
+                       lair with its escort; a pack together in the far waters, one sunk back to its pack while it
+                       doesn't fight; the story's prey, stepPrey: what the player's step asks them to sink,
+                       brought in near them out of sight, weaker than its kind, a player's own; a monster's brood,
+                       spawnBrood, round it)
+    items/             items.ts (the Golden Galleon's items, for doubloons only: eighty of them in ten groups, each its name,
                        what it is to do in its text and figures and its price; none works yet: docs/items.md),
                        quickSlots.ts (the skill bar's ten quick slots, the player's: an item of the hold in each, one
                        slot an item, put there, swapped or emptied)
     economy/           player.ts (a player's gold, the guns, outfit and items in their hold, the quick slots, fitting
-                       guns from the hold, their progress; a new player's guns in the hold, STARTING_HOLD), loot.ts (bounties for kills, chests and goods dropped and hauled aboard, a player's
-                       cargo lost where their ship sank; the story's prey's shard of moon glass), cargo.ts (goods,
-                       moon glass among them, the hold), quests.ts (the tavern's bounty
-                       quests, each sea's own, kills counted in their sea; a quest the ship's that took it, its kills
-                       alone counting, turned in by it alone), shop.ts (guns, ammo, outfit and repairs bought in port, the outfit fitted there, goods
-                       sold at the market, items bought there for doubloons by any count (buyItem), guns and ammo sold back to the arsenal for a quarter, ammo dealt in by any
+                       guns from the hold, their progress, the seas they have sailed (charted: only these the bestiary
+                       and the world chart tell the bots of); a new player's guns in the hold, STARTING_HOLD), loot.ts (bounties for kills, chests and goods dropped and hauled aboard, a player's
+                       cargo lost where their ship sank; the story's prey's shard of moon glass; the prey's chest
+                       kept for its player and a boss's for the players in its fight, afloat till emptied; what a kill
+                       of a kind would pay the player's ship now and what adds to each part, killReward, for the
+                       bestiary), cargo.ts (goods,
+                       moon glass and the Inkmother's moon pearl among them, the hold), quests.ts (the tavern's bounty
+                       quests, each sea's own, kills counted in their sea, eight to a dozen of a kind, a whole pack or a boss, graded
+                       easy, hard, elite or epic; a quest the ship's that took it, its kills alone counting, turned in
+                       by it alone at the tavern of its sea, given up anywhere, done or not, from any ship; the first time a player turns one in, its prizes besides (the starting waters'
+                       own, for now), from the third time less gold and experience: REPEAT_SHARES), prizes.ts (what a
+                       reward gives besides gold and experience: guns, outfit, ammo, items, doubloons), shop.ts (guns, ammo, outfit and repairs bought in port, the outfit fitted there, goods
+                       sold at the market, items bought on the Golden Galleon for doubloons by any count (buyItem), guns and ammo sold back to the arsenal for a quarter, ammo dealt in by any
                        count, as many as the gold pays for; the prices),
                        shipyard.ts (the ships for sale and their terms, by tier, the same for every line (TIER_TERMS):
                        the goal (shipGoal: after the starter sloop a tier 1 ship of any line, LADDER_LINES, then the
                        next of the line sailed), the Captain's path (the story, a level, the price);
                        tierMastered, a masterwork's term), fleet.ts (a player's ships: buying the one picked of the
-                       goal's, taking the helm of one laid up in port; neither of a ship below the sea's tier: fitsSea),
+                       goal's, the guns and outfit of the ship left taken into the hold first if the player says so,
+                       taking the helm of one laid up in port; neither of a ship below the sea's tier: fitsSea; the
+                       ammo the player's, going with the ship sailed, at hand as it was),
                        currencies.ts (gold, doubloons, spent on forgetting the mastery or a ship's talents, and the currencies to come
                        that the shipyard already prices ships in)
     navigation/        NavGrid.ts (open water as a grid with clearance from land; routes round islands, A*),
@@ -173,7 +199,9 @@ src/
                        what is taken, added up, is the ship's `captain` (a ShipBonus, ships/bonus.ts), read with
                        its talents'; forgotten in port for doubloons; the debug buttons' levels, giveLevels, here for they
                        take the passives again), feats.ts (the captain's feats: ladders of rungs counted
-                       from the player's stats, each rung giving points), portrait.ts (the captain's portrait, picked
+                       from the player's stats, each rung's reward claimed by the player (claimFeat: captain's points,
+                       doubloons, items of the Golden Galleon's), a `feat` event as one is reached (stepFeats)),
+                       portrait.ts (the captain's portrait, picked
                        from PORTRAITS by number and kept with the progress: others will see it online)
     records/           stats.ts (what a player and each of their ships have done: kills by class, quests, gold
                        earned and spent, chests, the fight, the voyage; for the medals to come), tally.ts (stepStats:
@@ -194,7 +222,7 @@ src/
     input/             pointerInput.ts: mouse/touch → ship.setTarget; a click picks a unit out (selection.ts,
                        client state), a double click attacks it; keyboardInput.ts (by key code, any layout): Space
                        attacks the unit picked out, Escape stops firing or lets go of it, Q and E pick the cannons
-                       or the harpoons, Z and X load the first or the second ammo at hand, R repairs, F, G and T use the ship's abilities, L the loadout, K the talents, J the
+                       or the harpoons, Z and X load the first or the second ammo at hand, R repairs or stops, F, G and T use the ship's abilities, L the loadout, K the talents, J the
                        combat log, M the sea chart, N the world chart, B the bestiary, I the statistics, H the hold, P the captain's mastery; a click on the port sails into it; cursor.ts (the game's own mouse pointers, painted, CSS cursors of 32
                        pixels at the screen's density: an arrow over the sea, a ship's wheel while steering, an anchor
                        over the port, a vortex over a gate (crossed out, shut to the ship's tier), a chest over loot, a
@@ -213,14 +241,16 @@ src/
                        captain's portrait (CaptainPortrait.ts: round on the face, or the whole bust; a click on it opens
                        PortraitPicker.ts, the ten to pick from), the badge gold while a talent waits, the ship's name,
                        the hold's icon (the minimap's button) and count at the top right, a click on which opens it,
-                       the hull and experience, the purse, gold and doubloons (only the debug buttons give them yet),
+                       the hull and experience, the purse, gold and doubloons (only a few quests' prizes, the feats' rewards and the debug buttons give them yet),
                        and the status; a click on the rest the statistics. Beside it the unit
-                       picked out, smaller: its hull's picture (the bestiary's HullPortrait), name, temper and tier,
-                       hull, what hurts it and the Fire button; a click on a bot's opens the bestiary on its kind),
+                       picked out, in a frame like it: its hull's picture (the bestiary's HullPortrait), name and
+                       tier, hull, temper and the Fire button (as wide as its longer label); a click on a bot's opens
+                       the bestiary on its kind),
                        QuestTracker.ts (top right, a plate in the night look: the story, its chapter, step and objectives
                        not met yet (one just met lit a moment), or the word to come back to port; the quests the ship
                        sailed has taken, a line
-                       and a thin meter each, ✕ gives one up once the player says yes, how many the other ships have, and the
+                       and a thin meter each, ✕ gives one up, done or not, once the player says yes, how many the other ships have (a
+                       click unfolds them by ship, each given up there too: no need to take its helm), and the
                        Captain's path to the next ship, the steps still to do (one just done lit a moment, then gone); each part folds by its
                        header, the browser keeps the folds), Prologue.ts (a new player's first sight, over everything:
                        the night sky and four cards of what happened, a painted picture each,
@@ -229,16 +259,19 @@ src/
                        speaker's painted portrait in a gold ring (SPEAKER_ICONS; their initial till it loads), name
                        and role, each line written
                        out, Next (Enter) and Skip), Tips.ts (the bosun's tips in that box, when the story has nothing
-                       to say: the first three times the player fires the wrong weapon at a target, has no guns or
-                       ammo at hand, runs out of ammo or low, or fills the hold; each going by itself after a while),
+                       to say: the first time the player fires the wrong weapon at a target, has no guns or
+                       ammo at hand, runs out of ammo or low, or fills the hold; a monster dives at them, its ink
+                       blinds them, its brood comes up; each going by itself after a while),
                        storyCue.ts (what the story asks a new player to press now in the starting waters: the guns
-                       fitted, Set sail, the market's Sell, a talent, a weapon, the repair, the new ship's Buy; none
+                       fitted, Set sail (till they first leave port), the market's Sell, a bounty's Take and Turn in at
+                       the tavern, the workshop's cheapest outfit, a talent, a weapon, the repair, the new ship's Buy; none
                        while a conversation is told or there is nothing to press for it yet), StoryGuide.ts (the
                        story showing them: the game's gold pointer clicking that button, a light breathing round it
                        and rings of it going out at each click, a note over or under it; the first talent spotlit
                        in the tree, all else dimmed; Yes lit in the question it asks; and in the loadout, a gun
-                       carried from the hold onto its slot), fullscreen.ts (the game on the whole screen and back),
-                       SkillBar.ts (at the bottom, in a painted frame: ten quick slots, 1…0, the items put there from
+                       carried from the hold onto its slot), fullscreen.ts (the game on the whole screen and back;
+                       Escape kept there for the windows, the full screen left by holding it, where the browser
+                       lets a page keep it: Chromium's Keyboard Lock), SkillBar.ts (at the bottom, in a painted frame: ten quick slots, 1…0, the items put there from
                        the hold, each with its count: dragged from slot to slot they swap, and only dropped back into
                        the open hold does one leave the bar; a click or its key does nothing yet; the skills, painted: the repair and the three abilities (F, G, T), locked
                        till their talents are picked (a rocket or a bombardment dimmed while nothing it could aim at is
@@ -270,8 +303,8 @@ src/
                        of the skill bar or clicked into the first empty one; the bar raised over it, so an item dragged
                        off the bar back into it leaves the bar), itemLook.ts (what the HUD shows of an item: its
                        grade's colour by its price, its text, its tooltip, the quick slots' keys),
-                       goodIcons.ts (the goods' colours and pictures, drawn until they are painted, and a good's row
-                       with its buttons: the hold's and the market's),
+                       goodIcons.ts (the goods' colours and pictures, drawn till their painted icons load, and a
+                       good's row with its painted icon and its buttons: the hold's and the market's),
                        MasteryPanel.ts (the captain's mastery, P, in the night look: a tree growing up from the
                        captain on a compass rose, the moon and a constellation low in the sky behind it, its seven
                        specializations side by side in columns on boards of blue glass, each a trunk forking into twigs, the
@@ -280,36 +313,48 @@ src/
                        on what glows asks and takes it, dragged and brought nearer with the wheel, what a passive
                        gives under the pointer; forget all in port),
                        FeatsPanel.ts (the captain's feats, in the night look, from the cup on the minimap's frame:
-                       a row a ladder, its next goal, a meter, its rungs and the points they gave, those points
-                       together in the header),
+                       a row a ladder, its next goal, a meter, its rungs with their points (gold once claimed, a
+                       breathing light round one whose reward waits), the next rung's reward, all of it under the
+                       pointer, and Claim while it waits, else the points it gave; those points and the rewards
+                       waiting in the header), FeatReward.ts (a rung's reward just claimed, over the feats: the rung
+                       and what it asked, met, and each part of the reward with its picture and where it went; a
+                       button to the captain's mastery),
                        LoadoutPanel.ts (the loadout window, L, in the night look and of one size: a tab a weapon,
                        and that weapon's boards: its gun slots (a picture each), its two ammo at hand and what waits
                        in the hold (a card each with its figures), each with a line of how; the slots and the hold
                        scroll on their own (ScrollPane.ts: a part of a window that scrolls, the wheel or a bar; its
                        ScrollBar is every scroll bar's, the talent tree's band and the port's lists too); a
                        click or a drag fits a gun or puts ammo at hand, here or on the skill bar, a gun fitted with a
-                       click picking the next empty slot; while the story's guns wait in the hold, StoryGuide.ts
+                       click picking the next empty slot, a fitted gun dragged onto another slot swapping with what
+                       is there; while the story's guns wait in the hold, StoryGuide.ts
                        shows how: the game's gold pointer carrying a gun from the hold onto the empty slot lit for
                        it, again and again, a note over it, then the next weapon's tab lit),
                        PortScreen.ts (in port: the harbour's picture with a medallion per building, HarbourView.ts,
                        in a frame of the night look with the port's name on a plaque, and the window each opens, in
-                       the night look like the hold, closed by its gold cross: the tavern's quests (a card each, a dial round how far it has
-                       got, its reward with the bonuses in brackets, what adds to it under the pointer), the market
-                       (Sell, laid out like the hold; Buy, the items, group by group, for doubloons, the purse in the
-                       header in them), the workshop's outfit (a tab a
+                       the night look like the hold, closed by its gold cross: the tavern's quests (shut, saying what opens it, till the story
+                       does; a card each, its painted picture in a dial round how far it has
+                       got, the count at its foot, its grade on a pill after its title, its reward with the bonuses and the repeats in
+                       brackets, what adds to it under the pointer, at its foot the prizes of its first time, an icon
+                       each, or how many times it was turned in), the market
+                       (the goods sold, laid out like the hold), the Golden Galleon (the items, group by group, for
+                       doubloons, the purse in the header in them; its medallion over the galleon at anchor drawing
+                       the eye: a warmer light, painted stars twinkling over it, the doubloon on it till it is
+                       painted), the workshop's outfit (a tab a
                        slot) and repairs, the shipyard (the player's ships, a tab a line: its ships, built or planned,
                        and Buy: the masterworks), the arsenal's guns and ammo (bought and sold back); the shop's items as cards with their
-                       icons, scrolled when they don't fit; the guild hall and the auction house closed for now; the
+                       icons, and the tavern's quests, scrolled when they don't fit; the guild hall and the auction house closed for now; the
                        player's ship over the sloop at the quay, a medallion opening the loadout (a "!" and a call
                        while the story's guns wait in the hold, Set sail dimmed under a note till they are fitted); Set
                        sail), itemFaces.ts (what a card and the info window say of a gun, an ammo, a piece of outfit,
-                       a ship or an item of the market's, and what their button does),
+                       a ship or an item of the Golden Galleon's, and what their button does),
                        ItemInfo.ts (an item up close, from its card's info button, in the night look: its picture,
                        every figure, its legend, Buy, Fit or Take the helm, Sell; for ammo, how many),
                        ConfirmDialog.ts (a question before what can't be undone: selling an item back, giving a quest
-                       up, a passive of the mastery or a talent taken; as high as its text; one for the whole HUD, in
+                       up, a passive of the mastery or a talent taken; or a choice of two: the first ship bought after
+                       the starter sloop, whether the sloop's guns and outfit go into the hold for it, so a new captain
+                       learns they are a ship's own; as high as its text; one for the whole HUD, in
                        the night look, over every window), iconAtlas.ts (the guns', the ammo's, the outfit's, the
-                       ships', the items', the mastery's passives' and the talents' icons, the minimap's buttons, the skill bar's skills, the gold coin, the doubloon and the XP star (ui.ts's goldCoin, doubloon, xpStar),
+                       ships', the items', the goods', the mastery's passives' and the talents' icons, the minimap's buttons, the skill bar's skills, the gold coin, the doubloon and the XP star (ui.ts's goldCoin, doubloon, xpStar),
                        the captains' portraits, the maps' markers, the arrows, the painted mouse pointers as
                        pictures, each atlas loaded once; IconSprites: an atlas's icons as a pool of sprites laid out
                        every frame), arsenalLore.ts, outfitLore.ts and shipLore.ts (each one's legend; a
@@ -321,45 +366,57 @@ src/
                        Minimap.ts (bottom right, in a painted frame of wood and brass: the sea round the ship, turned
                        like the screen, islands drawn as on the sea chart, and the units in sight, each a painted
                        marker (the story's prey gold, a bounty's silver, a boss crowned, hostile red, the rest green,
-                       the one fired at in a sight); the boss's lair, the harbour (its lighthouse silver while a
+                       the one fired at in a sight); the lairs of the boss and the mini-bosses, the harbour (its lighthouse silver while a
                        bounty waits there), and where the story sends the player in breathing gold, on the rim the way
                        to steer while it is far off; the ten slots round
                        the frame's top are buttons, left to right: the settings, the full screen, the feats, the hold,
                        the loadout, the talents, the captain's mastery (painted medallions, these four), the bestiary,
                        the world chart and logging out (back to the landing, the progress kept), lit while open; while a talent waits to be
                        picked, a breathing "!" on the talents' button, its hint telling the points and milestones, and
-                       one on the captain's mastery's while a point waits to be spent, and on the loadout's while the
-                       story's guns wait in the hold), SeaChart.ts (the whole world in 8 × 8 squares A1…H8 with the islands drawn as
-                       in the game and the ship, in the diamond opening of a painted frame and nothing else; the boss's
-                       lair under its crown (a medallion till the markers load), its name and the port's under the
-                       pointer, the harbour's marker, where the story sends the player in breathing gold under a gold
+                       one on the captain's mastery's while a point waits to be spent, on the loadout's while the
+                       story's guns wait in the hold, and on the feats' while a reward waits to be claimed), SeaChart.ts (the whole world in 8 × 8 squares A1…H8 with the islands drawn as
+                       in the game and the ship, in the diamond opening of a painted frame and nothing else; the lairs
+                       of the boss and the mini-bosses under their crowns (medallions till the markers load), each
+                       one's name and the port's under the pointer, the harbour's marker, where the story sends the player in breathing gold under a gold
                        arrow and every one of the prey it brought in, the square under it named; the
                        minimap or M opens it, the button in the frame's corner closes it; the sea's gates, a painted
                        vortex each (faint while shut to the ship's tier, as on the minimap), named under the pointer, and a
-                       button to the world chart), WorldChart.ts (every sea, N or the Seas button: a column a tier,
-                       the gates between them, the one picked's description, gates and bots; a gold arrow over the sea
+                       button to the world chart), WorldChart.ts (every sea, N or the minimap's button: a column a tier,
+                       the gates between them, the one picked's description, gates and bots (once the player has
+                       sailed it); a gold arrow over the sea
                        the player is in, an ivory one over the next if their ship's tier opens it; for now a button jumps
-                       there, for the developer), Bestiary.ts (every kind of bot of every sea, B, the Seas button or a
+                       there, for the developer), Bestiary.ts (every kind of bot of every sea, B, the minimap's button or a
                        click on a bot's plate: the seas, a sea's bots with their portraits, and the one picked: its
-                       legend (bestiaryLore.ts), hull, temper, spoils, its guns or jaws (how many, their dice, crits,
-                       misses, reach, reload, the damage they do in its sea), a boss's mortar and escort), questText.ts (a quest's title and text with its target and sea
+                       lore (bestiaryLore.ts), hull, temper, spoils, its guns or jaws (how many, their dice, crits,
+                       misses, reach, reload, the damage they do in its sea, how far they reach against the player's
+                       guns), a boss's mortar and escort, a monster's own ways (its dive, ink and brood), and a
+                       boss's or a mini-boss's legend under them (BOSS_LEGENDS:
+                       what its sea tells of it), scrolled when it is longer than the window, which keeps one size; beside the kind's figures, in brackets, what it is to the
+                       player's ship (the XP by its tier and level, the bounty and the chests with the mastery and its
+                       talents, how near it attacks), what makes each up under the pointer, as the tavern's reward;
+                       only the seas the player has sailed told: one open to their ship its bots' shapes alone, one
+                       forbidden to it locked), rewardText.ts (what adds to a reward, as the tavern's and the
+                       bestiary's tooltips list it; a prize's line, glow and icon, a row of them in their slots, the tavern's
+                       cards' and the feats' rows' (layPrizes), a feat's rung's name), questText.ts (a quest's title and text with its target and sea
                        filled in), chart.ts (what the two maps share: projection, colors, the islands, the gates, the story's mark,
                        which painted marker a unit gets, the bob of a chart's arrow),
-                       hudItems.ts (every metric and control the settings can show, grouped), SettingsPanel.ts (dev
-                       settings: all controls, the layout editor's too, and checkboxes for what is also on the
-                       screen), ui.ts (the HUD's
+                       hudItems.ts (what the HUD can show on the screen, the speed and the frame rate, and the
+                       settings' controls in their groups, the player's and the developer's), SettingsPanel.ts (the
+                       settings, in the night look: on one board the player's, the language picked from a list
+                       (Select.ts), the layout editor, the sound, the zoom (×0.5, ×1, ×1.5), the range rings and
+                       checkboxes for what is on the screen; under it, on a board of its own, the developer's: tuning
+                       the ship and the debug buttons; scrolled when taller than the screen), ui.ts (the HUD's
                        colors, clickable tiles and buttons, icons, HudWindow: a window over the game, in a look of
                        its choice), theme.ts (the windows' look: dark wood under a brass frame, gold serif titles,
                        rows on darker boards, brass tabs, icon slots, meters, the painted
-                       gold cross every window closes with (crossButton: the HudWindows', the settings', the sea
-                       chart's), THEMED_WINDOW: HudWindow's look in it; the bestiary and the world chart wear it),
+                       gold cross every window closes with (crossButton: the HudWindows', the loadout's taking a gun off; the sea chart lays the same cross in its slot), THEMED_WINDOW: HudWindow's look in it; the bestiary and the world chart wear it),
                        nightTheme.ts
                        (the night look, the alternative for a window: deep blue and the night sky under the brass rim,
                        painted gold corner pieces and dividers, boards of blue glass, a window's header and a board's
                        emblem and heading (nightHeader, nightBoard), the two trees' colours and light (TREE_COLORS,
                        takenGlow); NIGHT_WINDOW; the captain's
                        mastery, the talent tree, the feats, the loadout, the hold, the statistics, the portraits, the
-                       port's windows and the question before what can't be undone wear it, the harbour's frame too (nightPanel
+                       settings, the port's windows and the question before what can't be undone wear it, the harbour's frame too (nightPanel
                        drawn larger round the picture, the port's name on a nightPlaque); and the plates, the tracker
                        at the top and the chat, plainer: nightPlate, a fine gold edge, thin meters (drawNightMeter),
                        a well for lines of text (drawNightWell); and the buttons of every window, whatever its look,
@@ -367,8 +424,8 @@ src/
                        edge, a painted star on each point, a halo of moonlight under the pointer), ornaments.ts (its painted pieces by name, stars, moons, constellations,
                        corners, dividers, swatches, the windows' close cross, and the night sky to tile a panel with, loaded once, a sprite
                        dressed in its piece when it comes, scaled alike both ways),
-                       FpsMeter.ts, ButtonRow.ts (a row of HUD buttons),
-                       Checkbox.ts, DamagePanel.ts (debug buttons that set hull health)
+                       FpsMeter.ts, ButtonRow.ts (a row of the night look's buttons, some lit, wrapping onto more
+                       lines), Checkbox.ts (in the night look), DamagePanel.ts (debug buttons that set hull health)
     render/            3D engine with no game knowledge
       Camera3D.ts      parallel projection world → camera → screen and back (screenToGround)
       Painter3D.ts     3D primitives on top of Pixi Graphics: projection, lighting, shadows
@@ -382,10 +439,12 @@ src/
                        (the port's walls, quay, houses, lighthouse and flag, until
                        its pictures load; then its lamp and flags over them), botShip3d.ts
                        (the bots' ships as vector models, until their atlases load; the seas' pirate brig, warship
-                       and flagship only so, for now), monster3d.ts (the seas' crab, shark and kraken, vector-drawn,
-                       until they are modelled), gate3d.ts (a gate to another sea on the water, till the sea's
+                       and flagship and the packs' jackal cutter only so, for now), monster3d.ts (the seas' crab, shark and kraken, and the starting
+                       waters' Inkmother and her brood, vector-drawn, until they are modelled; and a monster
+                       under water, diving: its shape gliding at its foe, bubbles over it), gate3d.ts (a gate to another sea on the water, till the sea's
                        maps load: then it is the sea's whirlpool), storyMark3d.ts (where the story sends the player: a
-                       buoy with its lamp, its light Beacon.ts's; what it asks them to sink, a gold ring and a painted gold arrow over it; a painted
+                       buoy with its lamp, its light Beacon.ts's; a painted gold arrow over what it asks them to sink
+                       (its gold aura is Auras.ts's); a painted
                        gold arrow round the ship, turned towards the one off the screen, or the prey hidden in the fog;
                        drawn till the arrows load), serpent3d.ts and turtle3d.ts (sea monsters:
                        their water, the serpent's body bending as it swims, and their bodies until their atlases load),
@@ -408,33 +467,44 @@ src/
                        (the sinking animation, and the water round the wreck: churn, ring waves, bubbles),
                        ShotEffects.ts (muzzle flashes, smoke, splashes, splinters, bites, a rocket's fire, a powder keg blowing up), DamageNumbers.ts (damage
                        and repairs floating up), Wrecks.ts (sunk bots going down), RepairEffect.ts (a ship under
-                       repair), LevelUpEffect.ts (a level reached), BarrageMarks.ts (a boss's shells coming down, red;
-                       a player's bombardment's, gold),
-                       Trails.ts (where each serpent swam, for its body), targetLock.ts (the rings round the target
-                       fired at and the unit picked out), rangeRings.ts (how far the weapon picked reaches: its guns'
+                       repair), LevelUpEffect.ts (a level reached: the story's gold Beacon round the ship, the ship
+                       glowing gold, its sprite blurred under it, and sparks winding up), BarrageMarks.ts (a boss's
+                       grapeshot coming down, a canister's balls each with its shadow and its spout, the sea lit red
+                       under them; a player's bombardment's one shell, on a soft gold glow),
+                       Trails.ts (where each serpent swam, for its body), Auras.ts (round the target fired at, the
+                       unit picked out and what the story asks the player to sink, as round the ship at a level
+                       reached with no pillar: a pool of light in the water and rings of it spreading, the sea's
+                       shader's; gold round the story's prey, else red round a foe, green round a neutral unit, blue
+                       round a friend; the prey's dimmer till picked out or fired at, the rings quicker round the
+                       target fired at; rings on the water till the sea's maps load), rangeRings.ts (how far the
+                       weapon picked reaches: its guns'
                        longest and shortest reach, dashed rings running round in its colour), wind.ts,
                        navDebug.ts (the navigation's debug views, switched in the settings: the route, the hulls),
-                       fogOfWar.ts (haze and mist beyond the ship's view range and the spot it watches, one shader),
-                       FogClouds.ts (its puffs),
-                       SkyClouds.ts (now and then a light cloud drifting over everything, and its shadow),
+                       fogOfWar.ts (haze and mist beyond the ship's view range and the spot it watches, one shader;
+                       closing in round a ship in a cloud of ink, the ink's murk for its haze),
                        seaSurface.ts (the sea's surface, one shader: the waves, light in the water and on the floor
                        of the shallows, the sky, glitter, whitecaps, and the Moon's light from below, its glass
                        glowing up from the seabed here and there; where the story sends the player, a pool of gold
                        light in the water, rings of it spreading, bent by the waves, and a red one round a boss that
-                       fights them and on every spot its shells are to land on; towards the map's edges the
+                       fights them and on every spot its shells are to land on, the same ink-dark where a monster
+                       will come up from a dive (DIVE_LIGHTS), its clouds of ink, the sea gone dark under them
+                       (INK_CLOUDS), and the units' auras, each its own colour (AURA_LIGHTS at once); towards the
+                       map's edges the
                        Seam's storm, rougher and darker, whitewater at its wall's foot; at a gate to another sea a
                        whirlpool, arms of foam winding in to a dark funnel, its eye violet, red while shut to the
                        ship's tier), seaLook.ts (how it looks: one set of numbers), Beacon.ts (over that pool, a
-                       pillar of soft gold light, gold motes rising in it, coming in and going softly; the same in red
+                       pillar of soft gold light, gold motes rising in it, coming in and going softly; the same round
+                       the player's ship a few seconds at a level reached; the same in red
                        round a boss while it fights the player, following it, under the ships, its pillar rising
-                       behind the masts, and over every spot its shells are to land on, ShellBeacons; its textures
+                       behind the masts, and over every spot its shells are to land on, and ink-dark over where a
+                       monster will come up from a dive (SpotBeacons); its textures
                        made in a canvas), SeamWalls.ts (the Seams, docs/story.md's walls of storm, at the map's edges:
                        a wall of water along each, the sea's ripples running up its face, streams of foam, a white
                        crest blowing off into spray; those the camera looks towards under everything on the water,
                        those in front of it over it, a curtain seen through, clearer round the ship)
 public/sprites/ships/  ship atlases: <line>/<id>/[<look>/]<damage stage>.{webp,json}, rendered in Blender from a
                        source outside this repo — don't edit by hand
-public/sprites/fog/    fog of war textures (puffs.webp/json, wisps.webp), made by blender-assets/effects/fog/build_fog.py
+public/sprites/fog/    the fog of war's mist (wisps.webp), made by blender-assets/effects/fog/build_fog.py
 public/sprites/loot/   the floating loot's atlases (chest/<look>/intact.{webp,json}), rendered in Blender like the ships
 public/sprites/port/   the port's pictures (ground.webp, raised_<n>.webp, port.json): a painting laid on the render of
                        blender-assets/port/build_port.py (on the port's geometry exported from port.ts) and cut like
@@ -451,10 +521,13 @@ public/sprites/icons/  the guns', the ammo's, the outfit's and the ships' icons 
                        blender-assets/icons/build_gun_icons.py, build_ammo_icons.py, build_outfit_icons.py and
                        build_ship_icons.py; the items' (items.webp/json, by item id), cut out of eight painted sheets,
                        two pictures an item (the left used, unless the script's SECOND says the right), by
-                       build_item_icons.py; the mastery's passives' (mastery.webp/json, by passive id), cut round
+                       build_item_icons.py; the goods' (goods.webp/json, by good id), cut out of one painted sheet
+                       by build_good_icons.py; the mastery's passives' (mastery.webp/json, by passive id), cut round
                        out of one painted sheet by build_mastery_icons.py; the ships' talents' (talents.webp/json, by
                        talent id, and the talent tree's boards' emblems, by "signatures" or "<ship>/<branch key>"),
-                       cut round out of two painted sheets by build_talent_icons.py — don't edit by hand
+                       cut round out of two painted sheets by build_talent_icons.py; the tavern's contracts' pictures
+                       (contracts.webp/json, by quest id, "contract" for every other sea's), cut round out of one
+                       painted sheet by build_contract_icons.py — don't edit by hand
 public/sprites/hud/    the minimap's frame (minimap_frame.webp), made from a painted picture by
                        blender-assets/hud/build_minimap_frame.py, which prints its opening and slots for Minimap.ts's
                        FRAME; the buttons in the slots (minimap_buttons.webp/json), four cut out of painted medallions
@@ -481,7 +554,6 @@ public/sprites/hud/    the minimap's frame (minimap_frame.webp), made from a pai
                        grid by build_map_markers.py — don't edit by hand
 public/sprites/sea/    sea wave maps (swell, ripples, chop), the caustics and its broad patches (depth, clouds,
                        gusts), made by blender-assets/effects/sea/build_sea.py (its wind map the game leaves out)
-public/sprites/sky/    the sky's clouds (clouds.webp/json), made by blender-assets/effects/sky/build_clouds.py
 public/sprites/story/  the story's pictures: the prologue's (prologue_1.webp … prologue_4.webp, a card each, 16:9) and
                        the speakers' portraits (speakers.webp/json, by speaker id, each cut square round the face),
                        made from painted art by blender-assets/story/build_story_art.py — don't edit by hand
@@ -493,7 +565,7 @@ public/landing/        the landing's pictures: og-image.jpg (sprites/port/harbou
                        of sprites/port/medallions.webp, 96 pixels); with public/favicon.ico (the crest, 48) and
                        apple-touch-icon.png (on the night's blue, 180), cut with ffmpeg
 docs/ships.md          ship lines (planned factions and tiers), where a ship's files live, how to add a ship
-docs/items.md          the market's items: what works now, what using them needs, and each item's plan
+docs/items.md          the Golden Galleon's items: what works now, what using them needs, and each item's plan
 docs/story.md          the story: the world, its people, the starting waters' steps, how the code tells it,
                        its pictures (painted and still to paint)
 ```
@@ -537,7 +609,7 @@ the landing's text goes to all three. Its form takes the player to the game in t
 `GameClient` keeps it as picked), and what its script says is in it too (`landing.ts`).
 
 Camera settings are the `CAMERA` constant in [src/client/scene/SceneView.ts](src/client/scene/SceneView.ts)
-(pitch 30°, yaw 45°, zoom 1.4); the HUD's zoom buttons scale the zoom ×1–×3 at runtime (`SceneView.setZoom`). Don't add perspective, sky or other projections unless asked —
+(pitch 30°, yaw 45°, zoom 1.4); the settings' zoom buttons scale it ×0.5, ×1 or ×1.5 at runtime (`SceneView.setZoom`). Don't add perspective, sky or other projections unless asked —
 they were tried and removed (commit `2c8125f` still has them). How the camera follows the ship is
 `scene/cameraControl.ts`: one way only, gliding after it (a dead zone and a recentering camera were tried and
 removed). The ship atlases are rendered for this pitch and yaw:

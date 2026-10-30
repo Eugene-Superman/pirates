@@ -54,6 +54,11 @@ const MORTAR_GAIN = 1.2; // a boss's mortar firing, by the cannon's level
 // A rocket leaving a deck and a powder keg blowing up: the cannon's sound, by its level and played this much faster
 const ROCKET_SOUND = { gain: 0.7, rate: 1.7 } as const;
 const KEG_SOUND = { gain: 1.4, rate: 0.6 } as const;
+// A monster going under and coming up from a dive, its arms striking, and shedding ink: the splash's sound, by its
+// level and played at this share of its speed (deeper for a bigger body of water); and a roar as it comes up
+const DIVE_SOUND = { gain: 1, rate: 0.75 } as const;
+const SURFACE_SOUND = { gain: 1.5, rate: 0.55, roar: 0.6 } as const;
+const INK_SOUND = { gain: 0.9, rate: 0.5 } as const;
 const PITCH_SPREAD = 0.07; // ± share of speed a sound plays at, so a run of them doesn't sound like a loop
 // A volley of more guns sounds louder, up to this many times one gun; from VOLLEY_LAYER guns a second shot follows a
 // moment later, for the rumble of a broadside
@@ -206,6 +211,20 @@ export class Sounds {
           near('cannon', event.at, KEG_SOUND.gain, KEG_SOUND.rate);
           near('splash', event.at, KEG_SOUND.gain, 0.8);
           break;
+        case 'dive':
+          near('splash', event.at, DIVE_SOUND.gain, DIVE_SOUND.rate);
+          break;
+        case 'surface':
+          if (event.radius <= 0) {
+            near('splash', event.at, DIVE_SOUND.gain, DIVE_SOUND.rate);
+            break;
+          }
+          near('splash', event.at, SURFACE_SOUND.gain, SURFACE_SOUND.rate);
+          near('roar', event.at, SURFACE_SOUND.roar);
+          break;
+        case 'ink':
+          near('splash', event.at, INK_SOUND.gain, INK_SOUND.rate);
+          break;
         case 'damage': {
           if (event.source === 'bite') break;
           if (event.amount <= 0) near('splash', event.at);
@@ -244,6 +263,10 @@ export class Sounds {
           break;
         case 'level':
           if (mine(event)) this.play('levelUp', 1, 0.2);
+          break;
+        // A feat's rung reached: its reward waits to be claimed
+        case 'feat':
+          if (mine(event) && !leveled) this.play('questDone', 1, 0.3);
           break;
         // An objective of the story met, or a step of it done with no gold to ring for it
         case 'story':

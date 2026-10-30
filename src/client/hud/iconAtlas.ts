@@ -1,9 +1,21 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from 'pixi.js';
-import type { AmmoId, GunId, ItemId, LineShipId, OutfitId, ShipClassId, SpeakerId, TalentId } from '../../game';
+import type {
+  AmmoId,
+  GoodId,
+  GunId,
+  ItemId,
+  LineShipId,
+  OutfitId,
+  QuestId,
+  ShipClassId,
+  SpeakerId,
+  TalentId,
+} from '../../game';
 import type { CursorId } from '../input/cursor';
 
 // Cut out of painted sheets by blender-assets/icons/build_gun_icons.py, build_ammo_icons.py, build_outfit_icons.py,
-// build_ship_icons.py, build_item_icons.py, build_mastery_icons.py and build_talent_icons.py (in icons/), and
+// build_ship_icons.py, build_item_icons.py, build_good_icons.py, build_mastery_icons.py, build_talent_icons.py and
+// build_contract_icons.py (in icons/), and
 // build_minimap_buttons.py, build_map_markers.py (the markers and the arrows),
 // build_skill_icons.py, build_symbol_icons.py, build_portraits.py and build_cursors.py (in hud/), and
 // build_story_art.py (in story/)
@@ -152,6 +164,8 @@ export const OUTFIT_ICONS = new IconAtlas<OutfitId>('outfit');
 export const SHIP_ICONS = new IconAtlas<LineShipId>('ships');
 /** The items' icons, for the market, the hold and the skill bar's quick slots: painted scrolls, charms, flags... */
 export const ITEM_ICONS = new IconAtlas<ItemId>('items');
+/** The goods' icons, for the hold's and the market's rows: painted fish, cloth, rum, moon glass... */
+export const GOOD_ICONS = new IconAtlas<GoodId>('goods');
 /** The captain's mastery's passives, by their ids: painted icons, each round in its own ground */
 export const MASTERY_ICONS = new IconAtlas<string>('mastery');
 /**
@@ -165,6 +179,11 @@ export type TalentEmblemId = 'signatures' | `${ShipClassId}/${string}`;
  * starter sloop's crew's): the rest show their branch's sign
  */
 export const TALENT_ICONS = new IconAtlas<TalentId | TalentEmblemId>('talents');
+/**
+ * The tavern's contracts' pictures, by their quests' ids, each round: painted scenes of the starting waters' eight, and
+ * `contract`, a bounty contract nailed to a post, for every other sea's until it has pictures of its own
+ */
+export const CONTRACT_ICONS = new IconAtlas<QuestId | 'contract'>('contracts');
 /** What the buttons in the slots round the minimap's frame's top open or do */
 export type MinimapButtonId =
   'settings' | 'fullscreen' | 'feats' | 'hold' | 'loadout' | 'talents' | 'mastery' | 'bestiary' | 'world' | 'logout';

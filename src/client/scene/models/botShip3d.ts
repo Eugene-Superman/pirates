@@ -74,6 +74,20 @@ const LOOKS: Readonly<Partial<Record<ShipClassId, ShipLook>>> = {
     sailWidth: 15,
     deckLoad: null,
   },
+  // A pack's cutter (the starting waters' jackals, every sea's packs), drawn only from this look until it is
+  // modelled: a low, lean hull of tarred planks with a rust stripe, two raked masts under rust-red lateen sails, a
+  // black flag with a yellow eye
+  jackalCutter: {
+    outline: [[12, 0], [8.5, 3.4], [2.5, 4.4], [-5, 4.2], [-9.8, 3.2], [-11, 1.8], [-11, -1.8], [-9.8, -3.2], [-5, -4.2], [2.5, -4.4], [8.5, -3.4]],
+    deckZ: 2.6,
+    colors: { hull: 0x33261e, deck: 0x6e5236, stripe: 0xc0622a, mast: 0x2a1c12, sail: 0xa0603a, trim: 0x5e3722, flag: 0x16110d, flagMark: 0xe0b23a },
+    mastX: 0,
+    mastHeight: 16,
+    sail: 'lateen',
+    sailWidth: 10,
+    deckLoad: null,
+    foremast: { x: 7, height: 12, sailWidth: 6 },
+  },
   // The Smuggler Baron's: a long black hull with a red stripe, two masts of dark sails, his flag on the main. Its
   // atlases (the smuggler's ship made bigger, with red sails) reach higher: this mast puts the hit point bar over them
   baronBrig: {

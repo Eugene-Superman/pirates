@@ -26,7 +26,7 @@ import {
   nightHeader,
   type NightBoardLayout,
 } from './nightTheme';
-import { ITEM_ICONS } from './iconAtlas';
+import { GOOD_ICONS, ITEM_ICONS } from './iconAtlas';
 import { QUICK_KEYS, itemColor, itemHint } from './itemLook';
 import { ScrollPane } from './ScrollPane';
 import { THEME, drawMeter, iconSlot, subheading } from './theme';
@@ -108,7 +108,7 @@ interface Press {
  * The hold (H, or a click on the hold in the top right corner), in the night look like the loadout, a tab each for
  * what it holds. The cargo: on a board how full it is and what the goods aboard fetch at the market, and on another a
  * row a good, with buttons to throw them overboard (one, or all of a good), to make room for better ones floating
- * nearby. The items, bought for doubloons at the market, as many as the player likes, taking no room: a cell each with
+ * nearby. The items, bought for doubloons on the Golden Galleon, as many as the player likes, taking no room: a cell each with
  * how many, and the key of its quick slot if it is on the skill bar; dragged onto a quick slot it goes there (a click
  * puts it in the first empty one), and an item dragged off the bar into the window leaves the bar. Closed by its gold
  * cross, Escape, H or a click beside it
@@ -217,7 +217,7 @@ export class HoldPanel {
     this.waresCount.position.set(INNER - BOARD.pad, EMBLEM_Y);
     const how = text(
       t(
-        'Drag an item onto a quick slot of the skill bar, or click it to put it in the first empty one. Bought at the market for doubloons, as many as you like: they take no room. Dragged off the bar back here, an item leaves it',
+        'Drag an item onto a quick slot of the skill bar, or click it to put it in the first empty one. Bought on the Golden Galleon in port for doubloons, as many as you like: they take no room. Dragged off the bar back here, an item leaves it',
       ),
       12,
       NIGHT.dim,
@@ -244,6 +244,7 @@ export class HoldPanel {
     );
     this.dragLayer.eventMode = 'none';
     ITEM_ICONS.load(() => (this.builtFor = ''));
+    GOOD_ICONS.load(() => (this.builtFor = ''));
   }
 
   get isOpen() {
@@ -370,7 +371,7 @@ export class HoldPanel {
     );
   }
 
-  /** A cell for every item in the hold, in the market's order, rows of them in the pane; or a word on where to buy them */
+  /** A cell for every item in the hold, in the galleon's order, rows of them in the pane; or a word on where to buy them */
   private buildItems(player: Player) {
     for (const child of this.pane.content.removeChildren()) child.destroy({ children: true });
     this.cells = [];
@@ -389,7 +390,7 @@ export class HoldPanel {
     );
     if (ids.length === 0) {
       const empty = text(
-        t('No items yet: they are bought for doubloons at the market in port, under Buy'),
+        t('No items yet: they are bought for doubloons on the Golden Galleon in port'),
         13,
         NIGHT.dim,
         { wordWrap: true, wordWrapWidth: this.pane.inner - 32, align: 'center' },
@@ -504,7 +505,7 @@ export class HoldPanel {
   }
 }
 
-/** The kinds of item the player has, in the market's order */
+/** The kinds of item the player has, in the galleon's order */
 function owned(player: Player) {
   return ITEM_IDS.filter((id) => (player.items[id] ?? 0) > 0);
 }

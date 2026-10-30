@@ -1,11 +1,13 @@
+import type { FeatId } from '../account/feats';
 import type { GameState } from '../GameState';
 import { clamp } from '../lib/math';
 import { hullGap } from '../physics/hull';
 import { BONUS_PERKS, type BonusEffect, type ShipBonus } from '../ships/bonus';
-import type { Ship } from '../ships/Ship';
+import { newFireRun, type FireRun, type Ship } from '../ships/Ship';
 import { PERKS, abilityCooldown, abilityUsed, reloadShare, talentsGiving, type TalentId } from '../ships/talents';
 import { AMMO, rollVolley, type AmmoId, type Bite, type DamageDie, type GunId } from './arsenal';
 import type { Cargo } from '../economy/cargo';
+import type { Prize } from '../economy/prizes';
 import type { QuestId } from '../economy/quests';
 import type { GoldReason } from '../records/stats';
 import type { StoryStepId } from '../story/story';
@@ -21,9 +23,10 @@ export interface Point3 {
 
 /**
  * What did the damage: a weapon's volley, a monster's bite, a boss's mortar shell (combat/barrage.ts), a rocket or a
- * powder keg (the level 25 abilities, combat/ordnance.ts), a ship's own shell (the level 50 Bombardment)
+ * powder keg (the level 25 abilities, combat/ordnance.ts), a ship's own shell (the level 50 Bombardment), a monster's
+ * arms as it comes up from a dive (combat/monsterSkills.ts)
  */
-export type DamageSource = WeaponId | 'bite' | 'shell' | 'rocket' | 'keg' | 'bombard';
+export type DamageSource = WeaponId | 'bite' | 'shell' | 'rocket' | 'keg' | 'bombard' | 'arms';
 
 /** One die of a volley in full: which gun rolled it (null: a monster's jaws), its sides, the face, what it did */
 export interface DieResult {
@@ -225,6 +228,37 @@ export type GameEvent =
       readonly at: Point3;
     }
   | {
+      /** A quest turned in for the first time gave its prizes too (economy/quests.ts) */
+      readonly type: 'prizes';
+      /** The player's ship */
+      readonly shipId: number;
+      readonly quest: QuestId;
+      readonly prizes: readonly Prize[];
+      readonly at: Point3;
+    }
+  | {
+      /** A rung of a feat reached (account/feats.ts): its reward waits for the player to claim it */
+      readonly type: 'feat';
+      /** The player's ship */
+      readonly shipId: number;
+      readonly feat: FeatId;
+      /** The rung, 0 for the first */
+      readonly rung: number;
+      readonly at: Point3;
+    }
+  | {
+      /** A rung's reward claimed: the captain's points and the prizes it gave (account/feats.ts) */
+      readonly type: 'featClaimed';
+      /** The player's ship */
+      readonly shipId: number;
+      readonly feat: FeatId;
+      /** The rung, 0 for the first */
+      readonly rung: number;
+      readonly points: number;
+      readonly prizes: readonly Prize[];
+      readonly at: Point3;
+    }
+  | {
       /** A ship earned experience (ships/talents.ts): what it took, never at its last level */
       readonly type: 'xp';
       readonly shipId: number;
@@ -297,6 +331,33 @@ export type GameEvent =
       readonly at: Point3;
     }
   | {
+      /**
+       * A monster went under (combat/monsterSkills.ts): diving at its foe (`targetId`), or one of a brood going back to
+       * the deep for good (null)
+       */
+      readonly type: 'dive';
+      readonly shipId: number;
+      readonly targetId: number | null;
+      readonly at: Point3;
+    }
+  | {
+      /**
+       * A monster came up: from a dive, its arms striking within `radius` of `at`, or one of a brood let loose (radius
+       * 0)
+       */
+      readonly type: 'surface';
+      readonly shipId: number;
+      readonly at: Point3;
+      readonly radius: number;
+    }
+  | {
+      /** A monster shed a cloud of ink round it (state.inks), to spread to `radius` */
+      readonly type: 'ink';
+      readonly shipId: number;
+      readonly at: Point3;
+      readonly radius: number;
+    }
+  | {
       /** The story moved on (story/story.ts): an objective of the player's step met, or the step done */
       readonly type: 'story';
       readonly shipId: number;
@@ -324,8 +385,11 @@ export function holdReason(ship: Ship, target: Unit): HoldReason | null {
     if (ship.ammo[loaded] <= 0) return 'noAmmo';
     if (!ship.ammoBar[ship.weapon].includes(loaded)) return 'notAtHand';
   }
-  if (!ship.canSee(target.x, target.y)) return 'sight';
-  if (Math.hypot(target.x - ship.x, target.y - ship.y) > range) return 'range';
+  if (target.submerged) return 'deep';
+  const distance = Math.hypot(target.x - ship.x, target.y - ship.y);
+  // Within the view range, only ink hides it
+  if (!ship.canSee(target.x, target.y)) return distance <= ship.viewRange ? 'ink' : 'sight';
+  if (distance > range) return 'range';
   return null;
 }
 
@@ -341,7 +405,8 @@ export function stepCombat(state: GameState, dt: number, random: () => number) {
       for (let slot = 0; slot < reloads.length; slot++) reloads[slot] = Math.max(0, reloads[slot] - dt);
     }
     ship.biteReload = Math.max(0, ship.biteReload - dt);
-    if (ship.attackTarget === null) continue;
+    // A monster under water bites nothing till it comes up
+    if (ship.attackTarget === null || ship.submerged) continue;
     const target = findUnit(state, ship.attackTarget);
     // Destroyed, gone, or in port (out of the fight): nothing left to fire at
     if (!target || !isAfloat(target) || target.docked || ship.isSinking) {
@@ -362,8 +427,8 @@ export function stepCombat(state: GameState, dt: number, random: () => number) {
   for (let i = state.projectiles.length - 1; i >= 0; i--) {
     const p = state.projectiles[i];
     const target = findUnit(state, p.targetId);
-    // Its target was destroyed by another volley first, or made it into port: the shot falls into the sea
-    if (!target || !isAfloat(target) || target.docked) {
+    // Its target was destroyed by another volley first, made it into port or dived: the shot falls into the sea
+    if (!target || !isAfloat(target) || target.docked || target.submerged) {
       state.projectiles.splice(i, 1);
       continue;
     }
@@ -395,6 +460,7 @@ export function aimAt(point: { x: number; y: number; z: number }, target: Unit) 
 /**
  * A volley: every fitted gun of the selected weapon that is loaded, reaches the target and has a shot of the loaded
  * ammo fires one, the ammo is taken from the hold (a bot's never runs out), the dice are rolled and those guns reload.
+ * With a Broadside loaded, the loaded guns wait for the rest in reach, so it is every gun's volley at once.
  * It flies as one projectile, so fifty guns cost no more to move and draw than one
  */
 function fire(state: GameState, ship: Ship, target: Unit, random: () => number) {
@@ -402,9 +468,10 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
   const ammo = AMMO[ship.loaded[weapon.id]];
   const distance = Math.hypot(target.x - ship.x, target.y - ship.y);
   const reloads = ship.reloads[weapon.id];
-  const ready = ship
-    .fittedGuns(weapon.id)
-    .filter(({ gun, slot }) => reloads[slot] === 0 && ship.reach(gun) >= distance);
+  const inReach = ship.fittedGuns(weapon.id).filter(({ gun }) => ship.reach(gun) >= distance);
+  const ready = inReach.filter(({ slot }) => reloads[slot] === 0);
+  // Guns of different reloads drift apart: a quick one would fire the Broadside alone, the rest at their own damage
+  if (ship.broadsideArmed && ready.length < inReach.length) return;
   const count = ship.infiniteAmmo ? ready.length : Math.min(ready.length, ship.ammo[ammo.id]);
   if (count === 0) return;
   const firing = ready.slice(0, count);
@@ -450,13 +517,9 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
     boost *= PERKS.ambush;
     talents.push('ambush');
   }
-  const run = ship.relentless;
-  const again = run.target === target.id;
-  run.volleys = again ? run.volleys + 1 : 0;
-  run.cannons = (again ? run.cannons : 0) + (cannon ? 1 : 0);
-  run.target = target.id;
-  if (ship.hasTalent('relentless') && run.volleys > 0) {
-    boost *= 1 + PERKS.relentless.boost * Math.min(run.volleys, PERKS.relentless.most);
+  const run = runAt(state, ship, target, weapon.id);
+  if (ship.hasTalent('relentless') && run.rounds > 0) {
+    boost *= 1 + PERKS.relentless.boost * Math.min(run.rounds, PERKS.relentless.most);
     talents.push('relentless');
   }
   if (ship.hasTalent('lastStand') && ship.health < PERKS.lastStand.below) {
@@ -470,6 +533,8 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
   const tree = bonusBoost(state, ship, ship.talentBonus, target, weapon.id, distance, count);
   talents.push(...talentsGiving(ship, tree.by));
   const captain = bonusBoost(state, ship, ship.captain, target, weapon.id, distance, count).boost;
+  // Only now: this volley's boosts are its round's
+  countRound(run, firing, inReach);
   // A bot hits as hard as its sea asks
   boost *= tree.boost * captain * ship.power;
   const share = damageShare(weapon.id, target.nature);
@@ -539,6 +604,32 @@ function fire(state: GameState, ship: Ship, target: Unit, random: () => number) 
 }
 
 /**
+ * The ship's run of fire at the target a volley is fired at (Relentless, a Rolling thunder): a new one at another
+ * target or after a lapse; the other weapon's round under way is lost, as picking a weapon starts its guns' reloads over
+ */
+function runAt(state: GameState, ship: Ship, target: Unit, weapon: WeaponId): FireRun {
+  if (ship.fireRun.target !== target.id || state.time - ship.fireRun.lastAt > PERKS.relentless.lapse) {
+    ship.fireRun = { ...newFireRun(), target: target.id, weapon };
+  }
+  const run = ship.fireRun;
+  if (run.weapon !== weapon) {
+    run.weapon = weapon;
+    run.fired = [];
+  }
+  run.lastAt = state.time;
+  return run;
+}
+
+/** The guns of a volley fired in their round: it is over once every gun of its weapon in reach has fired in it */
+function countRound(run: FireRun, firing: readonly { slot: number }[], inReach: readonly { slot: number }[]) {
+  for (const { slot } of firing) if (!run.fired.includes(slot)) run.fired.push(slot);
+  if (!inReach.every(({ slot }) => run.fired.includes(slot))) return;
+  run.rounds++;
+  if (run.weapon === 'cannon') run.cannonRounds++;
+  run.fired = [];
+}
+
+/**
  * A bonus's effects as a strike reads them (`has`: an effect's share, 0 unless `when`), noting those that did something
  * (`by`), for the combat log
  */
@@ -554,8 +645,8 @@ function reading(bonus: ShipBonus) {
 
 /**
  * What a ship's talents, or its captain's mastery, multiply a volley's damage by: more of its weapon's, of everything
- * and against monsters; at a target nearly sunk (Coup de grace); up close (Point blank); for cannons a Rolling thunder (its run of volleys at the target counted
- * already), a Marksman's far volley and a full broadside of `fired` guns; a Battle cry. With the effects that did, for
+ * and against monsters; at a target nearly sunk (Coup de grace); up close (Point blank); for cannons a Rolling thunder (every volley of the
+ * round under way of its run at the target), a Marksman's far volley and a full broadside of `fired` guns; a Battle cry. With the effects that did, for
  * the combat log. 1 for a bot
  */
 function bonusBoost(
@@ -574,7 +665,7 @@ function bonusBoost(
   boost *= 1 + has('finisher', target.health < BONUS_PERKS.finisherBelow);
   boost *= 1 + has('pointBlank', distance <= ship.range(weapon) * BONUS_PERKS.pointBlankWithin);
   if (cannon) {
-    boost *= 1 + has('rollingThunder', ship.relentless.cannons % BONUS_PERKS.thunderEvery === 0);
+    boost *= 1 + has('rollingThunder', (ship.fireRun.cannonRounds + 1) % BONUS_PERKS.thunderEvery === 0);
     boost *= 1 + has('marksman', distance > ship.range('cannon') * BONUS_PERKS.marksmanBeyond);
     boost *= 1 + has('fullBroadside', fired > 1 && fired === ship.fittedGuns('cannon').length);
   }
@@ -605,14 +696,14 @@ function bite(state: GameState, monster: Ship, jaws: Bite, target: Unit, random:
 
 /**
  * One die's blow at full damage, done at once with no projectile: a monster's bite, a boss's mortar shell
- * (combat/barrage.ts). `random` is the game's dice
+ * (combat/barrage.ts), a monster's arms as it comes up (combat/monsterSkills.ts). `random` is the game's dice
  */
 export function strikeOnce(
   state: GameState,
   attacker: Unit,
   target: Unit,
   weapon: DamageDie & { readonly bonus: number },
-  source: 'bite' | 'shell',
+  source: 'bite' | 'shell' | 'arms',
   random: () => number,
 ) {
   // A bot's bite or shell as hard as its sea asks
@@ -635,12 +726,13 @@ export function strikeOnce(
 
 /**
  * Share of a blow from this source a unit's talents, or its captain's mastery, let through: less from cannons and
- * shells, from bites, from everything, and while its hull is low (Oak and iron, Last bastion). With the effects that
- * did, for the combat log. 1 for a bot
+ * shells, from bites (a monster's arms with them), from everything, and while its hull is low (Oak and iron, Last
+ * bastion). With the effects that did, for the combat log. 1 for a bot
  */
 function bonusGuard(unit: Unit, bonus: ShipBonus, source: DamageSource) {
   const { has, by } = reading(bonus);
-  const from = has('biteGuard', source === 'bite') + has('cannonGuard', source === 'cannon' || source === 'shell');
+  const monster = source === 'bite' || source === 'arms';
+  const from = has('biteGuard', monster) + has('cannonGuard', source === 'cannon' || source === 'shell');
   let share = 1 - has('guard') - from;
   share *= 1 - has('lowHullGuard', unit.health < BONUS_PERKS.lowHull);
   share *= 1 - has('lastBastion', unit.health < BONUS_PERKS.lastBastion);

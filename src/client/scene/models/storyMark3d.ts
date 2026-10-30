@@ -1,5 +1,5 @@
 import type { Graphics } from 'pixi.js';
-import type { StoryMark, Unit } from '../../../game';
+import type { StoryMark } from '../../../game';
 import type { ArrowId, IconSprites } from '../../hud/iconAtlas';
 import type { Camera3D } from '../../render/Camera3D';
 import type { Painter3D } from '../../render/Painter3D';
@@ -14,10 +14,9 @@ const COLORS = {
 };
 // World units: the buoy in the middle, its post and the lamp on it; a placeholder till a buoy is modelled
 const BUOY = { radius: 3.2, post: 9, lamp: 1.6 } as const;
-// A unit the story asks the player to sink: a gold ring on the water round it (world units beyond its size), and a
-// gold arrow over its hit point bar pointing down at it (pixels: the painted one's size; the one drawn till it loads,
-// across and high; how far over the unit's top its tip is, its bob and how fast)
-const TARGET_RING = { pad: 8, width: 1.6, alpha: 0.75 } as const;
+// A unit the story asks the player to sink: a gold arrow over its hit point bar pointing down at it (pixels: the
+// painted one's size; the one drawn till it loads, across and high; how far over the unit's top its tip is, its bob and
+// how fast); its gold aura is effects/Auras.ts's
 const CHEVRON = { size: 11, width: 6, height: 4, lift: 14, bob: 2, period: 1.1 } as const;
 // Pixels: the pointer round the player's ship towards where the story sends them when it is off the screen (how far
 // in from the screen's edge counts as on it), how far from the ship it goes round, its painted arrow's size, the one
@@ -40,13 +39,6 @@ export function drawStoryMark(p: Painter3D, mark: StoryMark, time: number) {
   p.ball([x, y, BUOY.radius + bob], BUOY.radius, COLORS.buoy);
   p.ball([x, y, BUOY.radius * 1.5 + bob], BUOY.radius * 0.7, COLORS.band);
   p.ball([x, y, BUOY.post + bob], BUOY.lamp * (1 + 0.3 * pulse), COLORS.lamp);
-}
-
-/** The gold ring on the water round a unit the story asks the player to sink, breathing */
-export function drawStoryTargetWater(p: Painter3D, unit: Unit, time: number) {
-  const pulse = 0.5 + 0.5 * Math.sin((time * Math.PI * 2) / CHEVRON.period);
-  const radius = unit.hull.bow + TARGET_RING.pad;
-  p.ring(unit.x, unit.y, 0, radius, TARGET_RING.width, COLORS.glow, TARGET_RING.alpha * (0.55 + 0.45 * pulse));
 }
 
 /**

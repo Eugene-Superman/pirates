@@ -40,7 +40,7 @@ const TONES: Readonly<Record<Tone, number>> = { good: UI.good, bad: UI.bad, plai
 
 /**
  * Something the port sells up close, in the night look over its building's window (its card's info button, or a click
- * on its icon): a gun, an ammo, a piece of outfit, a ship or an item of the market's (`itemFaces.ts` says what of it):
+ * on its icon): a gun, an ammo, a piece of outfit, a ship or an item of the galleon's (`itemFaces.ts` says what of it):
  * its picture, what it is, every figure the game works it out by, its price, its legend (or what an item will do), and
  * its button (Buy, Fit, Take off, Take the helm), and Sell beside it for what the arsenal buys back. Close, Escape or a
  * click beside it closes it
@@ -51,7 +51,7 @@ export class ItemInfo {
   private readonly confirm: ConfirmDialog;
   private readonly title = new Text({ text: '', style: { ...TITLE_STYLE, fontSize: 28 } });
   private readonly kind = text('', 13, NIGHT.dim);
-  /** The heading over the legend's board: its legend, or what an item of the market's will do */
+  /** The heading over the legend's board: its legend, or what an item of the galleon's will do */
   private readonly loreTitle = subheading('');
   /** The picture in its slot: made again for each item (its glow is its tier) */
   private readonly slot = new Container();
@@ -283,13 +283,19 @@ export class ItemInfo {
   private press(which: ItemButton | null) {
     if (!which || !this.state) return;
     const question = which.confirm?.(this.state);
-    if (question) this.confirm.ask(question, () => this.run(which));
-    else this.run(which);
+    if (question) {
+      this.confirm.ask(
+        question,
+        () => this.run(which, true),
+        () => this.run(which, false),
+      );
+    } else this.run(which);
   }
 
-  private run(which: ItemButton) {
+  /** yes: the answer picked, when the question offered a choice */
+  private run(which: ItemButton, yes?: boolean) {
     if (!this.state) return;
-    const done = which.press(this.state);
+    const done = which.press(this.state, yes);
     if (!done) return;
     show(this.message, done.message);
     tint(this.message, TONES[done.tone]);

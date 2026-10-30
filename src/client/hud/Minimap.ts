@@ -9,10 +9,11 @@ import {
   isHostile,
   milestonesToPick,
   pointsToSpend,
+  rewardsToClaim,
   storyFitting,
   storyGoal,
   storyTargets,
-  zoneBoss,
+  zoneBosses,
   type GameState,
   type Island,
   type Unit,
@@ -22,7 +23,6 @@ import type { Selection } from '../input/selection';
 import {
   CHART,
   MapProjection,
-  bossLair,
   bossMarker,
   bountyTargets,
   bountyWaiting,
@@ -31,7 +31,7 @@ import {
   drawGoalGlow,
   drawStoryMark,
   drawIslands,
-  drawLostCargo,
+  drawKeptLoot,
   drawRoute,
   drawShipArrow,
   goalMarker,
@@ -127,11 +127,11 @@ const MARKER = { unit: 13, prey: 16, boss: 20, target: 21, home: 15, goal: 20 } 
 const RIM_INSET = 10; // pixels inside the opening's edge a mark beyond it is drawn at
 const CHEST_COLOR = 0xffcf3f;
 const ME_SIZE = 11; // pixels: the player's arrow
-const LANDMARK_SIZE = 4; // pixels: the lost cargo's and the boss's marks
+const LANDMARK_SIZE = 4; // pixels: the marks of the loot kept on the chart and the boss's
 const COLORS = { neutral: 0xf4f1e6, selected: 0xf2b33d } as const;
 /**
- * The talents' button while a talent waits to be picked, and the captain's mastery's while a point waits to be spent: a
- * "!" on a gold badge at its top right, breathing, and a gold halo round the medallion pulsing with it; the badge pops
+ * The talents' button while a talent waits to be picked, the captain's mastery's while a point waits to be spent, the
+ * feats' while a reward waits to be claimed: a "!" on a gold badge at its top right, breathing, and a gold halo round the medallion pulsing with it; the badge pops
  * in bigger when there are more to pick
  */
 const ALERT = {
@@ -147,9 +147,9 @@ const ALERT = {
 } as const;
 /**
  * The buttons that wear the mark while something waits in their windows: a talent to pick, a captain's point to spend,
- * the guns the story asks to be fitted from the hold
+ * the guns the story asks to be fitted from the hold, a feat's reward to claim
  */
-type AlertId = 'talents' | 'mastery' | 'loadout';
+type AlertId = 'talents' | 'mastery' | 'loadout' | 'feats';
 
 /**
  * What the buttons on the frame do: most open or close their windows; logging out leaves for the landing. The full
@@ -218,8 +218,8 @@ function gridLines(from: number, to: number, size: number) {
  * A click on it (or M) opens the sea chart. The ten slots round the frame's top are buttons, left to right: the
  * settings, the full screen (where the browser allows it), the captain's feats, the hold, the loadout, the ship's
  * talents, the captain's mastery, the bestiary, the world chart and logging out, each lit while its window is open.
- * While a talent waits to be picked the talents' button wears a breathing "!", and while a captain's point waits to be
- * spent the mastery's, each one's hint telling what waits
+ * While a talent waits to be picked the talents' button wears a breathing "!", while a captain's point waits to be spent
+ * the mastery's, and while a feat's reward waits to be claimed the feats', each one's hint telling what waits
  */
 export class Minimap {
   static readonly WIDTH = FRAME_WIDTH;
@@ -332,6 +332,7 @@ export class Minimap {
       talents: this.pickAlert('talents'),
       mastery: this.pickAlert('mastery'),
       loadout: this.pickAlert('loadout'),
+      feats: this.pickAlert('feats'),
     };
     this.hint.anchor.set(0.5, 1);
     this.hint.visible = false;
@@ -342,6 +343,7 @@ export class Minimap {
       this.alerts.talents.badge,
       this.alerts.mastery.badge,
       this.alerts.loadout.badge,
+      this.alerts.feats.badge,
       this.hint,
     );
   }
@@ -362,7 +364,7 @@ export class Minimap {
     this.container.position.set(left, top);
     this.time += dt;
     this.updateAlerts(state, dt);
-    // The full screen's button follows the page's state, however it changed (Escape leaves the full screen too)
+    // The full screen's button follows the page's state, however it changed (Escape held down leaves the full screen too)
     const full = isFullscreen();
     for (const button of this.buttons) {
       const { id } = button;
@@ -394,15 +396,13 @@ export class Minimap {
     drawRoute(g, ship, map, 1.2);
     const markers = this.markers;
     markers.begin();
-    // The boss's lair, seen or not, under its crown; the harbour, its lighthouse silver while a bounty waits there (on
-    // the rim, far off, if the story sends the player nowhere)
-    const { zone } = state.world;
-    const lair = bossLair(zone);
-    const boss = zoneBoss(zone);
-    if (lair && boss) {
-      const marker = bossMarker(SHIP_CLASSES[boss.shipClass]);
+    // The boss's lair and the mini-bosses', seen or not, each under its crown; the harbour, its lighthouse silver while
+    // a bounty waits there (on the rim, far off, if the story sends the player nowhere)
+    for (const { shipClass, boss } of zoneBosses(state.world.zone)) {
+      const { lair } = boss;
+      const marker = bossMarker(SHIP_CLASSES[shipClass]);
       if (!markers.put(marker, map.x(lair.x, lair.y), map.y(lair.x, lair.y), MARKER.boss, 0.8)) {
-        drawBossLair(g, map, LANDMARK_SIZE, zone);
+        drawBossLair(g, map, LANDMARK_SIZE, lair);
       }
     }
     const goal = storyGoal(state, state.player);
@@ -415,11 +415,11 @@ export class Minimap {
 
     // Only what the ship can see: the rest is in the fog of war, but for the prey the story brought in for the player.
     // Each unit its painted marker: the story's prey gold, a bounty's silver, a boss crowned, hostile red, the rest
-    // green; the one the ship fires at in a sight
+    // green; the one the ship fires at in a sight. A monster under water is lost from sight till it comes up
     const targets = storyTargets(state.player);
     const bounties = bountyTargets(state);
     for (const unit of state.ships) {
-      if (unit === ship || !isAfloat(unit)) continue;
+      if (unit === ship || !isAfloat(unit) || unit.submerged) continue;
       if (unit.bot?.prey !== ship.id && !ship.canSee(unit.x, unit.y)) continue;
       const x = map.x(unit.x, unit.y);
       const y = map.y(unit.x, unit.y);
@@ -450,7 +450,7 @@ export class Minimap {
         .fill({ color: CHEST_COLOR })
         .stroke({ width: 1, color: 0x3a2400 });
     }
-    drawLostCargo(g, state, map, LANDMARK_SIZE);
+    drawKeptLoot(g, state, map, LANDMARK_SIZE);
     drawGates(g, markers, map, state.world.gates, LANDMARK_SIZE, ship.shipClass.tier);
     // Where the story sends the player, always in sight: on the rim, the way to steer, while it is far off; breathing
     // gold, over everything but the ship
@@ -541,12 +541,16 @@ export class Minimap {
   }
 
   /**
-   * What a button's hint says: the full screen's while the game fills the screen, the talents' and the mastery's what
-   * waits too
+   * What a button's hint says: the full screen's while the game fills the screen, the talents', the mastery's and the
+   * feats' what waits too
    */
   private hintOf(button: FrameButton, full: boolean) {
     if (button.id === 'fullscreen' && full) return this.leaveFullHint;
     if (button.id === 'loadout' && this.alerts.loadout.badge.visible) return `${button.hint}\n${this.fitHint}`;
+    const { feats } = this.alerts;
+    if (button.id === 'feats' && feats.badge.visible) {
+      return `${button.hint}\n${t('{n} reward to claim|{n} rewards to claim', { n: feats.points })}`;
+    }
     const alert = button.id === 'talents' || button.id === 'mastery' ? this.alerts[button.id] : null;
     if (alert?.badge.visible) return `${button.hint}\n${pickLabel(alert.points, alert.milestones)}`;
     return button.hint;
@@ -581,8 +585,8 @@ export class Minimap {
   }
 
   /**
-   * The marks while a talent waits to be picked, a captain's point to be spent or the story's guns to be fitted,
-   * breathing together. dt: seconds since the last frame
+   * The marks while a talent waits to be picked, a captain's point to be spent, the story's guns to be fitted or a
+   * feat's reward to be claimed, breathing together. dt: seconds since the last frame
    */
   private updateAlerts(state: GameState, dt: number) {
     const { ship } = state;
@@ -593,6 +597,7 @@ export class Minimap {
     this.updateAlert(this.alerts.mastery, captainPoints(state, state.player).left, 0, afloat, breath, dt);
     const fitting = storyFitting(state, state.player) !== null ? 1 : 0;
     this.updateAlert(this.alerts.loadout, fitting, 0, afloat, breath, dt);
+    this.updateAlert(this.alerts.feats, rewardsToClaim(state.player), 0, afloat, breath, dt);
   }
 
   /**

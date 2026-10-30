@@ -8,8 +8,11 @@ import {
   ITEM_CATEGORY_IDS,
   ITEM_IDS,
   ITEMS,
+  OUTFITS,
   OUTFIT_IDS,
+  OUTFIT_SLOTS,
   QUESTS,
+  REPEAT_SHARES,
   zoneQuests,
   REPAIR_HP_PER_GOLD,
   LADDER_LINES,
@@ -27,22 +30,26 @@ import {
   questLimit,
   questOffered,
   questReward,
+  questsToTurnIn,
   repairPrice,
   shipGoal,
   shipQuests,
   storyFitting,
   takenQuest,
+  tavernOpen,
   termsMet,
+  type ActiveQuest,
   type AmmoId,
   type GameState,
   type GoodId,
   type GunId,
   type ItemId,
-  type LineShipId,
   type OutfitId,
   type OutfitSlot,
   type PlayerLineId,
+  type Prize,
   type Quest,
+  type QuestGrade,
   type QuestId,
   type QuestReward,
   type ShipClassId,
@@ -53,13 +60,13 @@ import {
 import { BUILDINGS, HarbourView, type BuildingId } from './HarbourView';
 import type { ConfirmDialog } from './ConfirmDialog';
 import { ItemInfo } from './ItemInfo';
-import { AMMO_ICONS, GUN_ICONS, ITEM_ICONS, OUTFIT_ICONS, SHIP_ICONS } from './iconAtlas';
+import { AMMO_ICONS, CONTRACT_ICONS, GOOD_ICONS, GUN_ICONS, ITEM_ICONS, OUTFIT_ICONS, SHIP_ICONS } from './iconAtlas';
 import { KNOT, itemFace, type ItemButton, type ItemFace, type ShopItem, type Tone } from './itemFaces';
 import { abandonQuestion } from './QuestTracker';
 import { LINE_STYLE } from './shipLore';
 import type { StoryCue } from './storyCue';
 import { StoryGuide, type Guide } from './StoryGuide';
-import { THEME, TITLE_STYLE, drawMeter, glowFill, iconSlot, subheading } from './theme';
+import { THEME, TITLE_STYLE, drawMeter, iconSlot, subheading } from './theme';
 import {
   NIGHT,
   NIGHT_CORNER_REACH,
@@ -70,7 +77,7 @@ import {
   nightDivider,
 } from './nightTheme';
 import { GOODS_LIST, goodRow } from './goodIcons';
-import { questText, questTitle } from './questText';
+import { GRADE_LOOKS, questText, questTitle } from './questText';
 import {
   HudWindow,
   UI,
@@ -86,10 +93,12 @@ import {
   tint,
   whole,
   xpStar,
+  drawLock,
   type Tile,
 } from './ui';
 import { ScrollBar } from './ScrollPane';
 import { Tooltip, type TooltipText } from './Tooltip';
+import { bonusLines, fillPrizeSlots, layPrizes, prizeLine, type PrizeSlot } from './rewardText';
 import { t } from '../i18n/i18n';
 import type { CursorId } from '../input/cursor';
 
@@ -108,13 +117,17 @@ export interface PortActions {
   fitOutfit: (slot: OutfitSlot, id: OutfitId | null) => boolean;
   takeQuest: (id: QuestId) => boolean;
   turnInQuest: (id: QuestId) => boolean;
-  dropQuest: (id: QuestId) => void;
+  /** Gives a quest of one of the player's ships up, done or not (the player has said yes) */
+  dropQuest: (quest: ActiveQuest) => void;
   /** Sells every piece of a good in the hold at the market, or everything (no good given) */
   sellCargo: (good?: GoodId) => boolean;
-  /** Buys `count` of an item at the market, for doubloons */
+  /** Buys `count` of an item on the Golden Galleon in port, for doubloons */
   buyItem: (id: ItemId, count?: number) => boolean;
-  /** Buys a ship the shipyard offers and takes its helm */
-  buyShip: (id: ShipClassId) => boolean;
+  /**
+   * Buys a ship the shipyard offers and takes its helm; `unload`: the guns and outfit of the ship sailed now go into the
+   * hold first, for the new one
+   */
+  buyShip: (id: ShipClassId, unload?: boolean) => boolean;
   /** Takes the helm of a ship laid up in port (its place in the player's fleet) */
   takeHelm: (index: number) => boolean;
 }
@@ -138,12 +151,23 @@ const BODY_TOP = { tabs: TABS_TOP + TAB.height + 12, plain: DIVIDER + 18 }; // w
 const BODY_WIDTH = WIDTH - PAD * 2;
 const TAVERN_WIDTH = BODY_WIDTH;
 const SHOP_WIDTH = BODY_WIDTH;
-const QUEST_HEIGHT = 84;
+const QUEST_HEIGHT = 112;
 const QUEST_GAP = 8;
-const DIAL = 28; // pixels: the radius of a quest's dial, how far it has got
+// Pixels: a quest's dial, its contract's picture in a brass ring that fills with how far it has got: the ring's outer
+// radius and width, and the count on a plate over the ring's foot (its height, its room beside the figures, how far in
+// from the ring's edge its middle is, its letters' size)
+const DIAL = { radius: 44, ring: 7, count: { height: 18, pad: 7, rise: 5, size: 12 } } as const;
+const DIAL_MARK = { radius: 17, tick: 20, lock: 19 } as const; // pixels: the dark spot under a lock or a tick, and theirs
+const LOCKED_TINT = 0x5c5c5c; // a contract not offered yet: its picture darkened under the lock
 const QUEST_BUTTON = { width: 96, drop: 60, height: 26 } as const; // pixels: Take or Turn in, and Drop
 const QUEST_RIGHT = 190; // pixels at a quest's right end for its reward and buttons, beside its text
 const XP_COLOR = 0x5aa8ff; // a quest's experience, as under the player's frame
+// Pixels: a quest's grade after its title, its letters' size, round them across and down, and its gap from the title
+const GRADE_TAG = { size: 10, padX: 6, height: 16, gap: 10, y: 12 } as const;
+// Pixels: the row of a quest's prizes at its card's foot (or how many times it was turned in): an icon's slot, the
+// gap after its count, the count's gap from its slot and its font size, the doubloon's coin in a slot of its own
+const PRIZE = { top: 76, size: 28, gap: 14, count: 4, font: 12, coin: 9, coinInSlot: true } as const;
+const QUEST_ABOUT_LINE = 15; // pixels: a line of what a quest asks, two of them over its prizes
 // Pixels: a quest's reward, leftwards from `right` short of its card's right end on a line `middle` down: its gold,
 // then its experience, `gap` apart, each its sign's middle `sign` before its figure, and what the player would get
 // `bracket` after it; the pointer finds each in a box `height` tall
@@ -155,7 +179,7 @@ const CARD = { height: 100, gap: 12, rowGap: 8, slot: 84, inset: 10, coin: 7, re
 const CARD_WIDTH = (BODY_WIDTH - CARD.gap) / 2;
 const INFO = { width: 30, size: 16 } as const;
 const BUY = { width: 64, height: 24 };
-const ABOUT_LINE = 14; // pixels: a line of what an item of the market's does, two of them on its card
+const ABOUT_LINE = 14; // pixels: a line of what an item of the galleon's does, two of them on its card
 // Pixels: a ship's card's button (Take the helm) at its narrowest, and the room its label keeps past the stars on its
 // points when a language's is longer
 const SHIP_BUY = { width: 120, pad: 6 } as const;
@@ -218,11 +242,19 @@ const TAB_IDS: readonly ShopTab[] = [
 const GUIDE_SAYS = {
   setSail: 'Click to set sail',
   market: 'Sell the goods at the market',
-  sellTab: 'Open the Sell tab',
   sellAll: 'Click to sell everything',
   shipyard: 'Your new ship waits at the shipyard',
   buy: 'Click to buy the ship',
+  tavern: 'Bounties wait at the tavern',
+  take: 'Click to take the bounty',
+  turnIn: 'Turn the bounty in at the tavern',
+  hand: 'Click to turn it in',
+  workshop: 'Fit out your ship at the workshop',
+  buyOutfit: 'Click to buy it: it is fitted at once',
+  fitOutfit: 'Click to fit it',
 } as const;
+// The guide's note over a slot's tab of the workshop: {tab}, its name
+const OUTFIT_TAB_SAYS = 'Open the {tab} tab';
 
 /** The tabs of ammo, and the weapon whose ammo each sells */
 const AMMO_TABS: Partial<Record<ShopTab, WeaponId>> = { cannonballs: 'cannon', harpoons: 'harpoon' };
@@ -241,8 +273,9 @@ const TONES: Readonly<Record<Tone, number>> = { good: UI.good, bad: UI.bad, plai
 /** What each building's window shows: its tabs (none for the tavern, which has the quests, or one that isn't open) */
 const BUILDING_TABS: Readonly<Record<BuildingId, readonly ShopTab[]>> = {
   tavern: [],
-  // The hold's goods sold, and the items bought for doubloons
-  market: ['market', 'wares'],
+  // The hold's goods sold for gold; the items bought for doubloons, in a building of their own that draws the eye
+  market: ['market'],
+  galleon: ['wares'],
   workshop: ['sails', 'hull', 'rudder', 'lookout', 'shipwright'],
   shipyard: ['myShips', 'european', 'eastern', 'pirate', 'northern', 'legendary', 'premium'],
   arsenal: ['cannonballs', 'harpoons', 'cannon', 'harpoon'],
@@ -256,6 +289,9 @@ const CLOSED: Partial<Record<BuildingId, string>> = {
   auction:
     'Captains will sell one another guns, outfit and goods here, each at their own price. It opens with the online game.',
 };
+/** What the tavern says while the story keeps it shut (tavernOpen) */
+const TAVERN_SHUT =
+  "Hale, the harbour master, posts his bounties here for captains Saltwind knows. Follow the story: once you have scouted the Baron's waters, the tavern takes your name.";
 /** What a line's tab says after its look: how its ships are got, for the lines whose ships aren't the shipyard's */
 const LINE_NOTES: Partial<Record<PlayerLineId, string>> = {
   legendary:
@@ -270,6 +306,20 @@ const MESSAGE_Y = HEIGHT - PAD - 18; // pixels: the message's top, under the row
 const SCROLL = { speed: 0.6, margin: 2, thumb: 30 } as const;
 const TIER_HEADING = 28; // pixels: a tier's heading over its ships, in a line of several ships a tier
 
+/** The story's guide on a button of a building's window: its note over it (`above`) or under it */
+function click(container: Container, says: string, above = true, face?: ItemFace) {
+  return { guide: { kind: 'click', target: { container }, above } as const, says, face };
+}
+
+/**
+ * The piece of outfit the story's guide has a new player buy at the workshop: the first of the first slot left empty,
+ * each slot's listed from its cheapest; null with every slot fitted
+ */
+function guidedOutfit(ship: Ship): OutfitId | null {
+  const slot = OUTFIT_SLOTS.find((s) => ship.outfit[s] === null);
+  return slot ? (OUTFIT_IDS[slot][0] ?? null) : null;
+}
+
 /** The ship's figures that its outfit changes, in a line */
 function shipFigures(ship: Ship) {
   const turn = Math.round((ship.turnSpeed * 180) / Math.PI);
@@ -281,10 +331,13 @@ function shipFigures(ship: Ship) {
   });
 }
 
-/** A mark over a building's medallion when something waits there: quests to turn in, goods to sell, a ship to buy */
+/**
+ * A mark over a building's medallion when something waits there: quests to turn in (the ship sailed's of this sea:
+ * another ship's or sea's can't be turned in here), goods to sell, a ship to buy
+ */
 function badges(state: GameState): Partial<Record<BuildingId, string>> {
   const { player, ship } = state;
-  const done = shipQuests(state, player).filter(questDone).length;
+  const done = questsToTurnIn(state, player).length;
   const cargo = cargoCount(ship.cargo);
   return {
     tavern: done > 0 ? String(done) : '',
@@ -317,21 +370,38 @@ interface RewardPart {
 
 /** Which of a quest's reward's parts */
 type RewardKind = 'gold' | 'xp';
+/** What of a quest's card the pointer is over, for its tooltip: a part of its reward, its prizes or its grade */
+type QuestHint = RewardKind | 'prizes' | 'grade';
 
 interface QuestView {
   readonly id: QuestId;
   /** Its card's top in the tavern */
   readonly y: number;
   readonly background: Graphics;
-  /** How far it has got, round the count in it (or a lock, or a tick) */
+  /** Its contract's picture, round, shown once its atlas has loaded */
+  readonly picture: Sprite;
+  /** The ring round the picture, filling with how far it has got */
   readonly dial: Graphics;
+  /** A lock or a tick over the picture */
   readonly mark: Graphics;
+  /** The count to sink, or the kills so far, on a plate at the dial's foot */
   readonly count: Text;
+  readonly countPlate: Graphics;
   /** Its words: dimmed while it isn't offered */
   readonly body: Container;
   readonly about: Text;
+  /** The words it was last cut short for, '' before */
+  aboutFor: string;
   readonly gold: RewardPart;
   readonly xp: RewardPart;
+  /** Where the pointer finds its grade, after its title */
+  readonly grade: Rectangle;
+  /** Its prizes for the first time, a slot each, and where the pointer finds them; while it has any to give */
+  readonly prizes: Container;
+  readonly prizeSlots: readonly PrizeSlot[];
+  readonly prizeHit: Rectangle;
+  /** How many times it was turned in, in the prizes' place once they are given */
+  readonly repeat: Text;
   /** What its reward's brackets said when it was last laid out, '' before */
   laidOut: string;
   /** The state and kills its card and dial were last drawn for, '' before */
@@ -351,26 +421,32 @@ interface ShopRow {
   readonly owned: Text;
   readonly button: Tile;
   readonly label: Text;
-  /** The ship it sells, a shipyard's card's: the story's guide lights the one to buy */
-  readonly ship: LineShipId | null;
+  /** What it sells: the story's guide lights the ship to buy, the piece of outfit to fit */
+  readonly item: ShopItem;
   /** Its Sell button, for what the arsenal buys back */
   readonly sell: { readonly tile: Tile; readonly label: Text } | null;
 }
 
 /**
- * A quest's dial round (0, 0), `radius` pixels: a brass ring round a dark well lit in `color` (unless it is locked),
- * and a track round it filled `share` of the way, from the top clockwise
+ * A quest's dial round (0, 0): a brass ring round its picture, and a track along the ring filled `share` of the way in
+ * `color`, from the top clockwise
  */
-function drawDial(g: Graphics, radius: number, share: number, color: number, lit: boolean) {
-  g.circle(0, 0, radius).fill({ color: NIGHT.well }).stroke({ width: 3, color: THEME.brass });
-  if (lit) g.circle(0, 0, radius - 2).fill(glowFill(color));
-  const track = radius - 8;
-  g.circle(0, 0, track).stroke({ width: 5, color: 0x000000, alpha: 0.5 });
+function drawDial(g: Graphics, share: number, color: number) {
+  const { radius, ring } = DIAL;
+  const track = radius - ring / 2;
+  g.circle(0, 0, track)
+    .stroke({ width: ring, color: THEME.brass })
+    .circle(0, 0, radius)
+    .stroke({ width: 1, color: THEME.brassDark })
+    .circle(0, 0, radius - ring)
+    .stroke({ width: 1.5, color: NIGHT.rim })
+    .circle(0, 0, track)
+    .stroke({ width: ring - 3, color: 0x000000, alpha: 0.55 });
   if (share <= 0) return;
   const start = -Math.PI / 2;
   g.moveTo(0, -track)
     .arc(0, 0, track, start, start + Math.PI * 2 * Math.min(1, share))
-    .stroke({ width: 5, color, cap: 'round' });
+    .stroke({ width: ring - 3, color, cap: 'round' });
 }
 
 /** A tick round (0, 0), `size` pixels across: a quest done */
@@ -380,16 +456,6 @@ function drawTick(g: Graphics, size: number, color: number) {
     .lineTo(-h * 0.2, h * 0.75)
     .lineTo(h, -h * 0.7)
     .stroke({ width: 4, color, cap: 'round', join: 'round' });
-}
-
-/** A padlock round (0, 0), `size` pixels tall: a quest not offered yet */
-function drawLock(g: Graphics, size: number, color: number) {
-  const h = size / 2;
-  const shackle = h * 0.55;
-  g.moveTo(-shackle, 0)
-    .arc(0, 0, shackle, Math.PI, Math.PI * 2)
-    .stroke({ width: 2.5, color });
-  g.roundRect(-h * 0.8, 0, h * 1.6, h, 2).fill({ color });
 }
 
 /** A part of a quest's reward, its sign before its figure, in `size` pixels and `color` */
@@ -428,10 +494,6 @@ function layOut(part: RewardPart, right: number) {
   return part.sign.x;
 }
 
-function signedPercent(share: number) {
-  return `+${Math.round(share * 1000) / 10}%`;
-}
-
 /**
  * The tooltip over a quest's gold or experience: what the quest gives, what adds to it from the captain's mastery and
  * from the ship's talents, and the experience lost beyond the ship's last level
@@ -440,16 +502,19 @@ function rewardText(kind: RewardKind, quest: Quest, reward: QuestReward): Toolti
   const gold = kind === 'gold';
   const bonuses = gold ? reward.goldBonuses : reward.xpBonuses;
   const lines = [t('The quest gives {n}', { n: whole(gold ? quest.reward : quest.xp) })];
-  for (const source of ['captain', 'talent'] as const) {
-    const given = bonuses.filter((bonus) => bonus.source === source);
-    if (given.length === 0) continue;
-    lines.push(source === 'captain' ? t("Captain's mastery") : t("Ship's talents"));
-    for (const { name, share } of given) lines.push(`   ${t(name)}  ${signedPercent(share)}`);
+  if (reward.share < 1) {
+    lines.push(
+      t('Turned in {n} time: {share}% of it this time|Turned in {n} times: {share}% of it this time', {
+        n: reward.times,
+        share: Math.round(reward.share * 100),
+      }),
+    );
   }
   lines.push(
-    bonuses.length > 0
-      ? t('In all: {share}', { share: signedPercent(bonuses.reduce((sum, bonus) => sum + bonus.share, 0)) })
-      : t("No bonuses yet: the captain's mastery and the ship's talents add to it"),
+    ...bonusLines(
+      bonuses,
+      bonuses.reduce((sum, bonus) => sum + bonus.share, 0),
+    ),
   );
   if (!gold && reward.xpLost > 0) lines.push(t("{n} lost: beyond the ship's last level", { n: whole(reward.xpLost) }));
   return {
@@ -459,20 +524,113 @@ function rewardText(kind: RewardKind, quest: Quest, reward: QuestReward): Toolti
   };
 }
 
+/** The tooltip over a quest's prizes: each with how many, and where they go */
+function prizesText(prizes: readonly Prize[]): TooltipText {
+  return {
+    title: t('The first time, besides the reward'),
+    color: GOLD,
+    lines: [
+      ...prizes.map((prize) => `   ${prizeLine(prize)}`),
+      t("Guns, outfit and items go into the hold, ammo into the ship's"),
+    ],
+  };
+}
+
+/** The tooltip over a quest's grade: what it means */
+function gradeText(grade: QuestGrade): TooltipText {
+  const look = GRADE_LOOKS[grade];
+  return { title: t(look.name), color: look.color, lines: [t(look.about)] };
+}
+
 /**
- * A quest's card and dial as the player has it: dim with a lock until it is offered, the count to sink while it is
- * on offer, the kills so far round the dial once taken (its card edged in brass), and a green tick when done
+ * What a quest's card says in its prizes' place once it was turned in: how many times, and that it pays less from its
+ * third (amber once it does)
+ */
+function repeatNote(reward: QuestReward) {
+  const next = REPEAT_SHARES[Math.min(reward.times + 1, REPEAT_SHARES.length - 1)];
+  const n = reward.times;
+  if (reward.share < 1) {
+    return t('Turned in {n} time: {share}% of its reward now|Turned in {n} times: {share}% of its reward now', {
+      n,
+      share: Math.round(reward.share * 100),
+    });
+  }
+  return next < 1
+    ? t('Turned in {n} time: once more in full, then for less|Turned in {n} times: once more in full, then for less', {
+        n,
+      })
+    : t('Turned in {n} time|Turned in {n} times', { n });
+}
+
+/**
+ * A quest's grade after its title, `x` pixels across its card: its name on a pill in its colour, and where the pointer
+ * finds it
+ */
+function gradeTag(grade: QuestGrade, x: number) {
+  const look = GRADE_LOOKS[grade];
+  const label = text(t(look.name).toUpperCase(), GRADE_TAG.size, look.color, {
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  });
+  label.anchor.set(0, 0.5);
+  label.position.set(x + GRADE_TAG.padX, GRADE_TAG.y + GRADE_TAG.height / 2);
+  const hit = new Rectangle(x, GRADE_TAG.y, label.width + GRADE_TAG.padX * 2, GRADE_TAG.height);
+  const pill = new Graphics()
+    .roundRect(hit.x, hit.y, hit.width, hit.height, hit.height / 2)
+    .fill({ color: look.color, alpha: 0.14 })
+    .stroke({ width: 1, color: look.color, alpha: 0.8 });
+  const container = new Container();
+  container.addChild(pill, label);
+  container.eventMode = 'static';
+  container.hitArea = hit;
+  return { container, hit };
+}
+
+/**
+ * A quest's prizes for its first time, in a row at its card's foot: "First time:", then each in a slot glowing in its
+ * tier's colour (its icon once loaded, the doubloon drawn) with how many after it; and where the pointer finds them
+ */
+function prizeRow(prizes: readonly Prize[]) {
+  const container = new Container();
+  const middle = PRIZE.size / 2;
+  const label = text(t('First time:'), 12, GOLD, { fontWeight: 'bold' });
+  label.anchor.set(0, 0.5);
+  label.y = middle;
+  container.addChild(label);
+  const { slots, end } = layPrizes(container, prizes, label.width + PRIZE.gap, middle, PRIZE);
+  const hit = new Rectangle(0, 0, end, PRIZE.size);
+  container.eventMode = 'static';
+  container.hitArea = hit;
+  container.visible = prizes.length > 0;
+  return { container, slots, hit };
+}
+
+/**
+ * A quest's card and dial as the player has it: dim, its picture darkened under a lock, until it is offered; the count
+ * to sink at the dial's foot while it is on offer, the kills so far there and round the dial once taken (its card
+ * edged in brass), and a green tick over the picture when done
  */
 function paintQuest(view: QuestView, look: QuestState, kills: number, count: number) {
   const done = look === 'done';
-  const color = done ? UI.good : look === 'locked' ? NIGHT.dim : THEME.title;
   const share = done ? 1 : look === 'taken' ? kills / count : 0;
-  drawDial(view.dial.clear(), DIAL, share, color, look !== 'locked');
+  drawDial(view.dial.clear(), share, done ? UI.good : THEME.title);
+  view.picture.tint = look === 'locked' ? LOCKED_TINT : 0xffffff;
   view.mark.clear();
-  if (done) drawTick(view.mark, DIAL * 0.8, UI.good);
-  else if (look === 'locked') drawLock(view.mark, DIAL * 0.75, NIGHT.dim);
+  if (done || look === 'locked') view.mark.circle(0, 0, DIAL_MARK.radius).fill({ color: NIGHT.well, alpha: 0.75 });
+  if (done) drawTick(view.mark, DIAL_MARK.tick, UI.good);
+  else if (look === 'locked') drawLock(view.mark, DIAL_MARK.lock, NIGHT.dim);
   show(view.count, look === 'taken' ? `${kills}/${count}` : look === 'offered' ? `×${count}` : '');
   tint(view.count, look === 'taken' ? THEME.text : THEME.title);
+  // Its plate as wide as its figures
+  view.countPlate.clear();
+  if (view.count.text !== '') {
+    const { height, pad } = DIAL.count;
+    const width = view.count.width + pad * 2;
+    view.countPlate
+      .roundRect(-width / 2, -height / 2, width, height, height / 2)
+      .fill({ color: NIGHT.well })
+      .stroke({ width: 1.5, color: THEME.brass });
+  }
   view.body.alpha = look === 'locked' ? 0.6 : 1;
   const edge = done ? UI.good : look === 'taken' ? THEME.brassLight : undefined;
   drawNightCard(view.background.clear(), TAVERN_WIDTH, QUEST_HEIGHT, edge, done ? UI.good : edge && THEME.brass);
@@ -481,8 +639,8 @@ function paintQuest(view: QuestView, look: QuestState, kills: number, count: num
 /**
  * The port, over everything while the player's ship is in port: the harbour's picture with a medallion over each
  * building (HarbourView), and the window of the building clicked over it, in the night look like the hold. The tavern has bounties to take, how far
- * each has got and the reward to collect; the market buys the hold's goods and sells items for doubloons; the workshop sells and fits the ship's
- * outfit and mends its hull; the shipyard keeps the player's ships and shows every line's, built and planned, selling
+ * each has got and the reward to collect; the market buys the hold's goods for gold; the Golden Galleon, at anchor in
+ * the harbour, sells items for doubloons; the workshop sells and fits the ship's outfit and mends its hull; the shipyard keeps the player's ships and shows every line's, built and planned, selling
  * the next one; the arsenal sells guns and ammo. The guild hall and the auction house aren't open yet. The gold cross, a click beside
  * it or Escape closes a building's window; Escape in the harbour sets sail
  */
@@ -498,21 +656,27 @@ export class PortScreen {
   /** What the window shows: the owner adds to it */
   private readonly panel: Container;
   private readonly icon = new Sprite();
+  /** In the medallion's place in the header, while a premium building's isn't painted */
+  private readonly headerDoubloon = doubloon(ICON.size / 2);
   private readonly title = new Text({ text: '', style: { ...TITLE_STYLE, fontSize: NAME.size } });
   private readonly about = text('', 13, NIGHT.dim, { wordWrap: true, wordWrapWidth: ABOUT_WIDTH });
-  /** The player's gold beside the gold cross; their doubloons in the market's Buy, which takes only those */
+  /** The player's gold beside the gold cross; their doubloons on the Golden Galleon, which takes only those */
   private readonly gold = text('', 18, GOLD, { fontWeight: 'bold' });
   private readonly coin = goldCoin(10);
   private readonly doubloon = doubloon(10);
   private readonly message = text('', 13, THEME.text, { fontWeight: 'bold' });
   /** The ship's figures, at the bottom of the workshop's outfit while no message is there */
   private readonly figures = text('', 12, NIGHT.dim);
-  /** The tavern's quests, shown in its window */
+  /** The tavern's quests, shown in its window, scrolled as a tab's rows are when they are taller than it */
   private readonly tavern = new Container();
+  /** The quests' mask, the rows' own: a mask is one container's */
+  private readonly tavernClip = new Graphics();
+  /** How tall the quests are, all of them: a port's are the same while it is open */
+  private readonly tavernHeight: number;
   private readonly quests: QuestView[] = [];
   /** What a quest's reward is made of, over the part of it under the pointer */
   private readonly tooltip = new Tooltip();
-  private hint: { readonly view: QuestView; readonly kind: RewardKind } | null = null;
+  private hint: { readonly view: QuestView; readonly kind: QuestHint } | null = null;
   /** A building that isn't open yet: its medallion and what will be there */
   private readonly closed = new Container();
   private readonly closedIcon = new Sprite();
@@ -521,7 +685,8 @@ export class PortScreen {
     wordWrapWidth: BODY_WIDTH - CLOSED_ICON - 40,
   });
   private readonly tabs: { id: ShopTab; tile: Tile; label: Text; resize: (width: number) => void }[];
-  /** A tab's rows, scrolled with the mouse wheel or the bar beside them when they are taller than the window */
+  /** A tab's rows, scrolled with the mouse wheel or the bar beside them when they are taller than the window (the
+   * tavern's quests too) */
   private readonly list = new Container();
   /** The rows' mask: what of them shows */
   private readonly clip = new Graphics();
@@ -551,6 +716,8 @@ export class PortScreen {
   private readonly guideSays: Readonly<Record<keyof typeof GUIDE_SAYS, string>>;
   /** The card whose button the guide lights: the question before pressing it lights its Yes too */
   private guided: ItemFace | null = null;
+  /** Whether the tavern was shut by the story when its window was opened (tavernOpen): it shows what opens it */
+  private tavernShut = false;
 
   /** zone: the sea the port is in: its tavern offers that sea's quests; openLoadout: the ship at the quay clicked */
   constructor(
@@ -585,6 +752,8 @@ export class PortScreen {
 
     this.icon.width = this.icon.height = ICON.size;
     this.icon.position.set(ICON.x, ICON.y);
+    this.headerDoubloon.position.set(ICON.x + ICON.size / 2, ICON.y + ICON.size / 2);
+    this.headerDoubloon.visible = false;
     this.title.position.set(NAME.x, PAD - 6);
     this.about.position.set(NAME.x, NAME.about);
     // The gold beside the cross, on the title's line
@@ -596,8 +765,11 @@ export class PortScreen {
     this.figures.position.set(NIGHT_CORNER_REACH, MESSAGE_Y + 1);
 
     // The tavern: a row per quest of its sea
-    zoneQuests(zone).forEach((id, i) => this.tavern.addChild(this.questView(id, i * (QUEST_HEIGHT + QUEST_GAP))));
+    const quests = zoneQuests(zone);
+    quests.forEach((id, i) => this.tavern.addChild(this.questView(id, i * (QUEST_HEIGHT + QUEST_GAP))));
     this.tavern.position.set(PAD, BODY_TOP.plain);
+    this.tavern.mask = this.tavernClip;
+    this.tavernHeight = Math.max(0, quests.length * (QUEST_HEIGHT + QUEST_GAP) - QUEST_GAP);
 
     // A building that isn't open yet
     this.closedIcon.width = this.closedIcon.height = CLOSED_ICON;
@@ -620,12 +792,14 @@ export class PortScreen {
     this.panel.addChild(
       divider,
       this.icon,
+      this.headerDoubloon,
       this.title,
       this.about,
       this.coin,
       this.doubloon,
       this.gold,
       this.tavern,
+      this.tavernClip,
       this.closed,
       this.list,
       this.clip,
@@ -639,10 +813,16 @@ export class PortScreen {
     this.guideSays = {
       setSail: t(GUIDE_SAYS.setSail),
       market: t(GUIDE_SAYS.market),
-      sellTab: t(GUIDE_SAYS.sellTab),
       sellAll: t(GUIDE_SAYS.sellAll),
       shipyard: t(GUIDE_SAYS.shipyard),
       buy: t(GUIDE_SAYS.buy),
+      tavern: t(GUIDE_SAYS.tavern),
+      take: t(GUIDE_SAYS.take),
+      turnIn: t(GUIDE_SAYS.turnIn),
+      hand: t(GUIDE_SAYS.hand),
+      workshop: t(GUIDE_SAYS.workshop),
+      buyOutfit: t(GUIDE_SAYS.buyOutfit),
+      fitOutfit: t(GUIDE_SAYS.fitOutfit),
     };
     this.container.addChild(this.harbour.container, this.window.container, this.info.container, this.guide.container);
     window.addEventListener('keydown', (e) => {
@@ -668,8 +848,9 @@ export class PortScreen {
 
   /**
    * Where the story's guide points in port: in the harbour, at the ship's medallion (its guns to fit, the note over Set
-   * sail saying so), Set sail, or the medallion of the building to go into; in that building's window, at the tab and
-   * the button to press. Nothing over another building's window
+   * sail saying so), Set sail, or the medallion of the building to go into; in that building's window, at the button to
+   * press (the tavern's bounty to take or turn in, the workshop's tab and its cheapest piece). Nothing over another
+   * building's window
    */
   private guideFor(
     state: GameState,
@@ -687,28 +868,58 @@ export class PortScreen {
       if (cue.kind === 'setSail') return at('sail', says.setSail);
       if (cue.kind === 'sell') return at('market', says.market);
       if (cue.kind === 'buyShip') return at('shipyard', says.shipyard);
+      if (cue.kind === 'takeQuest') return at('tavern', says.tavern);
+      if (cue.kind === 'turnInQuest') return at('tavern', says.turnIn);
+      if (cue.kind === 'outfit') return at('workshop', says.workshop);
       return null;
     }
-    if (this.open === 'market' && cue.kind === 'sell') {
-      if (this.tab !== 'market') {
-        const tab = this.tabs.find(({ id }) => id === 'market');
-        return tab ? { guide: { kind: 'click', target: { container: tab.tile.container } }, says: says.sellTab } : null;
+    if (this.open === 'tavern' && (cue.kind === 'takeQuest' || cue.kind === 'turnInQuest')) {
+      const view = this.guidedQuest(state, cue.kind === 'turnInQuest');
+      return view ? click(view.button.container, cue.kind === 'turnInQuest' ? says.hand : says.take) : null;
+    }
+    if (this.open === 'workshop' && cue.kind === 'outfit') {
+      const piece = guidedOutfit(state.ship);
+      if (!piece) return null;
+      const { slot } = OUTFITS[piece];
+      if (this.tab !== slot) {
+        const tab = this.tabs.find(({ id }) => id === slot);
+        return tab ? click(tab.tile.container, t(OUTFIT_TAB_SAYS, { tab: t(TABS[slot]) }), false) : null;
       }
+      const row = this.rows.find((r) => 'outfit' in r.item && r.item.outfit === piece);
+      if (!row?.face.button(state).enabled) return null;
+      const spare = (state.player.outfits[piece] ?? 0) > 0;
+      return click(row.button.container, spare ? says.fitOutfit : says.buyOutfit, true, row.face);
+    }
+    if (this.open === 'market' && cue.kind === 'sell') {
       const sellAll = this.market?.sellAll;
       // Its note over it: under it, it would hide the goods' rows
-      return sellAll
-        ? { guide: { kind: 'click', target: { container: sellAll.container }, above: true }, says: says.sellAll }
-        : null;
+      return sellAll ? click(sellAll.container, says.sellAll) : null;
     }
     if (this.open === 'shipyard' && cue.kind === 'buyShip') {
       const goal = shipGoal(state, state.player);
       const ships: readonly string[] = goal ? goalShips(state, state.player, goal) : [];
-      const row = this.rows.find((r) => r.ship !== null && ships.includes(r.ship) && r.face.button(state).enabled);
-      if (!row) return null;
-      const guide = { kind: 'click', target: { container: row.button.container }, above: true } as const;
-      return { guide, says: says.buy, face: row.face };
+      const row = this.rows.find(
+        (r) => 'ship' in r.item && ships.includes(r.item.ship) && r.face.button(state).enabled,
+      );
+      return row ? click(row.button.container, says.buy, true, row.face) : null;
     }
     return null;
+  }
+
+  /**
+   * The tavern's quest whose button the story's guide lights: one of the ship's done, to turn in (`done`), or else the
+   * first easy one on offer and not taken; null if none, or if its card is scrolled out of sight
+   */
+  private guidedQuest(state: GameState, done: boolean) {
+    const { player } = state;
+    const view = this.quests.find((v) => {
+      const taken = takenQuest(state, player, v.id);
+      if (done) return taken !== undefined && questDone(taken);
+      return !taken && QUESTS[v.id].grade === 'easy' && questOffered(player, v.id);
+    });
+    if (!view) return null;
+    const top = this.tavern.y + view.y;
+    return top >= this.listTop - SCROLL.margin && top + QUEST_HEIGHT <= LIST_BOTTOM ? view : null;
   }
 
   /** Out to sea, unless the story keeps the ship in port: then the harbour says why */
@@ -719,8 +930,11 @@ export class PortScreen {
   /** Opens a building's window over the harbour */
   private enter(id: BuildingId) {
     this.open = id;
+    this.tavernShut = id === 'tavern' && this.state !== null && !tavernOpen(this.state, this.state.player);
     // The icons again, if they failed to load before
-    if (id === 'arsenal' || id === 'workshop' || id === 'shipyard' || id === 'market') this.loadIcons();
+    if (id === 'arsenal' || id === 'workshop' || id === 'shipyard' || id === 'galleon' || id === 'market') {
+      this.loadIcons();
+    }
     const building = BUILDINGS.find((b) => b.id === id);
     show(this.title, building ? t(building.name) : '');
     // The tavern says how many bounties a captain may take; the others what they are for
@@ -739,6 +953,8 @@ export class PortScreen {
     const medallion = this.harbour.medallion(id);
     this.icon.visible = medallion !== null;
     this.closedIcon.visible = medallion !== null;
+    // A premium building not painted yet: the doubloon it takes, as on its medallion
+    this.headerDoubloon.visible = medallion === null && building?.premium === true;
     if (medallion) {
       this.icon.texture = medallion;
       this.icon.width = this.icon.height = ICON.size;
@@ -760,12 +976,20 @@ export class PortScreen {
     this.list.position.set(PAD, top);
     // A little room round the rows, for the cards' outlines
     const { margin } = SCROLL;
-    this.clip
-      .clear()
-      .rect(PAD - margin, top - margin, BODY_WIDTH + margin * 2, LIST_BOTTOM - top + margin)
-      .fill({ color: 0xffffff });
-    this.tavern.visible = id === 'tavern';
-    const closed = CLOSED[id];
+    for (const mask of [this.clip, this.tavernClip]) {
+      mask
+        .clear()
+        .rect(PAD - margin, top - margin, BODY_WIDTH + margin * 2, LIST_BOTTOM - top + margin)
+        .fill({ color: 0xffffff });
+    }
+    const quests = id === 'tavern' && !this.tavernShut;
+    this.tavern.visible = quests;
+    // The tab's rows scroll to their top as they are made (buildShop); the tavern's now, and nothing else's
+    if (tabs.length === 0) {
+      this.listHeight = quests ? this.tavernHeight : 0;
+      this.scrollTo(0);
+    }
+    const closed = this.tavernShut ? TAVERN_SHUT : CLOSED[id];
     this.closed.visible = closed !== undefined;
     if (closed) show(this.closedText, t(closed));
     this.list.visible = tabs.length > 0;
@@ -829,7 +1053,7 @@ export class PortScreen {
   private fillWindow(state: GameState, open: BuildingId) {
     const { ship, player } = state;
     this.window.fit();
-    const doubloons = open === 'market' && this.tab === 'wares';
+    const doubloons = open === 'galleon';
     show(this.gold, whole(doubloons ? player.doubloons : player.gold));
     const coin = doubloons ? this.doubloon : this.coin;
     this.coin.visible = !doubloons;
@@ -837,7 +1061,11 @@ export class PortScreen {
     coin.position.set(this.gold.x - this.gold.width - 14, this.gold.y);
     this.message.visible = this.time < this.messageUntil;
 
-    if (open === 'tavern') this.updateQuests(state);
+    if (open === 'tavern') {
+      // Opened by the story while its window is open (a conversation heard out over it): its quests come in
+      if (this.tavernShut === tavernOpen(state, player)) this.enter('tavern');
+      if (!this.tavernShut) this.updateQuests(state);
+    }
     const tabs = BUILDING_TABS[open];
     if (tabs.length === 0) return;
     for (const { id, tile } of this.tabs) tile.setLook({ pressed: id === this.tab });
@@ -905,20 +1133,38 @@ export class PortScreen {
       const offered = questOffered(player, view.id);
       const kills = taken?.kills ?? 0;
       const look: QuestState = done ? 'done' : taken ? 'taken' : offered ? 'offered' : 'locked';
+      if (!view.picture.visible) {
+        // Another sea's contracts show the one painted for them all, until they have their own
+        const picture = CONTRACT_ICONS.get(view.id) ?? CONTRACT_ICONS.get('contract');
+        if (picture) {
+          view.picture.texture = picture;
+          // Sized once it has its texture: a sprite's size is a scale of the texture it has
+          view.picture.setSize((DIAL.radius - DIAL.ring) * 2 + 2);
+          view.picture.visible = true;
+        }
+      }
       if (view.painted !== `${look}:${kills}`) {
         view.painted = `${look}:${kills}`;
         paintQuest(view, look, kills, quest.count);
       }
-      show(
-        view.about,
-        offered
-          ? questText(quest)
-          : t('Turn in {n} more tavern quest to hear of it|Turn in {n} more tavern quests to hear of it', {
-              n: quest.after - player.progress.questsDone,
-            }),
-      );
+      const about = offered
+        ? questText(quest)
+        : t('Turn in {n} more tavern quest to hear of it|Turn in {n} more tavern quests to hear of it', {
+            n: quest.after - player.progress.questsDone,
+          });
+      // Two lines at most, over the prizes' row: cut short once, as the text changes
+      if (view.aboutFor !== about) {
+        view.aboutFor = about;
+        view.about.text = about;
+        clipLines(view.about, 2, QUEST_ABOUT_LINE);
+      }
       tint(view.about, offered ? NIGHT.dim : UI.warn);
       const reward = questReward(state, player, view.id);
+      // The prizes while the first time is to come, then how many times it was turned in
+      view.prizes.visible = reward.prizes.length > 0;
+      fillPrizeSlots(view.prizeSlots);
+      show(view.repeat, reward.times > 0 ? repeatNote(reward) : '');
+      tint(view.repeat, reward.share < 1 ? UI.warn : NIGHT.dim);
       showActual(view.gold, quest.reward, reward.gold);
       showActual(view.xp, quest.xp, reward.xp);
       const brackets = `${view.gold.actual.text}|${view.xp.actual.text}`;
@@ -931,32 +1177,48 @@ export class PortScreen {
         pressed: done,
         disabled: (taken !== undefined && !done) || (!taken && (full || !offered)),
       });
-      view.drop.container.visible = taken !== undefined && !done;
+      // A done one too: a player may let it go rather than take its reward
+      view.drop.container.visible = taken !== undefined;
     }
-    if (!this.hint) {
+    // The prizes just given go from under the pointer, and their tooltip with them
+    if (!this.hint || (this.hint.kind === 'prizes' && !this.hint.view.prizes.visible)) {
       this.tooltip.point(null, 0, 0);
       return;
     }
     const { view, kind } = this.hint;
-    const { hit } = view[kind];
-    const top = this.tavern.y + view.y + hit.y;
-    this.tooltip.point(
-      rewardText(kind, QUESTS[view.id], questReward(state, player, view.id)),
-      this.tavern.x + hit.x + hit.width / 2,
-      top,
-      { width: WIDTH - PAD, under: top + hit.height },
-    );
+    const quest = QUESTS[view.id];
+    const reward = questReward(state, player, view.id);
+    // Where it tells of, in the card's pixels
+    const box =
+      kind === 'prizes'
+        ? new Rectangle(view.prizes.x, view.prizes.y, view.prizeHit.width, view.prizeHit.height)
+        : kind === 'grade'
+          ? view.grade
+          : view[kind].hit;
+    const tip =
+      kind === 'prizes'
+        ? prizesText(reward.prizes)
+        : kind === 'grade'
+          ? gradeText(quest.grade)
+          : rewardText(kind, quest, reward);
+    const top = this.tavern.y + view.y + box.y;
+    this.tooltip.point(tip, this.tavern.x + box.x + box.width / 2, top, {
+      width: WIDTH - PAD,
+      under: top + box.height,
+    });
   }
 
+  /** A message under the rows, cut short to the window's width */
   private say(message: string, color: number = THEME.text) {
     show(this.message, message);
+    clip(this.message, WIDTH - NIGHT_CORNER_REACH * 2);
     tint(this.message, color);
     this.messageUntil = this.time + MESSAGE_TIME;
   }
 
   /**
-   * A quest's card, `y` pixels down the tavern: its dial on the left, its title and what it asks, the reward in gold
-   * and experience, and its buttons
+   * A quest's card, `y` pixels down the tavern: its picture in its dial on the left, its title and what it asks, the
+   * reward in gold and experience, and its buttons
    */
   private questView(id: QuestId, y: number) {
     const quest = QUESTS[id];
@@ -964,25 +1226,41 @@ export class PortScreen {
     row.position.set(0, y);
     const background = new Graphics();
     const dial = new Graphics();
-    dial.position.set(14 + DIAL, QUEST_HEIGHT / 2);
+    dial.position.set(14 + DIAL.radius, QUEST_HEIGHT / 2);
+    const well = new Graphics().circle(0, 0, DIAL.radius).fill({ color: NIGHT.well });
+    well.position.copyFrom(dial.position);
+    // Shown once its atlas has loaded (updateQuests)
+    const picture = new Sprite({ anchor: 0.5 });
+    picture.visible = false;
+    picture.position.copyFrom(dial.position);
     const mark = new Graphics();
     mark.position.copyFrom(dial.position);
-    const count = text('', 14, THEME.text, { fontWeight: 'bold' });
+    const countPlate = new Graphics();
+    countPlate.position.set(dial.x, dial.y + DIAL.radius - DIAL.count.rise);
+    const count = text('', DIAL.count.size, THEME.text, { fontWeight: 'bold' });
     count.anchor.set(0.5);
-    count.position.copyFrom(dial.position);
-    const left = 14 + DIAL * 2 + 16;
+    count.position.copyFrom(countPlate.position);
+    const left = 14 + DIAL.radius * 2 + 16;
     const title = subheading(questTitle(quest), 17);
     title.position.set(left, 9);
-    const about = text(questText(quest), 12, NIGHT.dim, {
+    const tag = gradeTag(quest.grade, left + title.width + GRADE_TAG.gap);
+    // Its words as the game is shown (updateQuests)
+    const about = text('', 12, NIGHT.dim, {
       wordWrap: true,
       wordWrapWidth: TAVERN_WIDTH - left - QUEST_RIGHT,
+      lineHeight: QUEST_ABOUT_LINE,
     });
     about.position.set(left, 37);
+    const prizes = prizeRow(quest.prizes);
+    prizes.container.position.set(left, PRIZE.top);
+    const repeat = text('', 12, NIGHT.dim);
+    repeat.anchor.set(0, 0.5);
+    repeat.position.set(left, PRIZE.top + PRIZE.size / 2);
     // The experience's star before it, as the coin is before the gold; laid out as the game is shown (updateQuests)
     const gold = rewardPart(goldCoin(7), quest.reward, 14, GOLD);
     const xp = rewardPart(xpStar(7), quest.xp, 12, XP_COLOR);
     const body = new Container();
-    body.addChild(title, about, xp.container, gold.container);
+    body.addChild(title, tag.container, about, prizes.container, repeat, xp.container, gold.container);
     const main = moonButton(QUEST_BUTTON.width, QUEST_BUTTON.height, t('Take'), () => this.questAction(id), 12);
     main.tile.container.position.set(TAVERN_WIDTH - 14 - QUEST_BUTTON.width, QUEST_HEIGHT - 12 - QUEST_BUTTON.height);
     // Asked first, as the quest tracker at sea does
@@ -990,23 +1268,42 @@ export class PortScreen {
       const taken = this.state && takenQuest(this.state, this.state.player, id);
       if (!taken) return;
       this.confirm.ask(abandonQuestion(taken), () => {
-        this.actions.dropQuest(id);
+        this.actions.dropQuest(taken);
         this.say(t('"{title}" dropped', { title: questTitle(quest) }), NIGHT.dim);
       });
     });
     drop.tile.container.position.set(main.tile.container.x - 6 - QUEST_BUTTON.drop, main.tile.container.y);
-    row.addChild(background, dial, mark, count, body, main.tile.container, drop.tile.container);
+    row.addChild(
+      background,
+      well,
+      picture,
+      dial,
+      mark,
+      countPlate,
+      count,
+      body,
+      main.tile.container,
+      drop.tile.container,
+    );
     const view: QuestView = {
       id,
       y,
       background,
+      picture,
       dial,
       mark,
       count,
+      countPlate,
       body,
       about,
       gold,
       xp,
+      grade: tag.hit,
+      prizes: prizes.container,
+      prizeSlots: prizes.slots,
+      prizeHit: prizes.hit,
+      repeat,
+      aboutFor: '',
       laidOut: '',
       painted: '',
       button: main.tile,
@@ -1014,8 +1311,13 @@ export class PortScreen {
       drop: drop.tile,
     };
     this.quests.push(view);
-    for (const kind of ['gold', 'xp'] as const) {
-      const { container } = view[kind];
+    const hints: readonly (readonly [QuestHint, Container])[] = [
+      ['gold', gold.container],
+      ['xp', xp.container],
+      ['grade', tag.container],
+      ['prizes', prizes.container],
+    ];
+    for (const [kind, container] of hints) {
       container.on('pointerover', () => (this.hint = { view, kind }));
       container.on('pointerout', () => {
         if (this.hint?.view === view && this.hint.kind === kind) this.hint = null;
@@ -1030,9 +1332,18 @@ export class PortScreen {
     const title = questTitle(quest);
     const taken = this.state && takenQuest(this.state, this.state.player, id);
     if (taken && questDone(taken)) {
-      // What it pays, with the bonuses: worked out before it is turned in
-      const gold = this.state ? questReward(this.state, this.state.player, id).gold : quest.reward;
-      if (this.actions.turnInQuest(id)) this.say(t('"{title}" done: +{n} gold', { title, n: gold }), GOLD);
+      // What it pays, with the bonuses, and its prizes the first time: worked out before it is turned in
+      const reward = this.state && questReward(this.state, this.state.player, id);
+      const n = reward ? reward.gold : quest.reward;
+      const prizes = reward ? reward.prizes.map(prizeLine).join(', ') : '';
+      if (this.actions.turnInQuest(id)) {
+        this.say(
+          prizes
+            ? t('"{title}" done: +{n} gold and {prizes}', { title, n, prizes })
+            : t('"{title}" done: +{n} gold', { title, n }),
+          GOLD,
+        );
+      }
     } else if (this.actions.takeQuest(id)) {
       this.say(t('Taken: {title}. Sink {n} and come back', { title, n: quest.count }));
     }
@@ -1087,28 +1398,34 @@ export class PortScreen {
     this.scrollTo(0);
   }
 
-  /** Scrolls a tab's rows by some pixels: down for more */
+  /** Scrolls a tab's rows, or the tavern's quests, by some pixels: down for more */
   private scrollBy(delta: number) {
-    if (this.open && BUILDING_TABS[this.open].length > 0) this.scrollTo(this.scroll + delta);
+    if (this.open === 'tavern' || (this.open && BUILDING_TABS[this.open].length > 0)) {
+      this.scrollTo(this.scroll + delta);
+    }
   }
 
-  /** Scrolls a tab's rows to a place (pixels from their top), as far as they go, and shows where on the bar */
+  /**
+   * Scrolls a tab's rows, or the tavern's quests, to a place (pixels from their top), as far as they go, and shows
+   * where on the bar
+   */
   private scrollTo(scroll: number) {
     const top = this.listTop;
     const view = LIST_BOTTOM - top;
     const most = Math.max(0, this.listHeight - view);
     this.scroll = Math.min(Math.max(scroll, 0), most);
-    this.list.y = top - this.scroll;
+    (this.open === 'tavern' ? this.tavern : this.list).y = top - this.scroll;
     this.scrollBar.container.position.set(WIDTH - PAD + SCROLL.margin, top);
     this.scrollBar.draw(view, most, this.scroll);
   }
 
-  /** Loads the arsenal's, the workshop's, the shipyard's and the market's icons; their cards are made again with them
-   * once they are there */
+  /** Loads the arsenal's, the workshop's, the shipyard's, the galleon's and the market's icons; their cards and rows
+   * are made again with them once they are there. And the tavern's pictures, which its cards take as they come */
   private loadIcons() {
-    for (const icons of [GUN_ICONS, AMMO_ICONS, OUTFIT_ICONS, SHIP_ICONS, ITEM_ICONS]) {
+    for (const icons of [GUN_ICONS, AMMO_ICONS, OUTFIT_ICONS, SHIP_ICONS, ITEM_ICONS, GOOD_ICONS]) {
       icons.load(() => (this.builtFor = ''));
     }
+    CONTRACT_ICONS.load(() => {});
   }
 
   /**
@@ -1155,7 +1472,7 @@ export class PortScreen {
     resaleCoin.visible = face.resale !== undefined;
     resaleCoin.position.set(resale.x - resale.width - 3 - CARD.resaleCoin, resale.y + resale.height / 2);
     const aboutWidth = width - left - 12 - (face.resale ? resale.width + CARD.resaleCoin * 2 + 11 : 0);
-    // An item of the market's says what it does in two lines, in place of the figures' line
+    // An item of the galleon's says what it does in two lines, in place of the figures' line
     const about = face.wrap
       ? text(face.about, 11, THEME.text, { wordWrap: true, wordWrapWidth: aboutWidth, lineHeight: ABOUT_LINE })
       : text(face.about, 11, NIGHT.dim);
@@ -1210,7 +1527,7 @@ export class PortScreen {
       owned,
       button: button.tile,
       label: button.text,
-      ship: 'ship' in item ? item.ship : null,
+      item,
       sell: sell && { tile: sell.tile, label: sell.text },
     });
     return card;
@@ -1222,13 +1539,18 @@ export class PortScreen {
    */
   private press(face: ItemFace, which: ItemButton = face) {
     if (!this.state) return;
-    const run = () => {
-      const done = this.state && which.press(this.state);
+    const run = (yes?: boolean) => {
+      const done = this.state && which.press(this.state, yes);
       if (done) this.say(done.message, TONES[done.tone]);
     };
     const question = which.confirm?.(this.state);
-    if (question) this.confirm.ask({ ...question, guided: which === this.guided }, run);
-    else run();
+    if (question) {
+      this.confirm.ask(
+        { ...question, guided: which === this.guided },
+        () => run(true),
+        () => run(false),
+      );
+    } else run();
   }
 
   /**
@@ -1285,8 +1607,8 @@ export class PortScreen {
   }
 
   /**
-   * The market's Buy: the items, for doubloons only, under a word that they do nothing yet, group by group, each under
-   * its heading and what its items are for, as cards (bought one at a click, any count in the info window)
+   * The Golden Galleon's wares: the items, for doubloons only, under a word that they do nothing yet, group by group,
+   * each under its heading and what its items are for, as cards (bought one at a click, any count in the info window)
    */
   private buildWares() {
     const note = text(

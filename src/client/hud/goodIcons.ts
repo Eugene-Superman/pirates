@@ -1,6 +1,7 @@
 import { Container, Graphics } from 'pixi.js';
 import { GOODS, type GoodId } from '../../game';
 import { t } from '../i18n/i18n';
+import { GOOD_ICONS } from './iconAtlas';
 import { THEME, iconSlot } from './theme';
 import { drawNightCard, moonButton } from './nightTheme';
 import { goldCoin, text, whole } from './ui';
@@ -25,13 +26,15 @@ export const GOOD_COLORS: Readonly<Record<GoodId, number>> = {
   turtleShell: 0x8fc25c,
   serpentScale: 0x45c4ab,
   moonGlass: 0x9fe8ff,
+  moonPearl: 0xe6dcff,
   baronsStrongbox: 0xffd34d,
 };
 
 /**
- * A good's picture round (0, 0), `size` pixels across, until the goods have painted icons: a fish, folded cloth, a
+ * A good's picture round (0, 0), `size` pixels across, until its painted icon has loaded (and the hold's board's
+ * emblem): a fish, folded cloth, a
  * sack of spices, a bottle of rum, a roped bundle under a seal, a turtle's shell, a serpent's scales, a glowing shard
- * of moon glass, a strongbox
+ * of moon glass, a pearl with the glass's light in it, a strongbox
  */
 export function drawGood(g: Graphics, good: GoodId, size: number) {
   const k = size / 32;
@@ -131,6 +134,16 @@ export function drawGood(g: Graphics, good: GoodId, size: number) {
         .lineTo(7 * k, -4 * k)
         .stroke({ width: k, color: 0x5fb6d4, alpha: 0.8 });
       break;
+    case 'moonPearl':
+      // Pale and round, the shard's light still in it
+      g.circle(0, 0, 13 * k).fill({ color: 0xc9b8ff, alpha: 0.16 });
+      g.circle(0, 1 * k, 10 * k)
+        .fill({ color: 0xe9e2f7 })
+        .stroke({ width: k, color: 0x6a5a8f });
+      g.circle(2 * k, 3 * k, 6 * k).fill({ color: 0xb9a8e0, alpha: 0.45 });
+      g.circle(1 * k, 2 * k, 2.6 * k).fill({ color: 0x9fe8ff, alpha: 0.8 });
+      g.circle(-4 * k, -4 * k, 3 * k).fill({ color: 0xffffff, alpha: 0.85 });
+      break;
     case 'baronsStrongbox':
       g.roundRect(-13 * k, -2 * k, 26 * k, 13 * k, 2 * k)
         .fill({ color: 0x7a4a22 })
@@ -150,7 +163,8 @@ export function drawGood(g: Graphics, good: GoodId, size: number) {
 }
 
 /**
- * A good's row, `width` pixels wide, in the hold or at the market: its picture with how many there are, its name,
+ * A good's row, `width` pixels wide, in the hold or at the market: its picture (painted, once GOOD_ICONS has loaded:
+ * the window that shows it loads them and builds its rows again) with how many there are, its name,
  * what they fetch (at `share` of their price: the captain's mastery), and its buttons at the right end, in the order
  * given, on a board of blue glass
  */
@@ -166,9 +180,13 @@ export function goodRow(
   const { name } = GOODS[id];
   const price = Math.round(GOODS[id].price * share);
   const slot = iconSlot(size, GOOD_COLORS[id], `${count}`, false);
-  const glyph = drawGood(new Graphics(), id, size - 14);
-  glyph.position.set(size / 2, size / 2);
-  slot.container.addChildAt(glyph, 1);
+  const painted = GOOD_ICONS.get(id);
+  slot.show(painted);
+  if (!painted) {
+    const glyph = drawGood(new Graphics(), id, size - 14);
+    glyph.position.set(size / 2, size / 2);
+    slot.container.addChildAt(glyph, 1);
+  }
   slot.container.position.set(12, (height - size) / 2);
   const title = text(t(name), 15, THEME.text, { fontWeight: 'bold' });
   title.position.set(12 + size + 14, 11);

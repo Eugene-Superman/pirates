@@ -483,11 +483,6 @@ export function masteryPassive(id: string): MasteryPassive | undefined {
   return BY_ID.get(id);
 }
 
-/** The most of an effect the whole tree gives: how many quests a captain may take at most, say */
-export function mostOf(effect: BonusEffect) {
-  return MASTERY_PASSIVES.reduce((sum, p) => sum + (p.effects[effect] ?? 0), 0);
-}
-
 /** The captain's points: from the ships levelled, from feats, and how many are spent and left */
 export interface CaptainPoints {
   readonly ships: number;
@@ -519,7 +514,7 @@ export function captainPoints(state: GameState, player: Player): CaptainPoints {
   for (const laidUp of player.fleet) {
     ships += shipPoints(levelOf(laidUp.xp, SHIP_CLASSES[laidUp.shipClass].maxLevel));
   }
-  const feats = featPoints(player.stats);
+  const feats = featPoints(player);
   const spent = masterySpent(player.mastery);
   return { ships, feats, total: ships + feats, spent, left: ships + feats - spent };
 }

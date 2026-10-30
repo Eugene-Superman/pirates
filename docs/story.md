@@ -1,6 +1,6 @@
 # The story
 
-What the game tells a player, and how the code tells it. The starting waters' part is built: a prologue, then twelve
+What the game tells a player, and how the code tells it. The starting waters' part is built: a prologue, then fifteen
 steps in five chapters that lead a new captain from the quay to their first ship of a line. The rest of this page is
 the plan the later seas will follow.
 
@@ -74,8 +74,11 @@ back. Then the player picks their captain's face, and wakes in port, where Edda 
 | 8   |                    | What drags them under | Kill 2 sea serpents, repair at sea             | at once   | The repair (R)               |
 | 9   | The Baron          | The Baron's men       | Sink 3 smuggler sloops                         | in port   | Hostile bots                 |
 | 10  |                    | Scouting              | Scout the Baron's lair                         | at once   | The sea chart (M)            |
-| 11  |                    | The Smuggler Baron    | Sink the Baron                                 | in port   | A boss and his mortar        |
-| 12  | The Seam's seal    | The Seam's seal       | Buy a tier 1 ship at the shipyard              | at once   | The shipyard, the gates      |
+| 11  |                    | Back to Saltwind      | Sail into the harbour                          | in port   | The tavern opens             |
+| 12  |                    | Honest gold           | Take a bounty at the tavern, turn it in        | at once   | The tavern's bounties        |
+| 13  |                    | The workshop          | Buy and fit a piece of outfit                  | at once   | The workshop's outfit        |
+| 14  |                    | The Smuggler Baron    | Sink the Baron                                 | in port   | A boss and his mortar        |
+| 15  | The Seam's seal    | The Seam's seal       | Buy a tier 1 ship at the shipyard              | at once   | The shipyard, the gates      |
 
 What happens: the sloop's guns are in its hold, and Edda has the player fit them before they sail (with a few hundred
 of the plainest cannonballs and harpoons aboard, nothing else); then she sends them out to the buoy. The fishing boats
@@ -85,22 +88,32 @@ of the Fall and the Seams. The shard in the keel wakes at level 2 ("...the sky..
 the merchants who slip past their dues sunk, and notices they carry glass, all of it bound north-east. The turtles grow
 glass in their shells, the serpents have eaten it. A smuggler's papers name the buyer: the Baron. The player scouts his
 lair (the bosun's spyglass on him: the camera turns to him through the fog, and nothing falls on the ship meanwhile),
-then sinks him; aboard are crates of glass and the **seal of a Seam**. Edda takes his papers ("the harbour's
-business now"; the shard: "...she knows who paid him..."). The seal opens a Seam, but the sloop's shard is too small to
-pass one: the shipyard lays a stronger keel stone in a new hull, **under any flag**. With the sloop at its last level
-and the gold saved, the player buys a tier 1 ship of the line they choose, and the Seam to the east lets them through
-to the Coral Coast.
+and the bosun takes them home: the sloop is no match for him yet. Edda agrees, and Hale opens the tavern to them (shut
+till then, it says what opens it): a couple of bounties, he says, grow the ship faster and save the gold for a new hull.
+The first one turned in, the bosun walks them through the workshop, where they buy the cheapest piece of outfit (the
+canvas sails, if the sails' slot is empty). Then the player sinks the Baron; aboard are crates of glass and the **seal
+of a Seam**. Edda takes his papers ("the harbour's business now"; the shard: "...she knows who paid him..."). The seal
+opens a Seam, but the sloop's shard is too small to pass one: the shipyard lays a stronger keel stone in a new hull,
+**under any flag**. With the sloop at its last level and the gold saved, the player buys a tier 1 ship of the line they
+choose (the shipyard asks whether the sloop's guns and outfit go into the hold for it: a new hull comes bare, and the
+gear is a ship's own, moved between ships through the hold), and the Seam to the east lets them through to the Coral
+Coast.
 
 The lines themselves are in [src/game/story/story.ts](../src/game/story/story.ts) (`STORY`, `PROLOGUE`), English, and
 in `uk.ts` and `ru.ts` translated: change them there.
 
-The tavern's bounties stay beside the story, for gold and experience between its steps, taken again and again.
+The tavern's bounties open once the player is home from scouting the Baron (`tavernOpen`: until then the tavern is shut and says what opens
+it, so a new captain learns the sea from the story first), and stay beside the story from then on, for gold and
+experience between its steps, taken again and again: eight to a dozen of a kind, a whole pack or a boss, the first time with prizes
+besides (a piece of outfit or a gun, the Golden Galleon's items, doubloons from the Inkmother and the Baron), from the
+third time for less, so a captain goes round them all.
 
 ## How the code tells it
 
 - `game/story/story.ts` holds it all as data: the speakers, the prologue's cards, the chapters, and each step's
   objectives (`reach` a mark, `sink` so many of a kind, `fit` so many guns, `haul` loot or a good, `dock`, `level`,
-  `talent`, `repair`, `sell`, a `weapon` picked, a `ship` of a tier), its opening and closing lines, how it is turned
+  `talent`, `repair`, `sell`, a tavern quest taken, `takeQuest`, and turned in, `turnInQuest`, a piece of `outfit`
+  fitted, a `weapon` picked, a `ship` of a tier), its opening and closing lines, how it is turned
   in, its reward, a good it takes from the hold, and a kind the crew watches while its closing is told.
 - A player's progress (`player.story`, saved): the prologue seen, the step they are on, whether its opening has been
   told, each objective's count, and a step done whose closing is still to be told. Objectives count only once the
@@ -116,9 +129,14 @@ The tavern's bounties stay beside the story, for gold and experience between its
   gun is fitted: the game's gold pointer carrying a cannon from the hold onto the empty slot lit for it, again and
   again, a note over it; the cannons fitted, the harpoon guns' tab is lit, and the same for them. Never a player shut
   in: with no guns to fit the ship sails.
+- The tavern is shut in the starting waters till the story has brought the player home from the Baron's waters
+  (`tavernOpen`, the step after Back to Saltwind reached), or while a quest of theirs is still to turn in (an older
+  save's); the client takes a quest through `takeBounty`, which refuses meanwhile, and the tavern's window says what
+  opens it. Another sea's tavern is open.
 - The story's places (`StoryMark`: the buoy, the spot off the Baron's lair) are placed on open water when the sea is
   made, like the gates, and no bot comes into the game or wanders near them; while a step asks the player home (or
-  to sell the goods aboard, once that is all it still asks), its mark is the harbour. Where the story sends the player (`storyGoal`: that mark, or the nearest of its prey) is always
+  to sell the goods aboard, once that is all it still asks, or for what only the tavern or the workshop does: a bounty
+  to take, one done to turn in, the outfit to buy), its mark is the harbour. Where the story sends the player (`storyGoal`: that mark, or the nearest of its prey) is always
   on the minimap in breathing gold, a painted marker (a star, the harbour's lighthouse, the prey's crescent), on its rim
   the way to steer while it is far off, and on the sea chart with every one of the prey; the bosun says so as the first
   course and the fishing boats begin. The mark glows gold in the water, rings of light spreading from it, bent by the waves, a
@@ -133,15 +151,15 @@ The tavern's bounties stay beside the story, for gold and experience between its
   turns to him and back after, and no bot starts a fight with the ship (`Ship.spotted`, `Ship.parley`).
 - A player who reads none of it still gets through: whatever the step asks to be pressed is lit
   (`client/hud/storyCue.ts`, `StoryGuide.ts`), a gold light breathing round it, the game's gold pointer clicking it
-  with rings of light going out, and a short note. In port Set sail while the step is done at sea, the market's
-  medallion while there are goods to sell, then its Sell tab and Sell everything, and the shipyard's medallion and the
-  new ship's Buy once its terms are met; at sea the talents' button once a point waits for the step's talent (in the
+  with rings of light going out, and a short note. In port Set sail while the step is done at sea, till the player first leaves port, the market's
+  medallion while there are goods to sell, then its Sell tab and Sell everything, the tavern's medallion and the first easy bounty's Take, its Turn in
+  once it is done, the workshop's medallion, the empty slot's tab and its cheapest piece's Buy (bought and fitted at
+  once), and the shipyard's medallion and the new ship's Buy once its terms are met; at sea the talents' button once a point waits for the step's talent (in the
   tree the talent to take spotlit, all else dimmed, and Yes in the question), the weapon to pick and the repair once the
   hull can be mended. Nothing while a conversation is told.
-- The bosun's tips (`client/hud/Tips.ts`): the first three times the player fires cannonballs at a beast or harpoons at
+- The bosun's tips (`client/hud/Tips.ts`): the first time the player fires cannonballs at a beast or harpoons at
   a hull, fires with no guns or ammo at hand, runs out of or low on ammo, or fills the hold, a line of the bosun's in
-  the conversation box, going by itself after a while; never while the story speaks. The browser keeps how often each
-  was given.
+  the conversation box, going by itself after a while; never while the story speaks. The browser keeps which were given.
 - The goal it leads to is the shipyard's: `economy/shipyard.ts`, the first ship after the starter sloop of tier 1 and
   any line (`TIER_TERMS`, the story told up to the Seam's seal), each next one the next of its line.
 - An older save, from before the story, is told to its end if the player was past the starting waters' first steps

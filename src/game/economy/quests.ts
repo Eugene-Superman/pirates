@@ -8,13 +8,21 @@ import type { ShipClassId } from '../ships/shipClasses';
 import { gainXp, talentOf, xpGiven, xpRoom } from '../ships/talents';
 import { START_ZONE, ZONE_IDS, type OuterZoneId, type ZoneId } from '../world/zones';
 import { earn, shipOf, type Player } from './player';
+import { givePrizes, type Prize } from './prizes';
 
 /** The starting waters' own quests */
-type StarterQuestId = 'fishers' | 'turtles' | 'merchants' | 'smugglers' | 'serpents' | 'baron';
+type StarterQuestId =
+  'fishers' | 'turtles' | 'merchants' | 'smugglers' | 'serpents' | 'jackals' | 'inkmother' | 'baron';
 /** The kinds of bots (bots/botKinds.ts, ARCHETYPES) every other sea's tavern puts a bounty on */
 type SeaQuestKey = Exclude<ArchetypeKey, 'raider'>;
 /** A tavern's quest, by id: the starting waters' own (`turtles`…), and every other sea's (`coralCoast.pirate`) */
 export type QuestId = StarterQuestId | `${OuterZoneId}.${SeaQuestKey}`;
+
+/**
+ * How hard a quest is, for the tavern to tell before it is taken: its prey neutral (easy) or out to sink the player
+ * (hard), an elite or a mini-boss, a sea's boss (epic)
+ */
+export type QuestGrade = 'easy' | 'hard' | 'elite' | 'epic';
 
 /** A bounty the tavern offers: sink (or kill) so many of one kind, then come back for the reward */
 export interface Quest {
@@ -34,6 +42,9 @@ export interface Quest {
   readonly xp: number;
   /** Quests the player must have turned in before the tavern offers this one */
   readonly after: number;
+  readonly grade: QuestGrade;
+  /** What it gives besides, the first time the player turns it in (none for the seas past the starting waters, yet) */
+  readonly prizes: readonly Prize[];
 }
 
 /**
@@ -64,68 +75,145 @@ export interface QuestReward {
   readonly xpLost: number;
   readonly goldBonuses: readonly RewardBonus[];
   readonly xpBonuses: readonly RewardBonus[];
+  /** How many times the player has turned it in before */
+  readonly times: number;
+  /** The share of its gold and experience it pays this time (REPEAT_SHARES) */
+  readonly share: number;
+  /** Its prizes, this the first time; none after */
+  readonly prizes: readonly Prize[];
 }
 
 /** Quests each of a player's ships may have at once */
 export const MAX_QUESTS = 3;
 
-// Rewards worth a few kills' bounties, more for the dangerous ones; every quest can be taken again once turned in. The
-// starting waters' experience is two and a half times the table's, as their bots' is (bots/botKinds.ts)
+// A dozen or so of a kind, not a few: a quest is an outing of its own, not a minute's errand. Its gold is about what its
+// kills' bounties pay, its experience most of what they bring (the starting waters' two and a half times the table's,
+// as their bots' is, bots/botKinds.ts); every quest can be taken again once turned in, paying less from its third
+// time (REPEAT_SHARES). The first time, prizes besides, worth more up the grades: a piece of outfit or a gun of the
+// arsenal's and some of the Golden Galleon's items, a gun of the next tier from the mini-boss and the Baron, doubloons
 const STARTER_QUESTS: Readonly<Record<StarterQuestId, Quest>> = {
   fishers: {
     id: 'fishers',
     zone: START_ZONE,
     title: 'Empty nets',
-    text: 'The fishing boats drag our reefs for glass and scare the fish off. Sink five of them.',
+    text: 'The fishing boats drag our reefs for glass and scare the fish off. Sink {count} of them.',
     target: 'fishingBoat',
-    count: 5,
-    reward: 50,
-    xp: 100,
+    count: 12,
+    reward: 80,
+    xp: 250,
     after: 0,
+    grade: 'easy',
+    prizes: [
+      { kind: 'outfit', id: 'spyglass', count: 1 },
+      { kind: 'item', id: 'fishingNets', count: 2 },
+      { kind: 'item', id: 'canvasPatch', count: 2 },
+    ],
   },
   turtles: {
     id: 'turtles',
     zone: START_ZONE,
     title: 'Turtle soup',
-    text: 'The cook wants turtle meat. Hunt five sea turtles; mind their jaws.',
+    text: 'The cook wants turtle meat, a barrel of it. Hunt {count} sea turtles; mind their jaws.',
     target: 'seaTurtle',
-    count: 5,
-    reward: 120,
-    xp: 225,
+    count: 10,
+    reward: 150,
+    xp: 400,
     after: 0,
+    grade: 'easy',
+    prizes: [
+      { kind: 'outfit', id: 'oakPlanking', count: 1 },
+      { kind: 'ammo', id: 'barbedHarpoon', count: 100 },
+      { kind: 'item', id: 'cabinBoysScroll', count: 2 },
+    ],
   },
   merchants: {
     id: 'merchants',
     zone: START_ZONE,
     title: 'Raid the trade',
-    text: 'Merchant sloops sail past without paying their dues. Sink three.',
+    text: 'Merchant sloops sail past without paying their dues. Sink {count} of them.',
     target: 'merchantSloop',
-    count: 3,
-    reward: 120,
-    xp: 250,
+    count: 10,
+    reward: 180,
+    xp: 600,
     after: 0,
+    grade: 'easy',
+    prizes: [
+      { kind: 'outfit', id: 'canvasSails', count: 1 },
+      { kind: 'item', id: 'luckyCoin', count: 1 },
+      { kind: 'item', id: 'fireworks', count: 3 },
+    ],
   },
   smugglers: {
     id: 'smugglers',
     zone: START_ZONE,
     title: 'Smugglers wanted',
-    text: 'Smugglers attack anyone who comes near. The harbour master pays for three sunk.',
+    text: 'Smugglers attack anyone who comes near. The harbour master pays for {count} of them sunk.',
     target: 'smugglerSloop',
-    count: 3,
-    reward: 160,
-    xp: 325,
+    count: 10,
+    reward: 250,
+    xp: 800,
     after: 0,
+    grade: 'hard',
+    prizes: [
+      { kind: 'outfit', id: 'tiller', count: 1 },
+      { kind: 'ammo', id: 'chainShot', count: 100 },
+      { kind: 'item', id: 'smokePots', count: 2 },
+    ],
   },
   serpents: {
     id: 'serpents',
     zone: START_ZONE,
     title: "Serpent's bane",
-    text: 'Sea serpents drag our boats under. Kill three, and keep your harpoons sharp.',
+    text: 'Sea serpents drag our boats under. Kill {count}, and keep your harpoons sharp.',
     target: 'seaSerpent',
-    count: 3,
-    reward: 180,
-    xp: 375,
+    count: 8,
+    reward: 220,
+    xp: 700,
     after: 0,
+    grade: 'hard',
+    prizes: [
+      { kind: 'gun', id: 'deckCrossbow', count: 1 },
+      { kind: 'item', id: 'whaleboneNet', count: 2 },
+      { kind: 'item', id: 'navigatorsScroll', count: 1 },
+    ],
+  },
+  // A pack of the far waters (bots/botKinds.ts, `jackals`): four at once, the first fight against many, an elite's.
+  // Paid more than its four bounties, as the Inkmother is: the fight is hard and a pack is far to find. Its prizes are
+  // for the next pack: sails quick into a turn, a horn that slows their reloads, timbers to mend the hull in the fight
+  jackals: {
+    id: 'jackals',
+    zone: START_ZONE,
+    title: 'The jackal pack',
+    text: 'Cutters hunt the far waters in packs of four and fall on lone ships together, like jackals. Sink a whole pack, all {count}. Come with your hull whole, sink the nearest first, and never let them circle you.',
+    target: 'jackalCutter',
+    count: 4,
+    reward: 200,
+    xp: 450,
+    after: 1,
+    grade: 'elite',
+    prizes: [
+      { kind: 'outfit', id: 'patchedJib', count: 1 },
+      { kind: 'item', id: 'hornOfDread', count: 2 },
+      { kind: 'item', id: 'spareTimbers', count: 2 },
+    ],
+  },
+  // The mini-boss (bots/botKinds.ts, `inkmother`), once the player has the harpoons' measure: before the Baron
+  inkmother: {
+    id: 'inkmother',
+    zone: START_ZONE,
+    title: 'The Inkmother',
+    text: 'Something with arms longer than a mast drags boats under in the south-west. Fishermen call it the Inkmother. Kill it, and mind its arms.',
+    target: 'inkmother',
+    count: 1,
+    reward: 220,
+    xp: 500,
+    after: 1,
+    grade: 'elite',
+    prizes: [
+      { kind: 'gun', id: 'harpoonGun2', count: 1 },
+      { kind: 'item', id: 'jellyfishVenom', count: 2 },
+      { kind: 'doubloons', count: 5 },
+    ],
   },
   // The starting waters' last bounty: the boss (bots/botKinds.ts, `baron`), once the player knows the sea
   baron: {
@@ -135,52 +223,83 @@ const STARTER_QUESTS: Readonly<Record<StarterQuestId, Quest>> = {
     text: 'The Baron and his smugglers hold the north-east. Sink his brig, and watch for his mortar: get out of the circles.',
     target: 'baronBrig',
     count: 1,
-    reward: 300,
-    xp: 750,
-    after: 3,
+    reward: 320,
+    xp: 1000,
+    after: 2,
+    grade: 'epic',
+    prizes: [
+      { kind: 'gun', id: 'cannon2', count: 2 },
+      { kind: 'item', id: 'captainsBanner', count: 1 },
+      { kind: 'doubloons', count: 10 },
+    ],
   },
 };
 
-// The other seas' quests, made from their bots (bots/botKinds.ts): so many of an archetype's kind sunk, for a share of
-// what the kills pay in gold and experience: together, about a quarter of the experience a ship earns in its sea
+// The other seas' quests, made from their bots (bots/botKinds.ts): so many of an archetype's kind sunk, as many as the
+// starting waters ask, for a share of what the kills pay in gold and experience: together, about a quarter of the
+// experience a ship earns in its sea. No prizes yet
 const SEA_QUESTS: readonly {
   readonly key: SeaQuestKey;
   readonly count: number;
+  readonly grade: QuestGrade;
   readonly title: string;
   readonly text: string;
 }[] = [
   {
     key: 'trader',
-    count: 5,
+    count: 10,
+    grade: 'easy',
     title: 'Bounty: {target}',
     text: 'The harbour master of {zone} pays for {count} of them sunk.',
   },
   {
     key: 'grazer',
-    count: 4,
+    count: 8,
+    grade: 'easy',
     title: 'Hunt: {target}',
     text: 'The cook of {zone} wants {count} of them, and mind their jaws.',
   },
   {
     key: 'pirate',
-    count: 5,
+    count: 10,
+    grade: 'hard',
     title: 'Bounty: {target}',
     text: 'The harbour master of {zone} pays for {count} of them sunk.',
   },
   {
     key: 'hunter',
-    count: 4,
+    count: 8,
+    grade: 'hard',
     title: 'Hunt: {target}',
     text: '{count} of them prey on the ships of {zone}. Hunt them down.',
   },
-  { key: 'elite', count: 1, title: 'Wanted: {target}', text: 'One {target} rules the sea lanes of {zone}. Sink it.' },
+  {
+    key: 'pack',
+    count: 4,
+    grade: 'elite',
+    title: 'The pack: {target}',
+    text: 'They hunt {zone} in packs and fall on lone ships together. Sink a whole pack, all {count}.',
+  },
+  {
+    key: 'elite',
+    count: 1,
+    grade: 'elite',
+    title: 'Wanted: {target}',
+    text: 'One {target} rules the sea lanes of {zone}. Sink it.',
+  },
   {
     key: 'boss',
     count: 1,
+    grade: 'epic',
     title: 'The terror of {zone}',
     text: 'Sink the {target} at its lair, and its escort scatters.',
   },
 ];
+/**
+ * The share of a quest's gold and experience it pays by the times the player turned it in before: in full twice, then
+ * less, the last share from then on, so a player goes round the tavern's quests rather than doing one over and over
+ */
+export const REPEAT_SHARES: readonly number[] = [1, 1, 0.5, 0.25];
 const QUEST_GOLD = 0.8; // a quest's gold, as a share of what its kills' bounties pay
 const QUEST_XP = 0.6; // and its experience, of what its kills bring
 // The effects (ships/bonus.ts) that add to a quest's gold (questGold) and to its XP (talents.ts, xpGiven)
@@ -188,7 +307,7 @@ const GOLD_EFFECTS: readonly BonusEffect[] = ['questGold', 'gold'];
 const XP_EFFECTS: readonly BonusEffect[] = ['xp', 'questXp'];
 
 function seaQuests(zone: OuterZoneId): Quest[] {
-  return SEA_QUESTS.map(({ key, count, title, text }) => {
+  return SEA_QUESTS.map(({ key, count, grade, title, text }) => {
     const kind = BOT_KINDS[kindId(zone, key)];
     return {
       id: `${zone}.${key}` as const,
@@ -200,6 +319,8 @@ function seaQuests(zone: OuterZoneId): Quest[] {
       reward: Math.round(count * kind.bounty * QUEST_GOLD),
       xp: Math.round(count * kind.xp * QUEST_XP),
       after: 0,
+      grade,
+      prizes: [],
     };
   });
 }
@@ -218,6 +339,10 @@ export const QUESTS: Readonly<Record<string, Quest>> = Object.fromEntries(ALL_QU
 
 export const QUEST_IDS: readonly QuestId[] = ALL_QUESTS.map((quest) => quest.id);
 
+export function isQuest(value: unknown): value is QuestId {
+  return typeof value === 'string' && Object.hasOwn(QUESTS, value);
+}
+
 /** The quests the tavern of a sea offers, in order */
 export function zoneQuests(zone: ZoneId): readonly QuestId[] {
   return QUEST_IDS.filter((id) => QUESTS[id].zone === zone);
@@ -225,6 +350,16 @@ export function zoneQuests(zone: ZoneId): readonly QuestId[] {
 
 function docked(state: GameState, player: Player) {
   return state.ships.some((ship) => ship.id === player.shipId && ship.docked);
+}
+
+/** How many times the player has turned a quest in, by any of their ships */
+export function timesTurnedIn(player: Player, id: QuestId) {
+  return player.progress.turnedIn[id] ?? 0;
+}
+
+/** The share of a quest's gold and experience it pays the player this time (REPEAT_SHARES) */
+function repeatShare(player: Player, id: QuestId) {
+  return REPEAT_SHARES[Math.min(timesTurnedIn(player, id), REPEAT_SHARES.length - 1)];
 }
 
 /** Whether the tavern offers a quest to this player yet: some wait till others have been turned in */
@@ -253,6 +388,8 @@ export function takenQuest(state: GameState, player: Player, id: QuestId) {
  * questLimit on hand. False if it can't
  */
 export function takeQuest(state: GameState, player: Player, id: QuestId) {
+  // Checked first: online the id is a player's
+  if (!isQuest(id)) return false;
   const ship = shipOf(state, player);
   if (!ship || !docked(state, player) || shipQuests(state, player).length >= questLimit(state, player)) return false;
   if (!questOffered(player, id)) return false;
@@ -262,23 +399,45 @@ export function takeQuest(state: GameState, player: Player, id: QuestId) {
   return true;
 }
 
-/** Gives a quest of the ship the player sails up, with nothing for it */
-export function dropQuest(state: GameState, player: Player, id: QuestId) {
-  const quest = takenQuest(state, player, id);
+/**
+ * Gives a quest of any of the player's ships up, with nothing for it, done or not: anywhere, from any ship, so a
+ * player needn't take the helm of a ship laid up in port and sail back to the sea of its quest only to let it go.
+ * False if that ship has no such quest
+ */
+export function dropQuest(player: Player, ship: ShipClassId, id: QuestId) {
+  const quest = player.quests.find((q) => q.ship === ship && q.id === id);
+  if (!quest) return false;
   player.quests = player.quests.filter((q) => q !== quest);
+  return true;
 }
 
-/** A quest's gold for the ship that turns it in: more with its talents and the captain's mastery */
-function questGold(ship: Ship | undefined, id: QuestId) {
+/**
+ * The quests the ship the player sails has done in this sea: those its tavern takes in, and the port's marks count.
+ * Another ship's wait till the player takes its helm, another sea's till they sail back there
+ */
+export function questsToTurnIn(state: GameState, player: Player) {
+  return shipQuests(state, player).filter((q) => questDone(q) && QUESTS[q.id].zone === state.world.zone);
+}
+
+/**
+ * A quest's gold for the ship that turns it in: more with its talents and the captain's mastery, `repeat` of it this
+ * time (repeatShare)
+ */
+function questGold(ship: Ship | undefined, id: QuestId, repeat: number) {
   const share = ship ? 1 + ship.bonus.questGold + ship.bonus.gold : 1;
-  return Math.round(QUESTS[id].reward * share);
+  return Math.round(QUESTS[id].reward * repeat * share);
+}
+
+/** A quest's experience before the bonuses: `repeat` of it this time (repeatShare) */
+function questXp(id: QuestId, repeat: number) {
+  return Math.round(QUESTS[id].xp * repeat);
 }
 
 /**
  * The passives of the player's mastery and the talents of their ship that give any of these effects, with what they
- * give of them together
+ * give of them together: what the tavern and the bestiary (economy/loot.ts, killReward) list under a reward
  */
-function bonusesFor(ship: Ship, player: Player, effects: readonly BonusEffect[]): RewardBonus[] {
+export function bonusesFor(ship: Ship, player: Player, effects: readonly BonusEffect[]): RewardBonus[] {
   const of = (given: Effects) => effects.reduce((sum, effect) => sum + (given[effect] ?? 0), 0);
   const bonuses = new Map<string, RewardBonus>();
   const add = (source: RewardBonus['source'], name: string, share: number) => {
@@ -297,12 +456,18 @@ function bonusesFor(ship: Ship, player: Player, effects: readonly BonusEffect[])
   return [...bonuses.values()];
 }
 
-/** What a quest would pay the player now, turned in by the ship they sail, and what adds to it: for the tavern */
+/**
+ * What a quest would pay the player now, turned in by the ship they sail, and what adds to it or takes from it: for the
+ * tavern
+ */
 export function questReward(state: GameState, player: Player, id: QuestId): QuestReward {
   const ship = shipOf(state, player);
-  const gold = questGold(ship, id);
-  if (!ship) return { gold, xp: 0, xpLost: 0, goldBonuses: [], xpBonuses: [] };
-  const given = xpGiven(ship, QUESTS[id].xp, 'quest');
+  const times = timesTurnedIn(player, id);
+  const share = repeatShare(player, id);
+  const gold = questGold(ship, id, share);
+  const prizes = times === 0 ? QUESTS[id].prizes : [];
+  if (!ship) return { gold, xp: 0, xpLost: 0, goldBonuses: [], xpBonuses: [], times, share, prizes };
+  const given = xpGiven(ship, questXp(id, share), 'quest');
   const xp = Math.min(given, xpRoom(ship));
   return {
     gold,
@@ -310,22 +475,35 @@ export function questReward(state: GameState, player: Player, id: QuestId): Ques
     xpLost: given - xp,
     goldBonuses: bonusesFor(ship, player, GOLD_EFFECTS),
     xpBonuses: bonusesFor(ship, player, XP_EFFECTS),
+    times,
+    share,
+    prizes,
   };
 }
 
 /**
- * Turns a done quest in at a tavern (of any sea) for its reward and experience, more with the captain's mastery and
- * the ship's talents: by the ship that took it. False if it isn't done, or the ship isn't in port
+ * Turns a done quest in at the tavern of its sea for its reward and experience, more with the captain's mastery and
+ * the ship's talents, less from its third time; its prizes besides the first time (a `prizes` event): by the ship
+ * that took it. False if it isn't done, or the ship isn't in port of the quest's sea
  */
 export function turnInQuest(state: GameState, player: Player, id: QuestId) {
   const quest = takenQuest(state, player, id);
   if (!quest || !docked(state, player) || quest.kills < QUESTS[id].count) return false;
+  if (QUESTS[id].zone !== state.world.zone) return false;
+  const times = timesTurnedIn(player, id);
+  const share = repeatShare(player, id);
   player.quests = player.quests.filter((q) => q !== quest);
   player.progress.questsDone++;
+  player.progress.turnedIn[id] = times + 1;
   const ship = shipOf(state, player);
   const at = ship ? { x: ship.x, y: ship.y, z: ship.height } : { x: 0, y: 0, z: 0 };
-  earn(state, player, { amount: questGold(ship, id), reason: 'quest', kind: null, quest: id, at });
-  if (ship) gainXp(state, ship, QUESTS[id].xp, 'quest', at);
+  earn(state, player, { amount: questGold(ship, id, share), reason: 'quest', kind: null, quest: id, at });
+  if (ship) gainXp(state, ship, questXp(id, share), 'quest', at);
+  const { prizes } = QUESTS[id];
+  if (times === 0 && prizes.length > 0) {
+    givePrizes(player, ship, prizes);
+    state.events.push({ type: 'prizes', shipId: player.shipId, quest: id, prizes, at });
+  }
   return true;
 }
 

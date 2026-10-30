@@ -1,7 +1,15 @@
 // Public API of the game logic. The client imports game/ only through this file,
 // so the logic can later move into a package shared with the server without touching the client
-export { BOT_KINDS, botsInSea, zoneBoss, zoneKinds, type BotKind, type BotKindId } from './bots/botKinds';
-export { isHostile, type BotMind } from './bots/brain';
+export {
+  BOT_KINDS,
+  botsInSea,
+  zoneBosses,
+  zoneKinds,
+  type BossKind,
+  type BotKind,
+  type BotKindId,
+} from './bots/botKinds';
+export { isHostile, noticeRange, type BotMind } from './bots/brain';
 export {
   AMMO,
   AMMO_IDS,
@@ -17,6 +25,7 @@ export {
   type GunId,
 } from './combat/arsenal';
 export type { Shell } from './combat/barrage';
+export type { Brood, Dive, Diving, Ink, InkCloud, MonsterSkills } from './combat/monsterSkills';
 export { abilityTarget, type PowderKeg } from './combat/ordnance';
 export {
   projectilePosition,
@@ -48,7 +57,7 @@ export {
   type Good,
   type GoodId,
 } from './economy/cargo';
-export { CHEST_TIME, LOST_CARGO_TIME, type Chest } from './economy/loot';
+export { killReward, mayHaul, type Chest, type KillReward, type RewardBoost } from './economy/loot';
 export {
   ITEMS,
   ITEM_CATEGORIES,
@@ -66,22 +75,27 @@ export {
   MAX_QUESTS,
   QUESTS,
   QUEST_IDS,
+  REPEAT_SHARES,
+  bonusesFor,
   dropQuest,
   questDone,
+  questsToTurnIn,
   questLimit,
   questOffered,
   questReward,
   shipQuests,
-  takeQuest,
   takenQuest,
+  timesTurnedIn,
   turnInQuest,
   zoneQuests,
   type ActiveQuest,
   type Quest,
+  type QuestGrade,
   type QuestId,
   type QuestReward,
   type RewardBonus,
 } from './economy/quests';
+export type { Prize } from './economy/prizes';
 export {
   AMMO_PACK,
   ammoPackPrice,
@@ -139,6 +153,8 @@ export {
   storyTalk,
   storyTargets,
   storyWatch,
+  takeBounty,
+  tavernOpen,
   tellStory,
   type Line,
   type Objective,
@@ -155,8 +171,8 @@ export { GOLD_REASONS, totalGold, totalKills, type GoldReason, type Stats } from
 export type { GameState } from './GameState';
 export { signedDistanceToPolygon } from './lib/geometry';
 export { createRandom } from './lib/random';
-export type { Body, Hull } from './physics/hull';
-export { REPAIR_HP_PER_GOLD, REPAIR_TICK, canPayRepair, orderRepair, repairStep } from './ships/repair';
+export { hullReach, type Body, type Hull } from './physics/hull';
+export { REPAIR_HP_PER_GOLD, REPAIR_TICK, canPayRepair, repairStep, toggleRepair } from './ships/repair';
 export type { Ship } from './ships/Ship';
 export {
   OUTFITS,
@@ -176,6 +192,7 @@ export {
   MILESTONES,
   PERKS,
   SIGNATURES,
+  XP_BY_LEVELS,
   abilityCooldown,
   milestonesToPick,
   pointsSpent,
@@ -194,6 +211,7 @@ export {
   type BranchLook,
   type BranchTalent,
   type BranchTalentId,
+  type KillXpShare,
   type SignatureId,
   type SignatureTalent,
   type Talent,
@@ -217,7 +235,6 @@ export {
   masteryPassive,
   masteryRespecPrice,
   masterySpent,
-  mostOf,
   takePassive,
   type CaptainPoints,
   type MasteryBlock,
@@ -225,7 +242,19 @@ export {
   type MasterySpecId,
   type PassiveTier,
 } from './account/mastery';
-export { FEATS, FEAT_IDS, RUNG_POINTS, rungsReached, type Feat, type FeatId } from './account/feats';
+export {
+  FEATS,
+  FEAT_IDS,
+  RUNG_POINTS,
+  claimFeat,
+  rewardsToClaim,
+  rungReward,
+  rungsClaimed,
+  rungsReached,
+  type Feat,
+  type FeatId,
+  type RungReward,
+} from './account/feats';
 export { PORTRAITS, choosePortrait } from './account/portrait';
 export { DAMAGE_STAGES, MAX_HEALTH, damageStage, type DamageStage } from './ships/damage';
 export {

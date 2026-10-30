@@ -1,11 +1,11 @@
 /**
- * The items the market sells, for doubloons only: scrolls, charms, powders, flags and other things a captain takes to
- * sea, used from the skill bar's quick slots (items/quickSlots.ts). What each is to do is only planned for now, its text
+ * The items the Golden Galleon in port sells, for doubloons only: scrolls, charms, powders, flags and other things a
+ * captain takes to sea, used from the skill bar's quick slots (items/quickSlots.ts). What each is to do is only planned for now, its text
  * and figures saying what and how much: bought and put on the bar, an item does nothing yet. docs/items.md tells how
  * each is to work, and what must be decided first. Figures are provisional
  */
 
-/** The groups the market shows the items in */
+/** The groups the galleon shows the items in */
 export type ItemCategory =
   'experience' | 'defence' | 'escape' | 'movement' | 'control' | 'strike' | 'scouting' | 'loot' | 'artifact' | 'looks';
 
@@ -254,7 +254,7 @@ export const ITEMS: Readonly<Record<ItemId, Item>> = {
   dolphinEscort: item('dolphinEscort', 'looks', 'Dolphin escort', 5, 'Dolphins swim beside your ship for {h} h', { h: 1 }),
 };
 
-/** Every item, in the market's order: by its group, as ITEM_CATEGORY_IDS, then as listed */
+/** Every item, in the galleon's order: by its group, as ITEM_CATEGORY_IDS, then as listed */
 export const ITEM_IDS: readonly ItemId[] = Object.values(ITEMS).map((it) => it.id);
 
 export function isItem(value: unknown): value is ItemId {

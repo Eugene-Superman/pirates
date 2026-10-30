@@ -10,7 +10,7 @@ import {
   seaOpenTo,
   signedDistanceToPolygon,
   storyGoal,
-  zoneBoss,
+  zoneBosses,
   type GameState,
   type GatePlace,
   type Island,
@@ -21,7 +21,6 @@ import {
   CHART,
   MapProjection,
   arrowBob,
-  bossLair,
   bossMarker,
   bountyWaiting,
   columnName,
@@ -30,11 +29,11 @@ import {
   drawStoryMark,
   goalMarker,
   drawIslands,
-  drawLostCargo,
+  drawKeptLoot,
   drawShipArrow,
   type MapAxes,
 } from './chart';
-import { ARROWS, IconSprites, MAP_MARKERS } from './iconAtlas';
+import { ARROWS, IconSprites, MAP_MARKERS, type MarkerId } from './iconAtlas';
 import { ornament } from './ornaments';
 import { THEME, TITLE_STYLE, subheading } from './theme';
 import { moonButton } from './nightTheme';
@@ -83,14 +82,14 @@ const GRID_ALPHA = 0.3;
 const LABEL = { size: 13, inset: 15, alpha: 0.9 } as const; // the squares' letters and numbers inside the edges, pixels
 const SQUARE_SIZE = 16; // pixels: the name of the square under the pointer, in its middle
 const ME_SIZE = 16; // pixels: the player's arrow
-const LANDMARK_SIZE = 6; // pixels: the lost cargo's mark
+const LANDMARK_SIZE = 6; // pixels: the marks of the loot kept on the chart
 const COURSE = { dash: 7, gap: 5, width: 1.5, end: 3.5 } as const; // pixels: the ship's way on
 // The boss's medallion: its radius (pixels), the seconds a ring takes to spread from it, and how far round it the
 // pointer tells of it (in its radius)
 const BOSS = { radius: 13, period: 2.4, rings: 2, hover: 1.4 } as const;
 const PORT_HOVER = 4; // pixels off the port's coast the pointer still tells of it
 const GATE = { size: 6, hover: 16 } as const; // pixels: a gate's mark, and how far round it the pointer tells of it
-// The painted markers, pixels across: the boss's lair, the harbour, the prey the story brought in for the player, and
+// The painted markers, pixels across: a lair, the harbour, the prey the story brought in for the player, and
 // where it sends them
 const MARKER = { boss: 34, home: 24, prey: 20, goal: 28 } as const;
 // Pixels: the gold arrow over where the story sends the player, and how far over its marker's top it hangs
@@ -98,7 +97,20 @@ const GOAL_ARROW = { size: 30, gap: 2 } as const;
 // The world chart's button in the frame's bottom left corner: its size and its inset from the frame's edges, pixels
 const WORLD_BUTTON = { width: 170, height: 30, inset: 22 } as const;
 
-/** The boss's medallion round (0, 0): a skull over crossed bones on dark red, in a brass ring */
+/** A boss's or a mini-boss's lair on the chart: its marker, its medallion till the markers load, its tooltip */
+interface Lair {
+  readonly x: number;
+  readonly y: number;
+  readonly marker: MarkerId;
+  readonly medallion: Graphics;
+  readonly text: TooltipText;
+}
+
+function isLair(pointing: Lair | 'port' | GatePlace | null): pointing is Lair {
+  return typeof pointing === 'object' && pointing !== null && 'medallion' in pointing;
+}
+
+/** A lair's medallion round (0, 0): a skull over crossed bones on dark red, in a brass ring */
 function drawBossMedallion(g: Graphics, r: number) {
   g.circle(0, 0, r * 1.5).fill({ color: CHART.boss, alpha: 0.16 });
   g.circle(0, 0, r).fill({ color: COLORS.bossDisc }).stroke({ width: 1.6, color: THEME.brass });
@@ -128,6 +140,7 @@ function drawBossMedallion(g: Graphics, r: number) {
       .lineTo(x * r, 0.34 * r)
       .stroke({ width: 0.04 * r, color: COLORS.boneShade });
   }
+  return g;
 }
 
 /** The ship's way on, pencilled in: dashes from it along the route left to sail, a ring at its end */
@@ -164,21 +177,20 @@ function drawCourse(g: Graphics, ship: Ship, map: MapProjection) {
  * letters west to east along its north edge, the numbers north to south along its east edge), in the diamond opening
  * of a painted frame and nothing else. Painted to go with the frame: deep water darkening to its edges, the islands as
  * in the game (shallows and lines round their coasts, beach, land, hills, palms), the brass lines of the squares; the
- * boss's lair under its crown (a medallion till the markers load), its name under the pointer, as is the port's; the
- * harbour's lighthouse (silver while a bounty waits there), and where the story sends the player in breathing gold
- * under a gold arrow, with every one of the prey it brought in for them. The square
+ * lairs of the boss and the mini-bosses under their crowns (medallions till the markers load), each one's name under the
+ * pointer, as is the port's; the harbour's lighthouse (silver while a bounty waits there), and where the story sends
+ * the player in breathing gold under a gold arrow, with every one of the prey it brought in for them. The square
  * under the pointer lights up with its name. Opened by the minimap or M, closed by M, Escape, the button in the frame's
  * top right corner or a click beside it. Until the frame's picture has loaded the opening has a thin rim of its own.
- * The chart is drawn once for a screen size; only the ship, the boss's rings and the square under the pointer move
+ * The chart is drawn once for a screen size; only the ship, the lairs' rings and the square under the pointer move
  */
 export class SeaChart {
   readonly container = new Container();
   private readonly dim = new Graphics();
   private readonly chart = new Graphics();
   private readonly labels: Text[] = [];
-  /** Under the boss's medallion: the square under the pointer, the rings spreading from the lair, the ship's way on */
+  /** Under the lairs' medallions: the square under the pointer, the rings spreading from each lair, the ship's way on */
   private readonly under = new Graphics();
-  private readonly lair = new Graphics();
   /** Over it: the lost cargo; the painted markers; over them the ship */
   private readonly marks = new Graphics();
   private readonly markers = new IconSprites(MAP_MARKERS);
@@ -195,7 +207,6 @@ export class SeaChart {
   /** The painted gold cross every window closes with, in a holder scaled with the frame */
   private readonly cross = new Container();
   private readonly tooltip = new Tooltip();
-  private readonly bossText: TooltipText;
   private readonly portText: TooltipText;
   private readonly sea = new FillGradient({
     type: 'radial',
@@ -216,10 +227,10 @@ export class SeaChart {
   private drawnFor = '';
   /** The square under the pointer, as its column and row; null off the chart */
   private hovered: { col: number; row: number } | null = null;
-  /** What the pointer is on that the tooltip tells of: the boss's lair, the port, a gate */
-  private pointing: 'boss' | 'port' | GatePlace | null = null;
-  /** The sea's boss's lair, if it has one */
-  private readonly lairAt: { readonly x: number; readonly y: number } | null;
+  /** What the pointer is on that the tooltip tells of: a lair, the port, a gate */
+  private pointing: Lair | 'port' | GatePlace | null = null;
+  /** The lairs of the sea's boss and its mini-bosses, the boss's first */
+  private readonly lairs: readonly Lair[];
   /** The sea's gates, as last laid out */
   private gates: readonly GatePlace[] = [];
   /** Opens the world chart: every sea */
@@ -235,13 +246,17 @@ export class SeaChart {
     this.map = new MapProjection(axes);
     this.screen = screen;
     this.container.visible = false;
-    this.lairAt = bossLair(zone);
-    const boss = zoneBoss(zone);
-    this.bossText = {
-      title: boss ? t(SHIP_CLASSES[boss.shipClass].name) : '',
-      color: CHART.boss,
-      lines: [t('Lv {level}', { level: boss?.level ?? 1 }), t("A boss's lair")],
-    };
+    this.lairs = zoneBosses(zone).map(({ shipClass, level, boss }) => ({
+      x: boss.lair.x,
+      y: boss.lair.y,
+      marker: bossMarker(SHIP_CLASSES[shipClass]),
+      medallion: drawBossMedallion(new Graphics(), BOSS.radius),
+      text: {
+        title: t(SHIP_CLASSES[shipClass].name),
+        color: CHART.boss,
+        lines: [t('Lv {level}', { level }), boss.mini ? t("A mini-boss's lair") : t("A boss's lair")],
+      },
+    }));
     this.world = moonButton(WORLD_BUTTON.width, WORLD_BUTTON.height, t('World chart (N)'), () => {
       this.hide();
       openWorld();
@@ -277,8 +292,6 @@ export class SeaChart {
     }
     this.square.anchor.set(0.5);
     this.square.visible = false;
-    drawBossMedallion(this.lair, BOSS.radius);
-    this.lair.visible = this.lairAt !== null;
     this.frame.visible = false;
     Assets.load<Texture>({ src: FRAME_URL, data: { autoGenerateMipmaps: true } })
       .then((texture) => {
@@ -294,7 +307,7 @@ export class SeaChart {
       this.chart,
       ...this.labels,
       this.under,
-      this.lair,
+      ...this.lairs.map((lair) => lair.medallion),
       this.marks,
       this.markers.container,
       this.arrows.container,
@@ -358,13 +371,13 @@ export class SeaChart {
       show(this.square, `${columnName(square.col)}${square.row + 1}`);
       this.square.position.set(map.x(middleX, middleY), map.y(middleX, middleY));
     }
-    if (this.lairAt) {
-      // Rings spreading from the lair one after another, fading as they go
-      const time = performance.now() / 1000;
+    // Rings spreading from each lair one after another, fading as they go
+    const time = performance.now() / 1000;
+    for (const { medallion } of this.lairs) {
       for (let i = 0; i < BOSS.rings; i++) {
         const k = (time / BOSS.period + i / BOSS.rings) % 1;
         under
-          .circle(this.lair.x, this.lair.y, BOSS.radius * (1.05 + 1.4 * k))
+          .circle(medallion.x, medallion.y, BOSS.radius * (1.05 + 1.4 * k))
           .stroke({ width: 2, color: CHART.boss, alpha: 0.7 * (1 - k) });
       }
     }
@@ -375,14 +388,14 @@ export class SeaChart {
       alpha: 0.5,
     });
     const g = this.marks.clear();
-    drawLostCargo(g, state, map, LANDMARK_SIZE);
+    drawKeptLoot(g, state, map, LANDMARK_SIZE);
     const markers = this.markers;
     markers.begin();
     drawGates(g, markers, map, this.gates, GATE.size, ship.shipClass.tier);
-    const boss = zoneBoss(state.world.zone);
-    const lair = boss && markers.put(bossMarker(SHIP_CLASSES[boss.shipClass]), this.lair.x, this.lair.y, MARKER.boss);
-    // The medallion stands in till the markers load
-    this.lair.visible = this.lairAt !== null && !lair;
+    for (const { marker, medallion } of this.lairs) {
+      // The medallion stands in till the markers load
+      medallion.visible = !markers.put(marker, medallion.x, medallion.y, MARKER.boss);
+    }
     const goal = storyGoal(state, state.player);
     if (goal?.kind !== 'port') {
       const { mooring } = state.world.port;
@@ -403,7 +416,6 @@ export class SeaChart {
     if (goal) {
       const x = map.x(goal.x, goal.y);
       const y = map.y(goal.x, goal.y);
-      const time = performance.now() / 1000;
       drawGoalGlow(g, x, y, MARKER.goal, time);
       if (!markers.put(goalMarker(goal), x, y, MARKER.goal)) drawStoryMark(g, map, state, GATE.size);
       const over = y - MARKER.goal / 2 - GOAL_ARROW.gap - GOAL_ARROW.size / 2 - arrowBob(time);
@@ -414,8 +426,8 @@ export class SeaChart {
     drawShipArrow(this.top.clear(), ship, map, ME_SIZE);
 
     const { pointing } = this;
-    if (pointing === 'boss') {
-      this.tooltip.point(this.bossText, this.lair.x, this.lair.y - BOSS.radius);
+    if (isLair(pointing)) {
+      this.tooltip.point(pointing.text, pointing.medallion.x, pointing.medallion.y - BOSS.radius);
     } else if (pointing !== null && pointing !== 'port') {
       this.tooltip.point(
         gateText(pointing, ship),
@@ -480,8 +492,7 @@ export class SeaChart {
     const { islands, port, gates } = state.world;
     this.port = port.island;
     this.gates = gates;
-    const lair = this.lairAt;
-    if (lair) this.lair.position.set(map.x(lair.x, lair.y), map.y(lair.x, lair.y));
+    for (const lair of this.lairs) lair.medallion.position.set(map.x(lair.x, lair.y), map.y(lair.x, lair.y));
     this.world.tile.container.position.set(
       left + WORLD_BUTTON.inset,
       top + side - WORLD_BUTTON.inset - WORLD_BUTTON.height,
@@ -523,15 +534,18 @@ export class SeaChart {
     this.cross.scale.set((size / CROSS_PAINTED) * (hovered ? CROSS_HOVER : 1));
   }
 
-  /** Picks out the square under the pointer, and the boss's lair or the port if it is on them */
+  /** Picks out the square under the pointer, and a lair, a gate or the port if it is on them */
   private hover(sx: number, sy: number) {
     const map = this.map;
     const p = map.toWorld(sx, sy);
     const inside = p.x >= 0 && p.y >= 0 && p.x < WORLD_WIDTH && p.y < WORLD_HEIGHT;
     this.hovered = inside ? { col: Math.floor(p.x / MAP_SQUARE), row: Math.floor(p.y / MAP_SQUARE) } : null;
     const gate = this.gates.find((g) => Math.hypot(sx - map.x(g.x, g.y), sy - map.y(g.x, g.y)) <= GATE.hover);
-    if (this.lairAt && Math.hypot(sx - this.lair.x, sy - this.lair.y) <= BOSS.radius * BOSS.hover) {
-      this.pointing = 'boss';
+    const lair = this.lairs.find(
+      ({ medallion }) => Math.hypot(sx - medallion.x, sy - medallion.y) <= BOSS.radius * BOSS.hover,
+    );
+    if (lair) {
+      this.pointing = lair;
     } else if (gate) {
       this.pointing = gate;
     } else if (this.port && signedDistanceToPolygon(p.x, p.y, this.port.coast) * map.scale < PORT_HOVER) {

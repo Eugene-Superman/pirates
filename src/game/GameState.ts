@@ -1,6 +1,7 @@
 import type { Respawn } from './bots/spawner';
 import type { Shell } from './combat/barrage';
 import type { GameEvent, Projectile } from './combat/combat';
+import type { InkCloud } from './combat/monsterSkills';
 import type { PowderKeg } from './combat/ordnance';
 import type { Chest } from './economy/loot';
 import type { Player } from './economy/player';
@@ -21,6 +22,8 @@ export interface GameState {
   projectiles: Projectile[];
   /** A boss's barrage: shells on their way to the spots marked on the water */
   shells: Shell[];
+  /** Clouds of ink a monster shed on the water (combat/monsterSkills.ts), hiding what is in them from a crew */
+  inks: InkCloud[];
   /** Powder kegs afloat where ships dropped them (the level 25 ability), waiting for a foe to come near */
   kegs: PowderKeg[];
   /** What happened during the last update (shots, hits, wrecks, repairs); replaced by every update */

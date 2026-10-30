@@ -1,4 +1,5 @@
 import { AMMO, AMMO_IDS, GUNS, STARTING_AMMO, type AmmoId, type Gun, type GunId } from '../combat/arsenal';
+import type { Diving, Veil } from '../combat/monsterSkills';
 import { WEAPON_IDS, type HoldReason, type TargetNature, type WeaponId } from '../combat/weapons';
 import type { BotMind } from '../bots/brain';
 import type { Cargo } from '../economy/cargo';
@@ -39,6 +40,29 @@ import { newStats, type Stats } from '../records/stats';
  * ammo aboard: one that runs out leaves its place
  */
 export type AmmoBar = [AmmoId | null, AmmoId | null];
+
+/**
+ * A ship's run of fire at one target, for Relentless and a Rolling thunder (combat/combat.ts). It counts rounds, not
+ * volleys: guns of different reloads drift apart and fire on their own, so a quick gun among slow ones would make a
+ * volley of every shot of its own. A round is over once every gun of its weapon in reach has fired in it
+ */
+export interface FireRun {
+  /** The unit fired at; null before the first volley */
+  target: number | null;
+  /** Game time of the last volley at it: the run is over PERKS.relentless.lapse seconds without one */
+  lastAt: number;
+  /** Rounds over before the one under way, of either weapon; of the cannons alone, for a Rolling thunder */
+  rounds: number;
+  cannonRounds: number;
+  /** The weapon of the round under way, and the slots of its guns that have fired in it */
+  weapon: WeaponId;
+  fired: number[];
+}
+
+/** No run: a ship that has fired at nothing yet */
+export function newFireRun(): FireRun {
+  return { target: null, lastAt: 0, rounds: 0, cannonRounds: 0, weapon: 'cannon', fired: [] };
+}
 
 // Bounds for tuning the top speeds, world units per second (1 to 40 knots)
 const MIN_TOP_SPEED = 10;
@@ -87,7 +111,7 @@ export class Ship implements Body {
   readonly abilityReadyAt = [0, 0, 0];
   /** A rocket asked for at this unit (the level 25 ability): fired at the next update (combat/ordnance.ts) */
   rocketAt: number | null = null;
-  /** Broadside was used: the next volley does more damage */
+  /** Broadside was used: the next volley waits for every gun in reach and does more damage */
   broadsideArmed = false;
   /** Game time a Royal standard flies till: more damage done, less taken */
   standardUntil = 0;
@@ -102,11 +126,8 @@ export class Ship implements Body {
   ironKeelUsed = false;
   /** Hull points Damage control has mended short of a whole one */
   patchDue = 0;
-  /**
-   * Relentless: the target of its last volleys, and how many in a row before this one; and the cannons' of them, this
-   * one too (a Rolling thunder's every third)
-   */
-  relentless: { target: number | null; volleys: number; cannons: number } = { target: null, volleys: 0, cannons: 0 };
+  /** Relentless and a Rolling thunder: its run of fire at its target */
+  fireRun = newFireRun();
   /** Game time Unsinkable is ready again */
   unsinkableReadyAt = 0;
   /** Share of its top speed it has this update: Full sail, a chain shot (stepTalents sets it) */
@@ -134,6 +155,13 @@ export class Ship implements Body {
   biteReload = 0;
   /** Game time a boss can fire its next barrage (combat/barrage.ts) */
   barrageReadyAt = 0;
+  /**
+   * A monster's dive under way (combat/monsterSkills.ts): under water it can't be seen, fired at or bumped into, and
+   * comes up where it marks. Null while it is up
+   */
+  diving: Diving | null = null;
+  /** The clouds of ink in the sea (combat/monsterSkills.ts), set every update: they hide a player's crew's sight */
+  veils: readonly Veil[] = [];
   /** Goods in the hold, by kind (economy/cargo.ts): lost overboard when the ship goes down */
   readonly cargo: Cargo = {};
   /** What this ship has done under its player (records/stats.ts): kept with it, laid up or sailed */
@@ -227,11 +255,37 @@ export class Ship implements Body {
     return this.bot !== null;
   }
 
-  /** Whether a point is close enough to be seen, or by the spot the crew watches: not hidden in the fog of war */
+  /**
+   * Whether a point is close enough to be seen, or by the spot the crew watches: not hidden in the fog of war. A
+   * player's crew in a cloud of ink sees only what is near, and sees into one only from as near; a bot sees through it
+   */
   canSee(x: number, y: number) {
     const { spotted } = this;
     if (spotted && Math.hypot(x - spotted.x, y - spotted.y) <= spotted.radius) return true;
-    return Math.hypot(x - this.x, y - this.y) <= this.viewRange;
+    const distance = Math.hypot(x - this.x, y - this.y);
+    if (distance > this.viewRange) return false;
+    if (this.bot) return true;
+    for (const veil of this.veils) {
+      const hides = Math.hypot(x - veil.x, y - veil.y) < veil.radius || this.inVeil(veil);
+      if (hides && distance > veil.sight) return false;
+    }
+    return true;
+  }
+
+  private inVeil(veil: Veil) {
+    return Math.hypot(this.x - veil.x, this.y - veil.y) < veil.radius;
+  }
+
+  /** How far a player's crew sees in the cloud of ink the ship is in (combat/monsterSkills.ts); null out of one */
+  get inkSight() {
+    if (this.bot) return null;
+    const veil = this.veils.find((v) => this.inVeil(v));
+    return veil ? Math.min(veil.sight, this.viewRange) : null;
+  }
+
+  /** Under water, diving (combat/monsterSkills.ts): out of every shot's and hull's way */
+  get submerged() {
+    return this.diving !== null;
   }
 
   /** Top speed of the intact ship, world units per second */
@@ -427,6 +481,8 @@ export class Ship implements Body {
   startRepair() {
     if (this.isSinking || this.hp >= this.maxHp || this.repairing) return;
     this.repairing = true;
+    // The first step a whole REPAIR_TICK away, whatever was under way: stopped and started again, however quickly,
+    // the crew never mends sooner than repairing on would
     this.repairClock = 0;
   }
 
@@ -465,6 +521,26 @@ export class Ship implements Body {
     if (gun !== null && GUNS[gun].weapon !== weapon) return;
     this.guns[weapon][slot] = gun;
     this.reloads[weapon][slot] = gun === null ? 0 : GUNS[gun].reload;
+  }
+
+  /**
+   * Moves a fitted gun into another slot of its weapon, the gun there (or the empty slot) coming the other way. Each
+   * keeps its reload: the crew carries a loaded gun across, so a swap neither skips a reload nor starts one over. False
+   * if either isn't a slot of the weapon, both are the same, or neither has a gun
+   */
+  swapGuns(weapon: WeaponId, from: number, to: number) {
+    // Checked first: online the weapon is a player's
+    if (!WEAPON_IDS.includes(weapon)) return false;
+    const guns = this.guns[weapon];
+    const reloads = this.reloads[weapon];
+    if (from === to || guns[from] === undefined || guns[to] === undefined) return false;
+    if (guns[from] === null && guns[to] === null) return false;
+    [guns[from], guns[to]] = [guns[to], guns[from]];
+    [reloads[from], reloads[to]] = [reloads[to], reloads[from]];
+    // The round under way counts guns by their slots: a gun that fired in it is still one that fired, wherever it goes
+    const run = this.fireRun;
+    if (run.weapon === weapon) run.fired = run.fired.map((slot) => (slot === from ? to : slot === to ? from : slot));
+    return true;
   }
 
   /** The fitted guns of a weapon with their slots, in slot order */
@@ -546,7 +622,7 @@ export class Ship implements Body {
     this.fullSailUntil = 0;
     this.standardUntil = 0;
     this.patchDue = 0;
-    this.relentless = { target: null, volleys: 0, cannons: 0 };
+    this.fireRun = newFireRun();
     this.retally();
   }
 
@@ -593,22 +669,32 @@ export class Ship implements Body {
   }
 
   /**
-   * Puts ammo in the hold (bought), or takes it out for a negative count (fired, sold). One that runs out leaves its
-   * place at hand empty; loaded, it stays loaded, and the ship holds fire till the player loads another (none is
-   * loaded for them: it might be a dear one) or buys more of it, which goes back to an empty place
+   * Puts ammo in the hold (bought, a prize), or takes it out for a negative count (fired, sold). One that runs out
+   * leaves its place at hand empty; loaded, it stays loaded, and the ship holds fire till the player loads another or
+   * puts some at hand again: none is put there for them, more of the same bought or not (it might be a dear one, and
+   * what is at hand is the player's to pick)
    */
   addAmmo(ammo: AmmoId, count: number) {
     this.ammo[ammo] = Math.max(0, this.ammo[ammo] + count);
-    const weapon = AMMO[ammo].weapon;
-    const bar = this.ammoBar[weapon];
-    if (this.ammo[ammo] > 0) {
-      const empty = bar.indexOf(null);
-      if (ammo === this.loaded[weapon] && !bar.includes(ammo) && empty >= 0) bar[empty] = ammo;
-      return;
-    }
+    if (this.ammo[ammo] > 0) return;
+    const bar = this.ammoBar[AMMO[ammo].weapon];
     bar.forEach((id, index) => {
       if (id === ammo) bar[index] = null;
     });
+  }
+
+  /**
+   * Takes every shot aboard `from` into this ship, each added to its kind's wherever that is here, at hand or in the
+   * hold; `from` is left with none. A player's ammo goes with the ship they sail (economy/fleet.ts)
+   */
+  takeAmmo(from: Ship) {
+    for (const weapon of WEAPON_IDS) {
+      for (const id of AMMO_IDS[weapon]) {
+        const count = from.ammo[id];
+        this.addAmmo(id, count);
+        from.addAmmo(id, -count);
+      }
+    }
   }
 
   /** Sends the ship somewhere; the pilot finds the way round islands and other ships */
@@ -661,7 +747,7 @@ export class Ship implements Body {
     this.secondWindUsed = false;
     this.ironKeelUsed = false;
     this.patchDue = 0;
-    this.relentless = { target: null, volleys: 0, cannons: 0 };
+    this.fireRun = newFireRun();
   }
 
   /** Turns towards the helm's heading no faster than turnSpeed, speeds up or slows down towards its speed, and moves */

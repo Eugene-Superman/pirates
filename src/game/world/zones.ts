@@ -74,7 +74,7 @@ const LADDER: readonly {
     tier: 0,
     levels: [1, 10],
     about:
-      'Calm waters round the port where every captain begins: fishing boats, merchants, smugglers and the odd sea monster. The Smuggler Baron holds the north-east.',
+      'Calm waters round the port where every captain begins: fishing boats, merchants, smugglers and the odd sea monster. The Smuggler Baron holds the north-east, the Inkmother lurks in the south-west.',
   },
   {
     id: 'coralCoast',

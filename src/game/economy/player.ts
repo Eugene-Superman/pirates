@@ -1,3 +1,4 @@
+import type { FeatId } from '../account/feats';
 import type { GunId } from '../combat/arsenal';
 import { findUnit } from '../combat/units';
 import type { ItemId } from '../items/items';
@@ -6,11 +7,11 @@ import type { OutfitId } from '../ships/outfit';
 import type { WeaponId } from '../combat/weapons';
 import type { GameState } from '../GameState';
 import type { Ship } from '../ships/Ship';
-import type { ActiveQuest } from './quests';
+import type { ActiveQuest, QuestId } from './quests';
 import type { SavedShip } from '../save';
 import { newStats, type Stats } from '../records/stats';
 import type { StoryProgress } from '../story/story';
-import type { ZoneId } from '../world/zones';
+import { START_ZONE, type ZoneId } from '../world/zones';
 
 /** Gold a new player starts with: a few packs of ammo, or most of a gun of the first tier */
 export const STARTING_GOLD = 100;
@@ -28,7 +29,10 @@ export interface Player {
   /** The ship they sail: one of state.ships. The id stays when they change ships (economy/fleet.ts) */
   readonly shipId: number;
   gold: number;
-  /** Doubloons (economy/currencies.ts): bought, in the online game; only the debug buttons give them until then */
+  /**
+   * Doubloons (economy/currencies.ts): bought, in the online game; only a few quests' prizes (economy/prizes.ts), the
+   * feats' rewards (account/feats.ts) and the debug buttons give them until then
+   */
   doubloons: number;
   /** Guns bought or taken off and not fitted, by kind */
   readonly hold: Partial<Record<GunId, number>>;
@@ -53,8 +57,20 @@ export interface Player {
   readonly stats: Stats;
   /** The passives of the captain's mastery taken (account/mastery.ts), in the order taken: for every ship they sail */
   readonly mastery: string[];
+  /** How many rungs of each feat's ladder they have claimed the rewards of (account/feats.ts) */
+  readonly feats: Partial<Record<FeatId, number>>;
+  /**
+   * The rungs of each ladder reached, as last counted (stepFeats): one more is told of. Not saved: none until the game's
+   * first update counts them
+   */
+  readonly featsReached: Partial<Record<FeatId, number>>;
   /** The captain's portrait, by its number (account/portrait.ts) */
   portrait: number;
+  /**
+   * The seas they have sailed (chartSea), the starting waters first: only these does the client tell what sails (the
+   * bestiary, the world chart)
+   */
+  readonly charted: ZoneId[];
   /**
    * The sea their ship has sailed off to through a gate (world/gates.ts), their last in this game: the client takes
    * them there (Game.travel); null while they sail this one. Not saved
@@ -62,10 +78,12 @@ export interface Player {
   departure: ZoneId | null;
 }
 
-/** What the Captain's path counts that a player's gold, ship and story don't show by themselves */
+/** What the Captain's path and the tavern count that a player's gold, ship and story don't show by themselves */
 export interface Progress {
   /** Tavern quests turned in, all together */
   questsDone: number;
+  /** How many times each quest was turned in, by any of their ships: its first time pays prizes, its third less (quests.ts) */
+  readonly turnedIn: Partial<Record<QuestId, number>>;
 }
 
 export function newPlayer(shipId: number): Player {
@@ -78,15 +96,24 @@ export function newPlayer(shipId: number): Player {
     items: {},
     quickSlots: emptyQuickSlots(),
     quests: [],
-    progress: { questsDone: 0 },
+    progress: { questsDone: 0, turnedIn: {} },
     // The prologue first, then the story's first step (story/story.ts, newStory)
     story: { prologue: false, step: 0, told: false, counts: [], closing: null, watchUntil: 0 },
     fleet: [],
     stats: newStats(),
     mastery: [],
+    feats: {},
+    featsReached: {},
     portrait: 0,
+    // Every captain starts in the starting waters
+    charted: [START_ZONE],
     departure: null,
   };
+}
+
+/** A sea the player has sailed: from now on the client tells them what sails it */
+export function chartSea(player: Player, zone: ZoneId) {
+  if (!player.charted.includes(zone)) player.charted.push(zone);
 }
 
 /** The player whose ship this is; undefined for a bot's. Online there will be a list of them */

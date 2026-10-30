@@ -1,0 +1,46 @@
+{
+ "file": "goods.webp",
+ "tile": 128,
+ "icons": {
+  "fish": [
+   0,
+   0
+  ],
+  "cloth": [
+   1,
+   0
+  ],
+  "spices": [
+   2,
+   0
+  ],
+  "rum": [
+   3,
+   0
+  ],
+  "contraband": [
+   4,
+   0
+  ],
+  "turtleShell": [
+   5,
+   0
+  ],
+  "serpentScale": [
+   6,
+   0
+  ],
+  "moonGlass": [
+   7,
+   0
+  ],
+  "moonPearl": [
+   8,
+   0
+  ],
+  "baronsStrongbox": [
+   9,
+   0
+  ]
+ }
+}

@@ -51,9 +51,11 @@ interface Flash {
   weapon: WeaponId;
 }
 
-const PARTICLES = 320;
+// A boss's barrage is four or five shells of seven balls of grapeshot, each throwing up its spout and ring
+const PARTICLES = 400;
 const MAX_MUZZLES = 8; // guns of one volley shown firing, at most
-const RIPPLES = 24;
+const RIPPLES = 48;
+const GRAPESHOT_SPRAY = 6; // drops in a ball of grapeshot's spout
 const FLASHES = 12;
 
 const CANNON_FLASH_TIME = 0.22; // seconds
@@ -65,6 +67,9 @@ const TRAIL_INTERVAL = 0.035; // seconds between the puffs a cannonball leaves b
 // A powder keg blowing up, for a blast of radius PERKS.powderKeg.blast: fire, sparks, smoke and water thrown up
 const BLAST = { fire: 34, sparks: 26, smoke: 22, spray: 30 } as const;
 const LUNGE_TIME = 0.45; // seconds a monster's head stays darted forward after a bite
+// A monster coming up from a dive: spouts where its arms strike round it, this many, between these shares of its radius
+const SURFACE_ARMS = { count: 9, from: 0.45, to: 0.95 } as const;
+const INK_BURST = 26; // drops of ink thrown up as a monster sheds a cloud of it
 
 const COLORS = {
   flashCore: 0xffe9a8,
@@ -80,6 +85,8 @@ const COLORS = {
   splinter: 0xc0925a,
   splinterDark: 0x6b4a2a,
   puff: 0xe8edef,
+  ink: 0x1b1233,
+  inkFar: 0x3a2a6b,
 };
 
 function makeParticles(n: number): Particle[] {
@@ -221,7 +228,7 @@ export class ShotEffects {
 
   private start(event: GameEvent, state: GameState) {
     const { time } = state;
-    // A boss's mortar: fire and smoke up from its deck; a shell landing throws up a column of water
+    // A boss's mortar, or a ship's bombardment: fire and smoke up from its deck
     if (event.type === 'barrage') {
       const at: Vec3 = [event.at.x, event.at.y, event.at.z + 2];
       this.flash(at, 0, 0, 'cannon');
@@ -246,14 +253,22 @@ export class ShotEffects {
       this.blast(event.at.x, event.at.y, event.radius);
       return;
     }
-    if (event.type === 'shellLanded') {
-      const { x, y } = event.at;
-      this.burst([x, y, 0], 26, (p) => spray(p, 1.3));
-      this.burst([x, y, 1], 10, (p) => smoke(p, 0, 0));
-      this.ripple(x, y, 4, 26, 1.4, 0.7, 0);
-      this.ripple(x, y, 3, 18, 1.2, 0.5, 0.25);
+    // A monster going under, coming up, shedding ink
+    if (event.type === 'dive') {
+      this.burst([event.at.x, event.at.y, 0], 16, (p) => spray(p, 1));
+      this.ripple(event.at.x, event.at.y, 4, 22, 1.4, 0.6, 0);
       return;
     }
+    if (event.type === 'surface') {
+      this.surfaced(event.at.x, event.at.y, event.radius);
+      return;
+    }
+    if (event.type === 'ink') {
+      this.burst([event.at.x, event.at.y, 0], INK_BURST, inkDrop);
+      this.ripple(event.at.x, event.at.y, 6, event.radius * 0.4, 1.5, 0.5, 0);
+      return;
+    }
+    // A shell landing is BarrageMarks', which knows where each ball of its shot comes down (shellSplash)
     // The damage, repair, gold, XP and talent numbers are DamageNumbers'
     if (event.type !== 'shot' && event.type !== 'impact' && event.type !== 'bite' && event.type !== 'destroyed') return;
     if (event.type === 'destroyed') {
@@ -305,6 +320,40 @@ export class ShotEffects {
       this.burst(at, 10, (p) => spark(p, between(-1, 1), between(-1, 1)));
     }
     this.ripple(x, y, 2, cannon ? 9 : 6, 1.2, 0.6, 0);
+  }
+
+  /**
+   * A shell landing in the sea (BarrageMarks): a bombardment's throws up a column of water, smoke over it, rings
+   * spreading; a ball of a boss's grapeshot, a spout of its own and a ring
+   */
+  shellSplash(x: number, y: number, grapeshot: boolean) {
+    if (grapeshot) {
+      this.burst([x, y, 0], GRAPESHOT_SPRAY, spout);
+      this.ripple(x, y, 1.5, 10, 1.1, 0.55, 0);
+      return;
+    }
+    this.burst([x, y, 0], 26, (p) => spray(p, 1.3));
+    this.burst([x, y, 1], 10, (p) => smoke(p, 0, 0));
+    this.ripple(x, y, 4, 26, 1.4, 0.7, 0);
+    this.ripple(x, y, 3, 18, 1.2, 0.5, 0.25);
+  }
+
+  /**
+   * A monster coming up: water thrown up where it breaks the surface; from a dive (`radius` > 0) a spout where each of
+   * its arms strikes round it too, and a ring spreading as far as they reached
+   */
+  private surfaced(x: number, y: number, radius: number) {
+    const dive = radius > 0;
+    this.burst([x, y, 0], dive ? 30 : 10, (p) => spray(p, dive ? 1.5 : 0.7));
+    this.ripple(x, y, 3, dive ? radius * 0.5 : 12, 1.3, 0.7, 0);
+    if (!dive) return;
+    const turn = Math.random() * Math.PI * 2;
+    for (let i = 0; i < SURFACE_ARMS.count; i++) {
+      const angle = turn + (i / SURFACE_ARMS.count) * Math.PI * 2;
+      const out = radius * between(SURFACE_ARMS.from, SURFACE_ARMS.to);
+      this.burst([x + Math.cos(angle) * out, y + Math.sin(angle) * out, 0], 5, (p) => spray(p, 0.9));
+    }
+    this.ripple(x, y, radius * 0.3, radius, 1.6, 0.6, 0.1);
   }
 
   /** Jaws closing on a hull: water thrown up between them, splinters bitten off, a ring on the water */
@@ -483,6 +532,32 @@ function spray(p: Particle, scale: number) {
   p.from = COLORS.splash;
   p.to = COLORS.splashFar;
   p.alpha = 0.95;
+}
+
+/** A drop of ink thrown up as a monster sheds a cloud of it: dark, spreading as it falls back */
+function inkDrop(p: Particle) {
+  spray(p, 1.1);
+  p.growth = 2.2;
+  p.from = COLORS.ink;
+  p.to = COLORS.inkFar;
+  p.alpha = 0.85;
+}
+
+/** A ball of grapeshot going in: a narrow spout thrown high, falling back */
+function spout(p: Particle) {
+  const angle = Math.random() * Math.PI * 2;
+  const out = between(0.3, 1.6);
+  p.vx = Math.cos(angle) * out;
+  p.vy = Math.sin(angle) * out;
+  p.vz = between(16, 28);
+  p.gravity = 40;
+  p.drag = 0.3;
+  p.maxLife = between(0.6, 0.9);
+  p.size = between(0.55, 0.95);
+  p.growth = 1.4;
+  p.from = COLORS.splash;
+  p.to = COLORS.splashFar;
+  p.alpha = 0.9;
 }
 
 function splinter(p: Particle, dirX: number, dirY: number) {

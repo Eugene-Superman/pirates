@@ -1,4 +1,6 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container } from 'pixi.js';
+import { moonButton, moonButtonEnd } from './nightTheme';
+import type { Tile } from './ui';
 
 export interface ButtonSpec<K> {
   label: string;
@@ -8,40 +10,41 @@ export interface ButtonSpec<K> {
 }
 
 interface Button<K> {
-  background: Graphics;
-  text: Text;
-  width: number;
-  key: K | null;
-  /** As last painted; undefined until the first paint */
+  readonly tile: Tile;
+  readonly key: K | null;
+  /** As last shown; undefined until the first time */
   pressed: boolean | undefined;
 }
 
-const BUTTON_HEIGHT = 26; // pixels
-const BUTTON_GAP = 6;
-const PADDING_X = 10;
-const COLORS = {
-  idle: 0x0b3a52,
-  active: 0xf2b33d,
-  text: 0xffffff,
-  activeText: 0x1b1b1b,
-  border: 0xffffff,
-};
+// Pixels: a button's height, the gap between two, its label's size, and the room its label keeps beyond its stars
+const BUTTON = { height: 28, gap: 8, font: 12, room: 6 } as const;
 
-// A row of HUD buttons. Some of them can be shown pressed: the row doesn't decide which, the owner tells it
-// from the real state (ship health, camera zoom, shown range rings), so the highlight never disagrees with the game
+// A row of the night look's buttons (moonButton), each as wide as its label. Some of them can be shown pressed (lit):
+// the row doesn't decide which, the owner tells it from the real state (ship health, camera zoom), so the light never
+// disagrees with the game
 export class ButtonRow<K> {
-  static readonly HEIGHT = BUTTON_HEIGHT;
+  static readonly HEIGHT = BUTTON.height;
   readonly container = new Container();
   private readonly buttons: Button<K>[] = [];
 
-  constructor(specs: readonly ButtonSpec<K>[]) {
+  /** most: pixels across the row takes at most; a button that would reach past it goes on a line under the others */
+  constructor(specs: readonly ButtonSpec<K>[], most = Infinity) {
+    const end = moonButtonEnd(BUTTON.height) + BUTTON.room;
     let x = 0;
+    let y = 0;
     for (const spec of specs) {
-      const button = this.makeButton(spec, x);
-      x += button.width + BUTTON_GAP;
-      this.buttons.push(button);
+      const { tile, text, resize } = moonButton(0, BUTTON.height, spec.label, spec.onTap, BUTTON.font);
+      const width = Math.ceil(text.width) + end * 2;
+      resize(width);
+      if (x > 0 && x + width > most) {
+        x = 0;
+        y += BUTTON.height + BUTTON.gap;
+      }
+      tile.container.position.set(x, y);
+      x += width + BUTTON.gap;
+      this.container.addChild(tile.container);
+      this.buttons.push({ tile, key: spec.key, pressed: undefined });
     }
-    this.setActive(null);
   }
 
   /** One button pressed, the one with this key: a choice of one option */
@@ -53,32 +56,10 @@ export class ButtonRow<K> {
   setPressed(isPressed: (key: K) => boolean) {
     for (const b of this.buttons) {
       const pressed = b.key !== null && isPressed(b.key);
-      // Repainting re-renders the text's texture, so only on change
+      // Repainting re-renders the button, so only on change
       if (pressed === b.pressed) continue;
       b.pressed = pressed;
-      b.background
-        .clear()
-        .roundRect(0, 0, b.width, BUTTON_HEIGHT, 6)
-        .fill({ color: pressed ? COLORS.active : COLORS.idle, alpha: 0.9 })
-        .stroke({ width: 1, color: COLORS.border, alpha: 0.5 });
-      b.text.style.fill = pressed ? COLORS.activeText : COLORS.text;
+      b.tile.setLook({ pressed });
     }
-  }
-
-  private makeButton(spec: ButtonSpec<K>, x: number): Button<K> {
-    const container = new Container();
-    const background = new Graphics();
-    const text = new Text({ text: spec.label, style: { fontFamily: 'Arial', fontSize: 13, fill: COLORS.text } });
-    const width = Math.ceil(text.width) + PADDING_X * 2;
-    text.position.set(PADDING_X, (BUTTON_HEIGHT - text.height) / 2);
-    container.addChild(background, text);
-    container.position.set(x, 0);
-    container.eventMode = 'static';
-    container.cursor = 'pointer';
-    // The stage listens for pointerdown to steer the ship; a click on a button must not reach it
-    container.on('pointerdown', (e) => e.stopPropagation());
-    container.on('pointertap', spec.onTap);
-    this.container.addChild(container);
-    return { background, text, width, key: spec.key, pressed: undefined };
   }
 }

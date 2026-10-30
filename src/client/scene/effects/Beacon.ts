@@ -1,12 +1,13 @@
 import { Container, Sprite, Texture } from 'pixi.js';
-import type { Shell, Ship, StoryMark } from '../../../game';
+import type { Ship, StoryMark } from '../../../game';
 import type { Camera3D } from '../../render/Camera3D';
-import { SHELL_LIGHTS, type WaterLight } from './seaSurface';
+import type { WaterLight } from './seaSurface';
 
 // Each look's colours: its pillar's glow, its bright heart, the motes rising in it
 const COLORS = {
   story: { beam: 0xffb547, core: 0xffe3a6, mote: 0xffc65a }, // the lighthouse's gold: the story's colour
   boss: { beam: 0xff3b2e, core: 0xffb4a0, mote: 0xff7a3d }, // blood and fire: a boss and its shells
+  ink: { beam: 0x7a4dff, core: 0xd9ccff, mote: 0xa98bff }, // ink with the Moon's light deep in it: a monster coming up
 } as const;
 export type BeaconLook = keyof typeof COLORS;
 
@@ -17,16 +18,25 @@ interface Pillar {
   readonly fade: number;
 }
 // Over the story's mark (the harbour's taller, over the town's roofs, seen across the sea); over a boss, high above its
-// masts, round a big hull; over a spot a boss's shell is to land on, quick: it lands within two seconds
-const PILLARS: Readonly<Record<'mark' | 'harbour' | 'boss' | 'shell', Pillar>> = {
+// masts, round a big hull; over a spot a boss's shell is to land on, quick: it lands within two seconds; over the spot
+// a monster comes up at, as quick and wider, as its arms strike; over the player's ship at a level reached, coming
+// quicker: it shows a few seconds
+const PILLARS: Readonly<Record<'mark' | 'harbour' | 'boss' | 'shell' | 'dive' | 'level', Pillar>> = {
   mark: { rise: 110, width: 30, fade: 0.8 },
   harbour: { rise: 170, width: 30, fade: 0.8 },
   boss: { rise: 230, width: 46, fade: 0.8 },
   shell: { rise: 150, width: 28, fade: 0.3 },
+  dive: { rise: 170, width: 70, fade: 0.3 },
+  level: { rise: 150, width: 30, fade: 0.5 },
 };
+export type SpotPillar = 'shell' | 'dive';
 // How far their light in the water reaches: a boss's this many times its hull's radius, round it, beyond its hull; a
-// shell's this many times its blast's, a little beyond the ring it is marked with (BarrageMarks)
-const SPREAD = { boss: 2.5, shell: 1.5 } as const;
+// shell's this many times its blast's, fading out beyond it (a dive's spot's as a shell's); a level's this many times
+// the ship's
+const SPREAD = { boss: 2.5, shell: 1.5, level: 4 } as const;
+// A marked spot's light in the water as it is marked, a share of its full light, which it grows to as what is to land
+// there comes
+const SHELL_DAWN = 0.35;
 // Light added onto the blue sea whitens it: the pillar's glow and the motes are laid over it (normal), tinting it,
 // its heart and foot added, lighting it
 // The share of the pillar's glow its bright heart takes, their opacities, breathing by `breath`
@@ -78,9 +88,29 @@ export function bossSpot(boss: Ship): BeaconSpot {
   return { key: boss.id, x: boss.x, y: boss.y, radius: boss.radius * SPREAD.boss, pillar: PILLARS.boss };
 }
 
-/** A spot a boss's shell is to land on */
-function shellSpot(shell: Shell): BeaconSpot {
-  return { key: shell.id, x: shell.x, y: shell.y, radius: shell.radius * SPREAD.shell, pillar: PILLARS.shell };
+/** The player's ship at a level reached (LevelUpEffect), wherever it sails */
+export function levelSpot(ship: Ship): BeaconSpot {
+  return { key: ship.id, x: ship.x, y: ship.y, radius: ship.radius * SPREAD.level, pillar: PILLARS.level };
+}
+
+/**
+ * A spot marked on the water till something lands or comes up there, world units and game times: a boss's shell, a
+ * monster coming up from a dive
+ */
+export interface MarkedSpot {
+  /** The same while it is the same spot: a shell's id, a diving monster's */
+  readonly key: number;
+  readonly x: number;
+  readonly y: number;
+  /** World units round it that are struck */
+  readonly radius: number;
+  readonly from: number;
+  readonly to: number;
+}
+
+function spotOf(spot: MarkedSpot, pillar: SpotPillar): BeaconSpot {
+  const { key, x, y, radius } = spot;
+  return { key, x, y, radius: radius * SPREAD.shell, pillar: PILLARS[pillar] };
 }
 
 function between([from, to]: readonly [number, number]) {
@@ -139,8 +169,9 @@ interface Mote {
 /**
  * A beacon over a spot on the water: a pillar of soft light rising out of it, breathing, a glow round its foot and
  * motes rising in it; and the light in the water under it, which the sea's shader draws (`water`). Gold where the story
- * sends the player, red round a boss that fights them and where its shells will land. It comes in and goes softly,
- * moves with what it stands over, and to something else only once its light has gone
+ * sends the player and round their ship at a level reached, red round a boss that fights them and where its shells
+ * will land. It comes in and goes softly, moves with what it stands over, and to something else only once its light
+ * has gone
  */
 export class Beacon {
   readonly container = new Container();
@@ -245,40 +276,51 @@ export class Beacon {
 }
 
 /**
- * A red beacon over every spot a boss's shells are to land on (state.shells; a player's own bombardment's are left to
- * their gold marks), from the moment it is marked till its shell lands: as many as the sea's shader lights, each shell
- * keeping its own and a new one taking one whose light has gone
+ * A beacon over every spot marked on the water from the moment it is marked till what is to land there does: red over
+ * a boss's shells (state.shells; a player's own bombardment's are left to their gold glow, BarrageMarks), ink-dark
+ * over where a monster comes up from a dive. As many as the sea's shader lights, each spot keeping its own and a new
+ * one taking one whose light has gone. Its light in the water grows as what is to land there comes
  */
-export class ShellBeacons {
+export class SpotBeacons {
   readonly container = new Container();
   private readonly beacons: Beacon[] = [];
+  private readonly pillar: SpotPillar;
+  /** Each beacon's share of its light in the water (SHELL_DAWN up to 1), by how near its spot is to being struck */
+  private readonly near: number[] = [];
 
-  constructor() {
-    for (let i = 0; i < SHELL_LIGHTS; i++) {
-      const beacon = new Beacon('boss');
+  /** count: as many as the sea's shader lights */
+  constructor(look: BeaconLook, pillar: SpotPillar, count: number) {
+    this.pillar = pillar;
+    for (let i = 0; i < count; i++) {
+      const beacon = new Beacon(look);
       this.beacons.push(beacon);
+      this.near.push(SHELL_DAWN);
       this.container.addChild(beacon.container);
     }
   }
 
   /** For the sea's shader: each beacon's light in the water, null where none shows */
   get water() {
-    return this.beacons.map((beacon) => beacon.water);
+    return this.beacons.map(
+      (beacon, i) => beacon.water && { ...beacon.water, shown: beacon.water.shown * this.near[i] },
+    );
   }
 
   /** width, height: the screen's, pixels */
-  update(dt: number, shells: readonly Shell[], camera: Camera3D, time: number, width: number, height: number) {
+  update(dt: number, spots: readonly MarkedSpot[], camera: Camera3D, time: number, width: number, height: number) {
     const free = [...this.beacons];
-    for (const shell of shells) {
-      if (shell.ordnance !== null) continue;
-      const spot = shellSpot(shell);
+    for (const marked of spots) {
+      const spot = spotOf(marked, this.pillar);
       const own = free.findIndex((beacon) => beacon.key === spot.key);
       const index = own >= 0 ? own : free.findIndex((beacon) => beacon.dark);
-      // More shells than beacons: the rest go unlit
+      // More spots than beacons: the rest go unlit
       if (index < 0) continue;
       const [beacon] = free.splice(index, 1);
       beacon.update(dt, spot, camera, time, width, height);
+      const flight = Math.min(1, Math.max(0, (time - marked.from) / (marked.to - marked.from)));
+      this.near[this.beacons.indexOf(beacon)] = SHELL_DAWN + (1 - SHELL_DAWN) * flight * flight;
     }
+    // A spot struck keeps its light as it was, fading
     for (const beacon of free) beacon.update(dt, null, camera, time, width, height);
   }
 }

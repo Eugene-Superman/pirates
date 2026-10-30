@@ -19,11 +19,12 @@ export interface DamageActions {
   changeHealth: (delta: number) => void;
 }
 
-// State presets, then −10% and +10%. The pressed preset follows the ship's actual stage
+// State presets, then −10% and +10%, on as many lines as `most` pixels across take. The pressed preset follows the
+// ship's actual stage
 export class DamagePanel {
   private readonly row: ButtonRow<DamageStage>;
 
-  constructor(actions: DamageActions) {
+  constructor(actions: DamageActions, most = Infinity) {
     const specs: ButtonSpec<DamageStage>[] = PRESETS.map((preset) => ({
       label: t(preset.label),
       key: preset.stage,
@@ -33,7 +34,7 @@ export class DamagePanel {
       { label: `−${STEP}%`, key: null, onTap: () => actions.changeHealth(-STEP) },
       { label: `+${STEP}%`, key: null, onTap: () => actions.changeHealth(STEP) },
     );
-    this.row = new ButtonRow(specs);
+    this.row = new ButtonRow(specs, most);
   }
 
   get container() {

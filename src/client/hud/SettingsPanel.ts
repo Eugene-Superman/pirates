@@ -1,109 +1,129 @@
-import { Container, Graphics, type Rectangle, Text } from 'pixi.js';
+import { Container, Graphics, Sprite, type Rectangle } from 'pixi.js';
 import { Checkbox } from './Checkbox';
-import { crossButton } from './theme';
-import { HUD_GROUPS, LABEL_STYLE, type HudFrame, type HudItem, type HudWidget } from './hudItems';
+import { CONTROL_WIDTH, DEV_GROUPS, type HudControl, type HudFrame, type HudMetric, type HudWidget } from './hudItems';
+import { MINIMAP_BUTTONS } from './iconAtlas';
+import {
+  NIGHT_HEADER,
+  NIGHT_WINDOW,
+  nightBoard,
+  nightDivider,
+  nightEmblem,
+  nightHeader,
+  type NightBoardLayout,
+} from './nightTheme';
+import { THEME, subheading } from './theme';
+import { HudWindow, drawWrench, text } from './ui';
 import { t } from '../i18n/i18n';
 
-const PANEL_COLOR = 0x0b2433;
-const PANEL_ALPHA = 0.95;
-const DIM_ALPHA = 0.45; // darkens the game behind the panel
-const MARGIN = 24; // pixels between the panel and the screen's edge
-const PADDING = 16; // pixels inside the panel
-const CLOSE = 28; // pixels: the close button, the gold cross, square
-const ROW_GAP = 8;
-const GROUP_GAP = 16;
-const CHECK_WIDTH = 30; // pixels: the "on screen" checkbox, then the item's label
-const LABEL_WIDTH = 120; // pixels: then the item's control
-const SCROLL_SPEED = 0.6; // pixels per unit of the mouse wheel
-const HEADER_STYLE = { ...LABEL_STYLE, fontSize: 16, fontWeight: 'bold' as const, fill: 0xf2b33d };
-const NOTE_STYLE = { ...LABEL_STYLE, fontSize: 12, fill: 0xb8cdd8 };
+const PAD = 24; // pixels: the window's padding
+const DIVIDER = PAD + NIGHT_HEADER.rule; // the gold line under the header
+const TOP = DIVIDER + 18; // pixels: the first board's top, where the band that scrolls starts
+const BOTTOM = PAD + 14; // pixels under the last board, clear of the window's bottom corner pieces
+const GAP = 16; // pixels between the two boards
+// A board, pixels: inside it, its corner pieces (high), its emblem's radius, its heading
+const BOARD: NightBoardLayout = { pad: 20, corner: 26, emblem: 16, heading: { y: 12, size: 18 } };
+const BOARD_STAR = 140; // pixels: the painted star of the divider under a board's heading, across
+const LABEL_WIDTH = 170; // pixels: a row's name, then its control
+const BOARD_WIDTH = BOARD.pad * 2 + LABEL_WIDTH + CONTROL_WIDTH;
+const WIDTH = PAD * 2 + BOARD_WIDTH; // pixels, before scaling down to fit the screen
+/**
+ * Pixels down a board: the divider under its heading and its first row; a row's height at least, and the room over and
+ * under a taller control; a group's heading's top and the first row under it; the room under the last row
+ */
+const ROWS = { divider: 48, top: 58, height: 38, pad: 5, group: 8, groupRows: 36, bottom: 16 } as const;
+const LABEL_SIZE = 14; // pixels
+const GROUP_SIZE = 15; // pixels: a group's heading on the developer's board
+const CHECK_GAP = 28; // pixels between two checkboxes in a row
+const WRENCH = 22; // pixels: the wrench on the developer's board's emblem, across
 
-interface Row {
-  readonly item: HudItem;
+interface ShownCheck {
+  readonly id: string;
   readonly check: Checkbox;
-  /** The item's own control, working here too; null for metrics, which only show on the screen */
-  readonly widget: HudWidget | null;
+}
+
+/** The settings' board's emblem: the gear of the minimap's button, painted (empty till it loads) */
+function gearEmblem() {
+  const inside = new Container();
+  const dress = () => {
+    const texture = MINIMAP_BUTTONS.get('settings');
+    if (!texture || inside.destroyed) return;
+    const sprite = new Sprite(texture);
+    sprite.anchor.set(0.5);
+    sprite.setSize(BOARD.emblem * 2 - 2);
+    inside.addChild(sprite);
+  };
+  if (MINIMAP_BUTTONS.get('settings')) dress();
+  else MINIMAP_BUTTONS.load(dress);
+  return nightEmblem(BOARD.emblem, inside);
 }
 
 /**
- * A development tool: every HUD item, grouped, with a checkbox for whether it is also shown on the screen, and every
- * control working right here. Opened by the gear on the minimap's frame, closed by its gold cross, Escape or
- * a click beside it.
- * The mouse wheel scrolls it when it is taller than the screen
+ * The settings (the gear on the minimap's frame), in the night look: on one board of blue glass the player's (the
+ * language, picked from a list, the layout of the screen, the sound, the zoom, the range rings, and what is shown on
+ * the screen: the speed and the frame rate), and under it on a board of its own the developer's tools (tuning the ship,
+ * the debug buttons). The boards scroll under the header when they are taller than the screen. Closed by its gold
+ * cross, Escape (which first folds an open list) or a click beside it
  */
 export class SettingsPanel {
-  readonly container = new Container();
-  private readonly dim = new Graphics();
-  private readonly panel = new Container();
-  private readonly background = new Graphics();
-  private readonly title = new Text({ text: t('Settings (dev)'), style: { ...HEADER_STYLE, fontSize: 18 } });
-  private readonly note = new Text({ text: t('Checked: also shown on the screen'), style: NOTE_STYLE });
-  private readonly close = crossButton(CLOSE, () => this.hide());
-  private readonly content = new Container();
-  private readonly clip = new Graphics();
-  private readonly rows: Row[] = [];
-  private readonly screen: Rectangle;
+  readonly container: Container;
+  private readonly window: HudWindow;
+  private readonly widgets: HudWidget[] = [];
+  private readonly checks: ShownCheck[] = [];
   private readonly isShown: (id: string) => boolean;
-  /** Measured before the content is masked: a masked container is only as big as its mask */
-  private contentWidth = 0;
-  private contentHeight = 0;
-  /** Where the scrolled content starts in the panel, and how much of it shows */
-  private contentTop = 0;
-  private viewHeight = 0;
-  private scroll = 0;
-  /** Screen size the panel was laid out for */
-  private laidOut = '';
 
+  /** isShown, toggle: whether a metric is on the screen, and putting it there or taking it off */
   constructor(
-    items: readonly HudItem[],
+    controls: readonly HudControl[],
+    metrics: readonly HudMetric[],
     isShown: (id: string) => boolean,
     toggle: (id: string) => void,
     screen: Rectangle,
   ) {
-    this.screen = screen;
     this.isShown = isShown;
-    this.container.visible = false;
-
-    // Clicks on the panel and around it must not reach the stage, which would steer the ship
-    for (const blocker of [this.dim, this.background]) {
-      blocker.eventMode = 'static';
-      blocker.on('pointerdown', (e) => e.stopPropagation());
-    }
-    this.dim.on('pointertap', () => this.hide());
-    this.panel.eventMode = 'static';
-    this.panel.on('wheel', (e) => this.scrollBy(e.deltaY * SCROLL_SPEED));
-
-    let y = 0;
-    for (const group of HUD_GROUPS) {
-      const members = items.filter((item) => item.group === group);
-      if (members.length === 0) continue;
-      const header = new Text({ text: t(group), style: HEADER_STYLE });
-      header.y = y;
-      this.content.addChild(header);
-      y += header.height + ROW_GAP;
-      for (const item of members) {
-        y += this.addRow(item, y, () => toggle(item.id)) + ROW_GAP;
-      }
-      y += GROUP_GAP - ROW_GAP;
-    }
-    this.contentWidth = this.content.width;
-    this.contentHeight = y;
-
-    this.content.mask = this.clip;
-    this.panel.addChild(this.background, this.title, this.note, this.close.container, this.content, this.clip);
-    this.container.addChild(this.dim, this.panel);
-
+    // Heard before the window's own Escape, made below: an open list folds first, the window stays
     window.addEventListener('keydown', (e) => {
-      // A window over it closes first: the HUD makes them before it
-      if (e.code !== 'Escape' || !this.isOpen || e.defaultPrevented) return;
-      this.hide();
-      // Escape closed the panel; it shouldn't also stop the ship firing (keyboardInput)
+      if (e.code !== 'Escape' || !this.isOpen || e.defaultPrevented || !this.fold()) return;
       e.preventDefault();
     });
+
+    const boards = new Container();
+    const game = this.board(TOP, t('Game'), gearEmblem(), (rows, y) => {
+      let at = y;
+      for (const control of controls) {
+        if (!DEV_GROUPS.includes(control.group)) at = this.control(rows, at, control);
+      }
+      return this.row(rows, at, t('On the screen'), this.shownChecks(metrics, toggle));
+    });
+    const wrench = new Graphics();
+    drawWrench(wrench, WRENCH, THEME.title);
+    const dev = this.board(game.bottom + GAP, t('Developer'), nightEmblem(BOARD.emblem, wrench), (rows, y) => {
+      let at = y;
+      for (const group of DEV_GROUPS) {
+        const heading = subheading(t(group), GROUP_SIZE);
+        heading.position.set(BOARD.pad, at + ROWS.group);
+        rows.addChild(heading);
+        at += ROWS.groupRows;
+        for (const control of controls) if (control.group === group) at = this.control(rows, at, control);
+      }
+      return at;
+    });
+    // The player's board over the developer's: a list unfolded from it lies over the boards under it
+    boards.addChild(dev.container, game.container);
+
+    const height = dev.bottom + BOTTOM;
+    this.window = new HudWindow(
+      screen,
+      { width: WIDTH, height, pad: PAD, scroll: { top: TOP, bottom: BOTTOM } },
+      () => this.hide(),
+      NIGHT_WINDOW,
+    );
+    this.container = this.window.container;
+    this.window.body.addChild(boards);
+    this.window.panel.addChild(nightHeader(WIDTH, PAD, t('Settings')).container);
   }
 
   get isOpen() {
-    return this.container.visible;
+    return this.window.isOpen;
   }
 
   toggle() {
@@ -112,66 +132,69 @@ export class SettingsPanel {
   }
 
   hide() {
+    this.fold();
     this.container.visible = false;
   }
 
   update(frame: HudFrame) {
     if (!this.isOpen) return;
-    const size = `${this.screen.width}x${this.screen.height}`;
-    if (size !== this.laidOut) this.layout(size);
-    for (const row of this.rows) {
-      row.check.setChecked(this.isShown(row.item.id));
-      row.widget?.update(frame);
+    this.window.fit();
+    for (const { id, check } of this.checks) check.setChecked(this.isShown(id));
+    for (const widget of this.widgets) widget.update(frame);
+  }
+
+  /** Folds whatever list is open; returns whether one was */
+  private fold() {
+    return this.widgets.reduce((folded, widget) => (widget.fold?.() ?? false) || folded, false);
+  }
+
+  /**
+   * A board of blue glass at `top`, its emblem and heading, a divider under them and the rows `lay` puts on it from
+   * its first row's top down, returning where they end
+   */
+  private board(top: number, heading: string, emblem: Container, lay: (rows: Container, y: number) => number) {
+    const rows = new Container();
+    const height = lay(rows, ROWS.top) + ROWS.bottom;
+    // A list to pick from over the rows under it
+    for (const widget of this.widgets)
+      if (widget.fold && widget.container.parent === rows) rows.addChild(widget.container);
+    const { container } = nightBoard(BOARD_WIDTH, height, BOARD, emblem, heading);
+    const divider = nightDivider(BOARD_WIDTH - BOARD.pad * 2, BOARD_STAR);
+    divider.position.set(BOARD.pad, ROWS.divider);
+    container.addChild(divider, rows);
+    container.position.set(PAD, top);
+    return { container, bottom: top + height };
+  }
+
+  /** A control's row at `y`; returns where the next one starts */
+  private control(rows: Container, y: number, control: HudControl) {
+    const widget = control.create();
+    this.widgets.push(widget);
+    return this.row(rows, y, t(control.label), widget.container);
+  }
+
+  /** A row at `y`: its name, then `part` after it, both on its middle; returns where the next one starts */
+  private row(rows: Container, y: number, name: string, part: Container) {
+    const height = Math.max(ROWS.height, part.height + ROWS.pad * 2);
+    const label = text(name, LABEL_SIZE, THEME.text);
+    label.anchor.set(0, 0.5);
+    label.position.set(BOARD.pad, y + height / 2);
+    part.position.set(BOARD.pad + LABEL_WIDTH, y + (height - part.height) / 2);
+    rows.addChild(label, part);
+    return y + height;
+  }
+
+  /** A checkbox a metric, side by side: ticked, it is shown on the screen */
+  private shownChecks(metrics: readonly HudMetric[], toggle: (id: string) => void) {
+    const checks = new Container();
+    let x = 0;
+    for (const { id, label } of metrics) {
+      const check = new Checkbox(t(label), () => toggle(id));
+      check.container.x = x;
+      x += check.container.width + CHECK_GAP;
+      checks.addChild(check.container);
+      this.checks.push({ id, check });
     }
-  }
-
-  /** Returns the row's height */
-  private addRow(item: HudItem, y: number, onToggle: () => void) {
-    const check = new Checkbox('', onToggle);
-    const label = new Text({ text: t(item.label), style: LABEL_STYLE });
-    const widget = item.kind === 'control' ? item.create() : null;
-    const height = Math.max(widget ? widget.container.height : 0, label.height, 18);
-    check.container.position.set(0, y + (height - 18) / 2);
-    label.position.set(CHECK_WIDTH, y + (height - label.height) / 2);
-    this.content.addChild(check.container, label);
-    if (widget) {
-      widget.container.position.set(CHECK_WIDTH + LABEL_WIDTH, y + (height - widget.container.height) / 2);
-      this.content.addChild(widget.container);
-    }
-    this.rows.push({ item, check, widget });
-    return height;
-  }
-
-  private layout(size: string) {
-    this.laidOut = size;
-    const { width, height } = this.screen;
-    this.dim.clear().rect(0, 0, width, height).fill({ color: 0x000000, alpha: DIM_ALPHA });
-
-    const top = PADDING + this.title.height + 4 + this.note.height + GROUP_GAP;
-    const panelWidth = Math.min(Math.max(this.contentWidth, this.title.width + 120) + PADDING * 2, width - MARGIN * 2);
-    const panelHeight = Math.min(top + this.contentHeight + PADDING, height - MARGIN * 2);
-    this.viewHeight = panelHeight - top - PADDING;
-    this.panel.position.set(Math.max(MARGIN, (width - panelWidth) / 2), Math.max(MARGIN, (height - panelHeight) / 2));
-    this.background
-      .clear()
-      .roundRect(0, 0, panelWidth, panelHeight, 10)
-      .fill({ color: PANEL_COLOR, alpha: PANEL_ALPHA })
-      .stroke({ width: 1, color: 0xffffff, alpha: 0.3 });
-    this.title.position.set(PADDING, PADDING);
-    this.note.position.set(PADDING, this.title.y + this.title.height + 4);
-    this.close.container.position.set(panelWidth - PADDING - this.close.width, PADDING);
-    this.content.x = PADDING;
-    this.clip
-      .clear()
-      .rect(PADDING, top, panelWidth - PADDING * 2, this.viewHeight)
-      .fill(0xffffff);
-    this.contentTop = top;
-    this.scrollBy(0);
-  }
-
-  private scrollBy(delta: number) {
-    const most = Math.max(0, this.contentHeight - this.viewHeight);
-    this.scroll = Math.min(Math.max(this.scroll + delta, 0), most);
-    this.content.y = this.contentTop - this.scroll;
+    return checks;
   }
 }

@@ -158,7 +158,6 @@ function placeCursor(state: GameState, x: number, y: number): CursorId {
  * KEYWORDS): a gold arrow over a button. Until the pictures load, the system's cursors stand in
  */
 export function bindCursor(app: Application, view: SceneView, state: GameState, hover: Hover) {
-  const { ship } = state;
   // The canvas inherits its cursor from the page, except over the HUD's elements (Pixi's cursor styles)
   const page = app.canvas.parentElement ?? document.body;
   let css: Partial<Record<CursorId, string>> = {};
@@ -192,7 +191,8 @@ export function bindCursor(app: Application, view: SceneView, state: GameState, 
     hover.id = unit ? unit.id : null;
     let id: CursorId = 'arrow';
     if (view.isSteering) id = 'wheel';
-    else if (unit) id = unitCursor(ship, unit);
+    // The ship sailed now: another may be bought or taken in port
+    else if (unit) id = unitCursor(state.ship, unit);
     else if (pointer) {
       const p = view.screenToWorld(pointer.x, pointer.y);
       id = placeCursor(state, p.x, p.y);

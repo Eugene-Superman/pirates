@@ -1,17 +1,14 @@
 /** Ukrainian: the game's English texts (the keys) as players read them. A missing one stays English */
 export const UK: Readonly<Record<string, string>> = {
   Settings: 'Налаштування',
-  'Settings (dev)': 'Налаштування (розробка)',
-  'Checked: also shown on the screen': 'Позначене видно й на екрані',
+  Game: 'Гра',
+  Developer: 'Розробник',
+  'On the screen': 'На екрані',
   Language: 'Мова',
   Info: 'Інформація',
   Sound: 'Звук',
-  Camera: 'Камера',
-  World: 'Світ',
-  Combat: 'Бій',
   'Ship tuning': 'Налаштування корабля',
   Debug: 'Налагодження',
-  Interface: 'Інтерфейс',
   Layout: 'Розташування',
   Edit: 'Редагувати',
   'drag the panels on the screen where you like, then save': 'перетягніть панелі на екрані, куди зручно, і збережіть',
@@ -25,15 +22,10 @@ export const UK: Readonly<Record<string, string>> = {
   Chat: 'Чат',
   'Skill bar': 'Панель умінь',
   Minimap: 'Мінікарта',
-  Help: 'Підказка',
   Speed: 'Швидкість',
   Hull: 'Корпус',
   FPS: 'FPS',
-  GPU: 'Відеокарта',
   Zoom: 'Масштаб',
-  Fog: 'Туман',
-  Sky: 'Небо',
-  Weapon: 'Зброя',
   Range: 'Дальність',
   Damage: 'Пошкодження',
   'Max speed': 'Макс. швидкість',
@@ -43,18 +35,13 @@ export const UK: Readonly<Record<string, string>> = {
   Level: 'Рівень',
   Progress: 'Прогрес',
   Navigation: 'Навігація',
-  Mist: 'Серпанок',
-  Clouds: 'Хмари',
   Route: 'Маршрут',
   'Hulls and coasts': 'Корпуси й береги',
   Show: 'Показувати',
   On: 'Увімк.',
   'Volume {volume}%': 'Гучність {volume}%',
   Muted: 'Без звуку',
-  software: 'програмно',
-  'Cease fire': 'Припинити вогонь',
   'Speed: {speed} kn (top now {top})': 'Швидкість: {speed} вуз. (зараз до {top})',
-  'Hull: {hp}/{max} ({health}%, {stage})': 'Корпус: {hp}/{max} ({health}%, {stage})',
   intact: 'цілий',
   minor: 'подряпаний',
   heavy: 'побитий',
@@ -70,8 +57,6 @@ export const UK: Readonly<Record<string, string>> = {
   'FPS: {fps}   longest frame: {ms} ms': 'FPS: {fps}   найдовший кадр: {ms} мс',
   "No graphics acceleration: the processor draws the game, at a lower resolution. Turn it on in the browser's settings":
     'Немає графічного прискорення: гру малює процесор, у меншій роздільності. Увімкніть його в налаштуваннях браузера',
-  "Click the sea to sail, the port to go in · click a ship or a monster to pick it, double-click or Space to fire, Esc to stop · Q/E weapons, R repair (for gold), F/G/T abilities, K talents, I statistics, H hold, P captain's mastery, N world chart":
-    'Клік по морю — плисти, по порту — зайти в нього · клік по кораблю чи чудовиську — обрати ціль, подвійний клік або Пробіл — вогонь, Esc — стоп · Q/E зброя, R ремонт (за золото), F/G/T уміння, K таланти, I статистика, H трюм, P майстерність капітана, N карта світу',
   'Intact 100%': 'Цілий 100%',
   'Minor 70%': 'Подряпаний 70%',
   'Heavy 45%': 'Побитий 45%',
@@ -103,6 +88,8 @@ export const UK: Readonly<Record<string, string>> = {
   'Goal: the {ship}': 'Мета: {ship}',
   'Take a talent (K)': 'Візьміть талант (K)',
   'Repair your hull at sea (R)': 'Полагодьте корпус у морі (R)',
+  'Stop the repair (R)': 'Зупиніть ремонт (R)',
+  'The step under way is lost, and nothing is paid for it': 'Розпочатий крок пропадає, і за нього нічого не платять',
   'Reach level': 'Досягніть рівня',
   'Sink the Smuggler Baron': 'Потопіть Барона контрабандистів',
   'Save gold': 'Зберіть золото',
@@ -125,6 +112,7 @@ export const UK: Readonly<Record<string, string>> = {
   'Bounties: up to {n} at a time. Sink what they ask, then come back':
     'Замовлення: до {n} водночас. Потопіть, що просять, і повертайтеся',
   Market: 'Ринок',
+  'Golden Galleon': 'Золотий галеон',
   Shipyard: 'Верф',
   'Set sail  (Esc)': 'Підняти вітрила  (Esc)',
   Workshop: 'Майстерня',
@@ -134,8 +122,9 @@ export const UK: Readonly<Record<string, string>> = {
   Repairs: 'Ремонт',
   'Bounties: sink what they ask and come back for the gold':
     'Замовлення: потопіть, що просять, і поверніться по золото',
-  'Buys the goods in your hold, and sells items for doubloons':
-    'Купує товари з вашого трюму й продає предмети за дублони',
+  'Buys the goods and loot in your hold, for gold': 'Купує за золото товари й здобич із вашого трюму',
+  'Rare wares for doubloons: scrolls, charms, flags and more':
+    'Рідкісний крам за дублони: сувої, амулети, прапори та інше',
   'Sails, planking, rudders and lookouts for your ship, and hull repairs':
     'Вітрила, обшивка, стерна й дозорне спорядження для корабля, ремонт корпусу',
   'New ships, and your ships laid up in port': 'Нові кораблі та ваші кораблі, що стоять у порту',
@@ -147,6 +136,8 @@ export const UK: Readonly<Record<string, string>> = {
     'Тут капітани об’єднуватимуться: засновуватимуть гільдії, матимуть спільну скарбницю, виходитимуть у море й битимуться пліч-о-пліч. Відкриється разом з онлайн-грою.',
   'Captains will sell one another guns, outfit and goods here, each at their own price. It opens with the online game.':
     'Тут капітани продаватимуть одне одному гармати, оснащення й товари, кожен за своєю ціною. Відкриється разом з онлайн-грою.',
+  "Hale, the harbour master, posts his bounties here for captains Saltwind knows. Follow the story: once you have scouted the Baron's waters, the tavern takes your name.":
+    'Гейл, начальник гавані, вивішує тут свої замовлення для капітанів, яких знає Солоний Вітер. Ідіть за сюжетом: щойно ви розвідаєте води Барона, таверна запише ваше ім’я.',
   Sails: 'Вітрила',
   Rudder: 'Стерно',
   Lookout: 'Дозор',
@@ -182,6 +173,29 @@ export const UK: Readonly<Record<string, string>> = {
   "No bonuses yet: the captain's mastery and the ship's talents add to it":
     'Бонусів поки немає: їх дають майстерність капітана й таланти корабля',
   "{n} lost: beyond the ship's last level": '{n} втрачено: понад останній рівень корабля',
+  '"{title}" done: +{n} gold and {prizes}':
+    '«{title}» виконано: +{n} золотий і {prizes}|«{title}» виконано: +{n} золоті і {prizes}|«{title}» виконано: +{n} золотих і {prizes}',
+  'The first time, besides: {prizes}': 'Уперше, на додачу: {prizes}',
+  'First time:': 'Уперше:',
+  'The first time, besides the reward': 'Уперше, на додачу до нагороди',
+  "Guns, outfit and items go into the hold, ammo into the ship's":
+    'Гармати, оснащення й предмети йдуть у трюм, боєприпаси — на корабель',
+  'Turned in {n} time: {share}% of it this time|Turned in {n} times: {share}% of it this time':
+    'Здано {n} раз: цього разу {share}%|Здано {n} рази: цього разу {share}%|Здано {n} разів: цього разу {share}%',
+  'Turned in {n} time: {share}% of its reward now|Turned in {n} times: {share}% of its reward now':
+    'Здано {n} раз: тепер {share}% нагороди|Здано {n} рази: тепер {share}% нагороди|Здано {n} разів: тепер {share}% нагороди',
+  'Turned in {n} time: once more in full, then for less|Turned in {n} times: once more in full, then for less':
+    'Здано {n} раз: ще раз повністю, далі менше|Здано {n} рази: ще раз повністю, далі менше|Здано {n} разів: ще раз повністю, далі менше',
+  'Turned in {n} time|Turned in {n} times': 'Здано {n} раз|Здано {n} рази|Здано {n} разів',
+  Easy: 'Легке',
+  Hard: 'Важке',
+  Elite: 'Елітне',
+  Epic: 'Епічне',
+  'Its prey leaves you be till you attack it': 'Його здобич не чіпає вас, доки ви не нападете',
+  'Its prey attacks whoever comes near': 'Його здобич нападає на всіх, хто підпливе',
+  'One strong foe, or a pack: come with the hull whole and every gun fitted':
+    'Один сильний ворог або зграя: приходьте з цілим корпусом і всіма гарматами на місцях',
+  "The sea's boss, with its escort and its tricks": 'Бос моря, зі своїм ескортом і своїми хитрощами',
   'Taken: {title}. Sink {n} and come back': 'Узято: {title}. Потопіть {n} і повертайтеся',
   'The shipwright mended the hull': 'Корабел полагодив корпус',
   'Or let the crew mend it at sea (R): 1 gold for every {per} hull, a step a second, out of combat':
@@ -209,13 +223,16 @@ export const UK: Readonly<Record<string, string>> = {
   'No {weapon} fitted: fit some in the loadout (L)': '{Weapon} не встановлено: поставте їх в озброєнні (L)',
   'No ammo at hand for your {weapon}: put some on the bar in the loadout (L)':
     '{Weapon}: під рукою немає боєприпасів, покладіть їх на панель в озброєнні (L)',
+  '{ammo} is not at hand: put it on the bar in the loadout (L), or load the other below (Z, X)':
+    'Не під рукою: {ammo}. Покладіть на панель в озброєнні (L) або зарядіть інші боєприпаси внизу (Z, X)',
   'Target hidden in the fog: sail closer': 'Ціль сховалася в тумані: підпливіть ближче',
   "Target beyond your {weapon}' reach ({range}): sail closer":
     'Ціль далі, ніж б’ють {weapon} ({range}): підпливіть ближче',
   'Lv {level}': 'Рів. {level}',
   'Your ship went down': 'Ваш корабель пішов на дно',
   '{Weapon} do {share}% {targets}: {better} do it all': '{Weapon} завдають {share}% шкоди {targets}: {better} — повну',
-  '{talent}: your next volley does ×{n} damage': '{talent}: наступний залп завдасть ×{n} шкоди',
+  '{talent}: your guns wait for each other, then fire as one for ×{n} damage':
+    '{talent}: знаряддя чекають одне на одного й б’ють разом: ×{n} шкоди',
   '{talent}: {n} s': '{talent}: {n} с',
   'Repairing: +{hp} hull every second, 1 gold for every {per}':
     'Ремонт: +{hp} корпусу щосекунди, 1 золотий за кожні {per}',
@@ -293,9 +310,6 @@ export const UK: Readonly<Record<string, string>> = {
   'Attacking you': 'Атакує вас',
   Aggressive: 'Агресивний',
   Neutral: 'Нейтральний',
-  '{what}: {weapon} do full damage': '{what}: найкраще б’ють {weapon}',
-  Creature: 'Істота',
-  Ship: 'Корабель',
   Jaws: 'Щелепи',
   miss: 'промах',
   crit: 'крит',
@@ -328,7 +342,7 @@ export const UK: Readonly<Record<string, string>> = {
   'Hauled aboard': 'Піднято на борт',
   'The hold is full: sell at the port market': 'Трюм повний: продайте на ринку в порту',
   'Your cargo floats where you sank: {goods}': 'Ваш вантаж плаває там, де ви затонули: {goods}',
-  'The Baron fires his mortar: get out of the marked circles!': 'Барон стріляє з мортири: виходьте з позначених кіл!',
+  'The Baron fires his mortar: get out of the red glow!': 'Барон стріляє з мортири: виходьте з червоного сяйва!',
   'for {n} gold': 'за {n} золотий|за {n} золоті|за {n} золотих',
   'Repaired +{hp} hull in {time} s': 'Полагоджено +{hp} корпусу за {time} с',
   'Hull {hp}/{max}': 'Корпус {hp}/{max}',
@@ -362,16 +376,18 @@ export const UK: Readonly<Record<string, string>> = {
   'Damage control': 'Боротьба за живучість',
   'Second wind': 'Друге дихання',
   Broadside: 'Бортовий залп',
-  'Ability (F): the next volley does ×2 damage. Every 30 s': 'Уміння (F): наступний залп завдає ×2 шкоди. Раз на 30 с',
-  'the next volley does ×2 damage': 'наступний залп завдає ×2 шкоди',
+  'Ability (F): the next volley waits till every gun in reach is loaded, then fires them all at once for ×2 damage. Every 30 s':
+    'Уміння (F): наступний залп чекає, доки зарядяться всі знаряддя, що дістають ціль, і б’є ними разом: ×2 шкоди. Раз на 30 с',
+  'the next volley waits till every gun in reach is loaded, then fires them all at once for ×2 damage':
+    'наступний залп чекає, доки зарядяться всі знаряддя, що дістають ціль, і б’є ними разом: ×2 шкоди',
   'Full sail': 'Усі вітрила',
   'Ability (F): +40% speed for 5 s. Every 30 s': 'Уміння (F): +40% швидкості на 5 с. Раз на 30 с',
   '+40% speed for 5 s': '+40% швидкості на 5 с',
   Ambush: 'Засідка',
   "+40% damage to a target that isn't in a fight: the first volley": '+40% шкоди цілі, що не в бою: перший залп',
   Relentless: 'Невблаганний',
-  '+5% damage for every volley in a row at one target, up to +25%':
-    '+5% шкоди за кожен залп поспіль по одній цілі, до +25%',
+  '+5% damage for every volley in a row at one target, up to +25%; with guns of different reloads, a volley once all of them have fired':
+    '+5% шкоди за кожен залп поспіль по одній цілі, до +25%; з гарматами різної перезарядки залп — коли вистрілили всі',
   'Seasoned crew': 'Досвідчена команда',
   'Broadside and Full sail are ready every 20 s, not 30': 'Бортовий залп і Усі вітрила готові кожні 20 с, а не 30',
   'Grog rations': 'Пайок грогу',
@@ -550,20 +566,26 @@ export const UK: Readonly<Record<string, string>> = {
   'Pride of the line': 'Гордість лінії',
   'Empty nets': 'Порожні сіті',
   'Turtle soup': 'Черепаховий суп',
-  'The cook wants turtle meat. Hunt five sea turtles; mind their jaws.':
-    'Куховарові потрібне черепахове м’ясо. Уполюйте п’ять черепах; стережіться щелеп.',
+  'The cook wants turtle meat, a barrel of it. Hunt {count} sea turtles; mind their jaws.':
+    'Куховарові потрібне черепахове м’ясо, ціла бочка. Уполюйте {count} черепах; стережіться щелеп.',
   'Raid the trade': 'Удар по торгівлі',
-  'Merchant sloops sail past without paying their dues. Sink three.':
-    'Торгові шлюпи пропливають повз, не сплачуючи мита. Потопіть три.',
+  'Merchant sloops sail past without paying their dues. Sink {count} of them.':
+    'Торгові шлюпи пропливають повз, не сплачуючи мита. Потопіть {count}.',
   'Smugglers wanted': 'Розшук контрабандистів',
-  'Smugglers attack anyone who comes near. The harbour master pays for three sunk.':
-    'Контрабандисти нападають на всіх, хто підпливе. Начальник гавані платить за три потоплені.',
+  'Smugglers attack anyone who comes near. The harbour master pays for {count} of them sunk.':
+    'Контрабандисти нападають на всіх, хто підпливе. Начальник гавані платить за {count} потоплених.',
   "Serpent's bane": 'Погибель змія',
-  'Sea serpents drag our boats under. Kill three, and keep your harpoons sharp.':
-    'Морські змії тягнуть наші човни під воду. Убийте трьох і тримайте гарпуни гострими.',
+  'Sea serpents drag our boats under. Kill {count}, and keep your harpoons sharp.':
+    'Морські змії тягнуть наші човни під воду. Убийте {count} і тримайте гарпуни гострими.',
+  'The jackal pack': 'Зграя шакалів',
+  'Cutters hunt the far waters in packs of four and fall on lone ships together, like jackals. Sink a whole pack, all {count}. Come with your hull whole, sink the nearest first, and never let them circle you.':
+    'Катери полюють у далеких водах зграями по четверо й разом нападають на самотні кораблі, як шакали. Потопіть цілу зграю, усіх {count}. Приходьте з цілим корпусом, топіть найближчого першим і не дайте їм узяти вас у коло.',
   'The Smuggler Baron': 'Барон контрабандистів',
   'The Baron and his smugglers hold the north-east. Sink his brig, and watch for his mortar: get out of the circles.':
     'Барон і його контрабандисти тримають північний схід. Потопіть його бриг і стережіться мортири: виходьте з кіл.',
+  'The Inkmother': 'Чорнильна Мати',
+  'Something with arms longer than a mast drags boats under in the south-west. Fishermen call it the Inkmother. Kill it, and mind its arms.':
+    'На південному заході щось зі щупальцями, довшими за щоглу, тягне під воду човни. Рибалки звуть цю тварюку Чорнильною Матір’ю. Убийте її і стережіться щупалець.',
   Fish: 'Риба',
   Cloth: 'Тканина',
   Spices: 'Прянощі',
@@ -572,6 +594,7 @@ export const UK: Readonly<Record<string, string>> = {
   'Turtle shell': 'Черепаховий панцир',
   'Serpent scales': 'Луска змія',
   "Baron's strongbox": 'Скарбничка Барона',
+  'Moon pearl': 'Місячна перлина',
   'Cannon I': 'Гармата I',
   'All-round': 'Універсальна',
   'Swivel gun': 'Фальконет',
@@ -707,8 +730,11 @@ export const UK: Readonly<Record<string, string>> = {
   'Fishing boat': 'Рибальський човен',
   'Merchant sloop': 'Торговий шлюп',
   'Smuggler sloop': 'Шлюп контрабандистів',
+  'Jackal cutter': 'Катер шакалів',
   'Smuggler Baron': 'Барон контрабандистів',
+  Inkmother: 'Чорнильна Мати',
   "A boss's lair": 'Лігво боса',
+  "A mini-boss's lair": 'Лігво міні-боса',
   'Giant turtle': 'Гігантська черепаха',
   'Sea serpent': 'Морський змій',
   Statistics: 'Статистика',
@@ -1027,6 +1053,11 @@ export const UK: Readonly<Record<string, string>> = {
   'Every term met': 'Усі умови виконано',
   "Captain's path: {done} / {all}": 'Шлях капітана: {done} / {all}',
   'You take the helm of the {name}': 'Ви стаєте за стерно: {name}',
+  "Take the sloop's gear off?": 'Зняти спорядження зі шлюпа?',
+  "A new ship comes bare: no guns, no outfit. The sloop's can go into the hold, to be fitted on the new one: the guns in the loadout (L), the outfit at the workshop. Left aboard, they stay on the sloop, laid up in port. Either answer buys the ship.":
+    'Новий корабель приходить порожнім: ані гармат, ані оснащення. Те, що на шлюпі, можна зняти в трюм і поставити на новий: гармати — в озброєнні (L), оснащення — в майстерні. Залишене на борту лишиться на шлюпі, що стоятиме в порту. Корабель буде куплено за будь-якої відповіді.',
+  'Take it off': 'Зняти в трюм',
+  'Leave it aboard': 'Залишити на шлюпі',
   'The {name} is yours: you take its helm': 'Куплено: {name}. Ви стаєте за стерно',
   'Every line has a tab of its ships: the shipyard sells the {name} now, the others come later':
     'Кожна лінія має свою вкладку з кораблями: зараз верф продає {name}, решта з’явиться згодом',
@@ -1299,8 +1330,8 @@ export const UK: Readonly<Record<string, string>> = {
   '{n} of {slots} fitted': '{n} з {slots} встановлено',
   'Full damage to ships, {share}% to sea monsters': 'Повна шкода кораблям, {share}% — морським чудовиськам',
   'Full damage to sea monsters, {share}% to ships': 'Повна шкода морським чудовиськам, {share}% — кораблям',
-  'Pick a slot, then a gun in the hold to fit it there; × takes a gun off':
-    'Виберіть слот, потім гармату в трюмі, щоб встановити її туди; × знімає гармату',
+  'Pick a slot, then a gun in the hold to fit it there; drag a fitted gun onto another slot to swap them; × takes a gun off':
+    'Виберіть слот, потім гармату в трюмі, щоб встановити її туди; перетягніть встановлену на інший слот, щоб поміняти їх місцями; × знімає гармату',
   'Ammo at hand': 'Боєприпаси під рукою',
   'Click one to load it; drag ammo from the hold here or onto the skill bar; × puts it back':
     'Клацніть, щоб зарядити; перетягніть сюди боєприпаси з трюму або на панель умінь; × повертає їх у трюм',
@@ -1365,6 +1396,19 @@ export const UK: Readonly<Record<string, string>> = {
   Feats: 'Досягнення',
   'Comes with the online game': "З'явиться з онлайн-грою",
   'Every rung reached': 'Усі щаблі пройдено',
+  'Feat reached!': 'Досягнення здобуто!',
+  'Your reward': 'Ваша нагорода',
+  'Aye!': 'Єсть!',
+  "+{n} captain's point|+{n} captain's points": '+{n} очко капітана|+{n} очки капітана|+{n} очок капітана',
+  'Yours to spend': 'Можна витратити',
+  'In the purse': 'У гаманці',
+  Claim: 'Забрати',
+  '{n} reward to claim|{n} rewards to claim': '{n} нагорода чекає|{n} нагороди чекають|{n} нагород чекають',
+  '{rung}: its reward waits': '{rung}: нагорода чекає',
+  'Doubloons go into the purse, items into the hold': 'Дублони йдуть у гаманець, предмети — у трюм',
+  'Feat: {feat}!': 'Досягнення: {feat}!',
+  'Feat {feat} reached: its reward waits in the feats': 'Досягнення «{feat}»: нагорода чекає в досягненнях',
+  'Feat {feat}: {reward}': 'Досягнення «{feat}»: {reward}',
   '+{n} point|+{n} points': '+{n} очко|+{n} очки|+{n} очок',
   '{n} point|{n} points': '{n} очко|{n} очки|{n} очок',
   'Forget the mastery?': 'Забути майстерність?',
@@ -1517,12 +1561,17 @@ export const UK: Readonly<Record<string, string>> = {
   // The top of the HUD: the quest tracker, the minimap's corners
   Quests: 'Завдання',
   'No quests: take bounties at the tavern in port': 'Завдань немає: візьміть їх у таверні в порту',
+  'No quests: the tavern opens to you further along the story':
+    'Завдань немає: таверна відкриється вам далі за сюжетом',
   'Quests of your other ships: {n}': 'Завдання інших ваших кораблів: {n}',
   'Done: turn it in at the tavern': 'Виконано: здайте в таверні',
+  'Done: turn it in at {zone}': 'Виконано: здайте — {zone}',
   'Abandon the quest': 'Відмовитися від завдання',
   'Abandon the quest?': 'Покинути завдання?',
   '"{title}": {kills} of {count} so far. The count is lost, but the tavern will offer the quest again.':
     '«{title}»: поки що {kills} з {count}. Лік пропаде, але таверна запропонує завдання знову.',
+  '"{title}" is done but not turned in: its reward is lost, but the tavern will offer the quest again.':
+    '«{title}» виконано, але не здано: нагорода пропаде, але таверна запропонує завдання знову.',
   Abandon: 'Відмовитися',
   'Full screen': 'На весь екран',
   'Leave full screen': 'Вийти з повного екрана',
@@ -1558,6 +1607,9 @@ export const UK: Readonly<Record<string, string>> = {
     'Кухарю моря «{zone}» треба {count} таких, і стережіться щелеп.',
   '{count} of them prey on the ships of {zone}. Hunt them down.':
     'У морі «{zone}» на кораблі полюють такі. Вполюйте {count}.',
+  'The pack: {target}': 'Зграя: {target}',
+  'They hunt {zone} in packs and fall on lone ships together. Sink a whole pack, all {count}.':
+    'Вони полюють зграями в морі «{zone}» і разом нападають на самотні кораблі. Потопіть цілу зграю, усіх {count}.',
   'One {target} rules the sea lanes of {zone}. Sink it.': 'Шляхами моря «{zone}» володарює {target}. Потопіть його.',
   'Sink the {target} at its lair, and its escort scatters.': 'Потопіть {target} у його лігві, і охорона розбіжиться.',
   'World chart (N)': 'Карта світу (N)',
@@ -1574,8 +1626,8 @@ export const UK: Readonly<Record<string, string>> = {
   'The gate to {sea} is closed: it needs a ship of tier {tier}':
     'Брама до моря «{sea}» зачинена: потрібен корабель {tier} рангу',
   'The gate to {sea} is closed while you are in combat': 'Брама до моря «{sea}» зачинена, поки ви в бою',
-  'Calm waters round the port where every captain begins: fishing boats, merchants, smugglers and the odd sea monster. The Smuggler Baron holds the north-east.':
-    'Спокійні води довкола порту, де починає кожен капітан: рибальські човни, торговці, контрабандисти й зрідка морські чудовиська. На північному сході панує Барон контрабандистів.',
+  'Calm waters round the port where every captain begins: fishing boats, merchants, smugglers and the odd sea monster. The Smuggler Baron holds the north-east, the Inkmother lurks in the south-west.':
+    'Спокійні води довкола порту, де починає кожен капітан: рибальські човни, торговці, контрабандисти й зрідка морські чудовиська. На північному сході панує Барон контрабандистів, на південному заході зачаїлася Чорнильна Мати.',
   'Shallow reefs and lagoons, the first sea of a ship of the line: traders and pirate brigs, turtles on the reefs, serpents in the channels.':
     'Мілкі рифи й лагуни, перше море корабля лінійки: торговці й піратські бриги, черепахи на рифах, змії в протоках.',
   'Narrow straits between rocky isles where contraband changes hands. The pirates here sail in numbers.':
@@ -1615,14 +1667,16 @@ export const UK: Readonly<Record<string, string>> = {
   'East gate: {sea} (tier {tier})': 'Східна брама: {sea} ({tier} ранг)',
   'What sails it': 'Хто тут плаває',
   boss: 'бос',
+  'mini-boss': 'міні-бос',
   aggressive: 'агресивний',
+  'in packs of {n}': 'зграями по {n}',
   neutral: 'нейтральний',
-  Seas: 'Моря',
   Bestiary: 'Бестіарій',
   'Bestiary (B)': 'Бестіарій (B)',
-  'Every ship and creature of every sea: what it carries, how hard it hits, what it is worth':
-    'Кожен корабель і кожна істота всіх морів: що несе, як сильно б’є, чого вартий',
+  'Every ship and creature of the seas you have sailed: what it carries, how hard it hits, what it is worth to you':
+    'Кожен корабель і кожна істота морів, де ви вже плавали: що несе, як сильно б’є, чого вартий для вас',
   Boss: 'Бос',
+  'Mini-boss': 'Міні-бос',
   'Miss chance': 'Шанс промаху',
   Body: 'Тіло',
   'Hull points': 'Міцність',
@@ -1638,6 +1692,13 @@ export const UK: Readonly<Record<string, string>> = {
   'In its sea': 'У своєму морі',
   'about {n}': 'близько {n}',
   'Back after it sinks': 'Повертається через',
+  'In a pack': 'У зграї',
+  'A pack of {n}': 'Зграя з {n}',
+  'They sail together behind the first of them and fight as one: whoever attacks one fights them all':
+    'Пливуть разом за першим із них і б’ються як один: хто нападе на одного, битиметься з усіма',
+  'They keep to the far waters, away from the port': 'Тримаються далеких вод, подалі від порту',
+  'One sunk comes back to its pack, never while the pack fights':
+    'Потоплений повертається до своєї зграї, але не поки та б’ється',
   Spoils: 'Здобич',
   Bounty: 'Нагорода',
   Experience: 'Досвід',
@@ -1646,10 +1707,9 @@ export const UK: Readonly<Record<string, string>> = {
   'Goods it may leave': 'Товари, що можуть випасти',
   '×{n} in its sea': '×{n} у своєму морі',
   Bite: 'Укус',
-  'Reach · every': 'Досяжність · кожні',
+  'Bites every': 'Кусає кожні',
   Guns: 'Гармати',
   'None: it runs when attacked': 'Немає: тікає, коли нападають',
-  'Reach · reload': 'Дальність · перезарядка',
   Ammo: 'Боєприпаси',
   'Damage a second, every gun': 'Пошкодження за секунду, усі гармати',
   Mortar: 'Мортира',
@@ -1658,14 +1718,76 @@ export const UK: Readonly<Record<string, string>> = {
   'Each shell': 'Кожна бомба',
   'Lands after · radius': 'Падає через · радіус',
   Escort: 'Супровід',
+  'd{die}: misses on {miss}, a critical hit on {crit} (×{times})':
+    'd{die}: промах на {miss}, критичний удар на {crit} (×{times})',
+  'Attacks your ship within {n}': 'Нападає на ваш корабель ближче ніж {n}',
+  'It notices a ship within {n} and goes for it': 'Помічає корабель ближче ніж {n} і кидається на нього',
+  'Stealth: hostile ships and monsters notice yours nearer':
+    'Скритність: ворожі кораблі й чудовиська помічають ваш ближче',
+  'It is worth {n}': 'Дає {n}',
+  'The starter sloop earns all of it, whatever it sinks': 'Стартовий шлюп отримує все сповна, хоч кого б потопив',
+  "A tier above your ship's: all of it": 'Ранг вищий за ранг вашого корабля: усе сповна',
+  "Two tiers or more below your ship's: a single point": 'На два ранги чи більше нижче за ваш корабель: лише одне очко',
+  "A tier below your ship's: ×{share}": 'На ранг нижче за ваш корабель: ×{share}',
+  'Your ship Lv {ship}, it Lv {level}: ×{share}': 'Рівень вашого корабля {ship}, його {level}: ×{share}',
+  'All of it up to {all} levels above it, half up to {half}, a quarter beyond':
+    'Повністю — до {all} рівнів вище за нього, половина — до {half}, далі чверть',
+  'Bounty: {n}': 'Нагорода: {n}',
+  'Its bounty: {n}': 'Нагорода за нього: {n}',
+  'Chest of gold: {share}': 'Скриня золота: {share}',
+  'It leaves one {share} of the time': 'Лишає її у {share} випадків',
+  'Gold in it': 'Золота в ній',
+  'Gold in a chest: {gold}': 'Золота в скрині: {gold}',
+  'Its chest holds {gold}': 'У його скрині {gold}',
+  'A second chest': 'Друга скриня',
+  'A second chest: {share}': 'Друга скриня: {share}',
+  'Another chest of gold beside the first, when it leaves one':
+    'Ще одна скриня золота поруч із першою, коли та випадає',
+  'How often its wreck leaves each of them': 'Як часто його уламки лишають кожен із них',
+  'Your {ship}, Lv {level}': '«{ship}», рів. {level}',
+  'Reach {n}, reloads every {s} s': 'Дальність {n}, перезаряджається кожні {s} с',
+  'Fires {ammo}: +{n} a hit': 'Стріляє: {ammo}, +{n} до влучання',
+  'Its sea makes it hit ×{n}': 'У своєму морі б’є ×{n}',
+  'A volley of all {count}: {n} on average': 'Залп усіх {count}: у середньому {n}',
+  'Against your ship: full damage': 'По вашому кораблю: повне пошкодження',
+  'Against your ship: {share} of it': 'По вашому кораблю: {share} пошкодження',
+  'Its jaws reach {n} from its head: it must come alongside':
+    'Щелепи дістають на {n} від голови: йому треба підійти впритул',
+  'Your cannons reach': 'Дальність ваших гармат',
+  'Your harpoons reach': 'Дальність ваших гарпунів',
+  'None fitted': 'Жодної не встановлено',
+  'Your longest gun of them, with your talents and the captain’s mastery: {n}':
+    'Найдальнобійніша з них, з вашими талантами й майстерністю капітана: {n}',
+  'You outreach it by {n}: from between {its} and {yours} away it cannot answer':
+    'Ви б’єте далі на {n}: з відстані від {its} до {yours} він не зможе відповісти',
+  'It outreaches you by {n}: close in, or keep beyond {its}':
+    'Він б’є далі на {n}: підходьте ближче або тримайтеся далі ніж {its}',
+  'You reach as far as it does': 'Ви б’єте так само далеко, як він',
+  Unknown: 'Невідомо',
+  'Not met yet': 'Ще не зустрічався',
+  'Forbidden waters': 'Заборонені води',
+  'Uncharted waters': 'Незвідані води',
+  'Only a ship of tier {tier} or higher may sail these waters, and your {ship} may not. What sails them stays unknown till you do.':
+    'Ці води відкриті лише кораблям рангу {tier} і вище, а «{ship}» туди не пройде. Хто в них плаває, лишиться невідомим, доки ви там не побуваєте.',
+  'No ship of yours has sailed these waters yet. Sail in through their gate, and the bestiary will tell of every ship and creature in them.':
+    'Жоден ваш корабель ще не плавав у цих водах. Пропливіть крізь їхню браму, і бестіарій розповість про кожен корабель і кожну істоту в них.',
+  'Unknown: no ship of yours has sailed it yet': 'Невідомо: жоден ваш корабель ще не плавав тут',
   'Nets and fish, and not a gun aboard: it runs from whoever attacks it. Easy gold for a captain who can catch it.':
     'Сіті й риба, і жодної гармати на борту: тікає від будь-кого, хто нападе. Легке золото для капітана, який зможе його наздогнати.',
   'A trader with a swivel gun on its rail that reaches less far than a ship’s cannons: keep your distance and it cannot answer. Gold and goods in its hold.':
     'Торговець із фальконетом на планширі, що б’є ближче за корабельні гармати: тримайтеся на відстані — і він не зможе відповісти. У трюмі золото й товари.',
   'Fast and quick to anger: it goes for any ship that comes near and circles at its gun’s reach. A boss keeps a pair of them at its side.':
     'Швидкий і запальний: кидається на кожен корабель, що підійде близько, і кружляє на відстані пострілу своєї гармати. Бос тримає пару таких біля себе.',
-  'The Smuggler Baron, the master of the starting waters: a slow brig with swivel guns and a mortar. He marks where his shells will fall, so sail out of the red circles, and sink his two smugglers first.':
-    'Барон контрабандистів, господар стартових вод: повільний бриг із фальконетами й мортирою. Він позначає, куди впадуть його бомби, тож виходьте з червоних кіл і спершу потопіть двох його контрабандистів.',
+  'A light cutter with a swivel gun on its rail, and never alone: they hunt in packs of four, fall on a ship together and circle it, all firing at once. One alone sinks in a few volleys. Come with your hull whole, open fire from beyond their guns’ reach, sink the nearest first, and keep running while your ship is faster than theirs: a holed one is not.':
+    'Легкий катер із фальконетом на борту, і ніколи не сам: вони полюють зграями по четверо, разом нападають на корабель і кружляють довкола, стріляючи всі разом. Сам один іде на дно за кілька залпів. Приходьте з цілим корпусом, відкривайте вогонь з-поза досяжності їхніх гармат, топіть найближчого першим і тікайте, поки ваш корабель швидший за них: пробитий уже ні.',
+  'Before the Fall he weighed other men’s cargo on Saltwind’s quay and kept none of it. The night the Moon came down he rowed out alone, and came back at dawn with a sack that glowed through the canvas. He bought a brig with it, then the smugglers of the reefs, then their silence. The fishermen say he has been sunk more times than they can count, and every time the sea gives him back with the next tide, his coat dry and his powder fresh. Nobody asks who pays for all the glass he buys. The few who did are on the seabed, and they have not come back.':
+    'До Падіння він зважував чужі вантажі на пристані Солоного Вітру й нічого з них не брав собі. Тієї ночі, коли впав Місяць, він сам-один вийшов у море на веслах, а на світанку повернувся з мішком, що світився крізь мішковину. За нього він купив бриг, потім контрабандистів із рифів, а потім і їхнє мовчання. Рибалки кажуть, що його топили стільки разів, що й не злічити, і щоразу море повертає його з наступним припливом: камзол сухий, порох свіжий. Ніхто не питає, хто платить за все скло, яке він скуповує. Ті кілька, хто питав, лежать на дні й назад не повернулися.',
+  'Old fishermen remember her as a squid no longer than a rowing boat, who stole the bait off the night boats and was cursed for it. Then the Moon fell, and a shard of it sank into her cave. She swallowed it, and she has not stopped growing since. Her ink is as black as a night without a Moon, with a light deep in it: boats caught in it turn up a week later, empty and dry, miles from where they went down. Every spring the reef folk set a lantern adrift for her, so that she takes the light and leaves the men. The pearl she grew round the shard is said to be the size of a fist, and to sing at the hour the tide should turn.':
+    'Старі рибалки пам’ятають її кальмаром, не більшим за шлюпку: вона крала наживку з нічних човнів, і її за це проклинали. Потім упав Місяць, і його уламок опустився в її печеру. Вона його проковтнула й відтоді не перестає рости. Її чорнило чорне, як ніч без Місяця, а глибоко в ньому світло: човни, що в нього потрапили, знаходять за тиждень, порожні й сухі, за милі від місця, де вони пішли на дно. Щовесни люди з рифів пускають для неї ліхтар за водою, щоб вона забрала світло й лишила людей. Кажуть, перлина, яку вона виростила довкола уламка, завбільшки з кулак і співає тієї години, коли мав би змінитися приплив.',
+  'The Smuggler Baron, the master of the starting waters: a slow brig with swivel guns and a mortar that rains grapeshot. The water glows red where it will fall, so sail out of the glow, and sink his two smugglers first.':
+    'Барон контрабандистів, господар стартових вод: повільний бриг із фальконетами й мортирою, що засипає картеччю. Вода сяє червоним там, куди вона впаде, тож виходьте з сяйва і спершу потопіть двох його контрабандистів.',
+  'A squid that swallowed a shard of the Moon and never stopped growing: the starting waters’ mini-boss, alone at its lair in the south-west. It is slow, but keeping away won’t save you: it dives and comes up under your keel, its arms striking all round, where the water glows dark a moment before. Turn hard out of the glow, don’t stop. As it is hurt it clouds the water with ink that blinds a crew: sail out of it. At half its hull its young come up round it, quicker than your ship: harpoon them first. The pearl it grew round the glass is worth the hunt.':
+    'Тварюка, що проковтнула уламок Місяця й так і не перестала рости: велетенський кальмар, міні-бос стартових вод, сама-одна в лігві на південному заході. Вона повільна, та триматися віддалік не допоможе: вона пірнає й виринає просто під кілем, б’ючи щупальцями довкола там, де за мить до того вода засвітиться темним. Круто відвертайте з сяйва, не зупиняйтеся. Поранена, вона затягує воду чорнилом, у якому команда сліпне: випливайте з нього. Коли в неї лишається пів корпусу, довкола виринають її мальки, швидші за ваш корабель: спершу бийте гарпунами їх. Перлина, що виросла довкола скла, варта полювання.',
   'Slow and peaceful until it is hurt. Its jaws reach only a ship alongside: keep away and harpoon it without a scratch.':
     'Повільна й мирна, доки її не поранять. Її щелепи дістають лише корабель поруч: тримайтеся віддалік і бийте гарпунами без жодної подряпини.',
   'A hunter of the open sea, a little slower than a sound sloop: you can get away from it, unless your hull is badly holed. Harpoons hurt it most.':
@@ -1674,8 +1796,8 @@ export const UK: Readonly<Record<string, string>> = {
     'Пірати кожного моря за стартовими водами, по три гармати на борт: нападають на кожного, хто підійде близько, і кружляють на відстані пострілу.',
   'Seldom met, and as strong as a captain’s ship of its sea’s tier: six cannons behind a thick hull. Half a minute’s fight and half your hull, with your tier’s guns.':
     'Трапляється рідко, а силою рівний капітанському кораблю рангу свого моря: шість гармат за товстим корпусом. Із гарматами свого рангу — пів хвилини бою й половина вашого корпусу.',
-  'A sea’s boss when it is a ship: slow, with four cannons and a mortar like the Baron’s. Keep out of the marked circles and sink its escort first.':
-    'Бос моря, коли це корабель: повільний, із чотирма гарматами й мортирою, як у Барона. Тримайтеся поза позначеними колами й спершу потопіть його супровід.',
+  'A sea’s boss when it is a ship: slow, with four cannons and a mortar like the Baron’s. Keep out of the red glow on the water and sink its escort first.':
+    'Бос моря, коли це корабель: повільний, із чотирма гарматами й мортирою, як у Барона. Тримайтеся поза червоним сяйвом на воді й спершу потопіть його супровід.',
   'A slow, armoured brawler of the shallows: it leaves alone whoever leaves it alone, and its claws reach only a ship alongside.':
     'Повільний броньований забіяка мілин: не чіпає тих, хто не чіпає його, а клешні дістають лише корабель поруч.',
   'Quick and hungry, it hunts the open sea: faster than the starter sloop, slower than a ship of tier 1. Harpoons hurt it most.':
@@ -1943,11 +2065,11 @@ export const UK: Readonly<Record<string, string>> = {
     'Перетягніть на інший швидкий слот, щоб поміняти їх місцями, або назад у відкритий трюм (H), щоб прибрати з панелі',
   Cargo: 'Вантаж',
   Items: 'Предмети',
-  'Drag an item onto a quick slot of the skill bar, or click it to put it in the first empty one. Bought at the market for doubloons, as many as you like: they take no room. Dragged off the bar back here, an item leaves it':
-    'Перетягніть предмет на швидкий слот панелі умінь або клацніть, щоб поставити його в перший вільний. Купуються на ринку за дублони, скільки завгодно, і місця не займають. Перетягнутий із панелі назад сюди, предмет зникає з неї',
+  'Drag an item onto a quick slot of the skill bar, or click it to put it in the first empty one. Bought on the Golden Galleon in port for doubloons, as many as you like: they take no room. Dragged off the bar back here, an item leaves it':
+    'Перетягніть предмет на швидкий слот панелі умінь або клацніть, щоб поставити його в перший вільний. Купуються за дублони на Золотому галеоні в порту, скільки завгодно, і місця не займають. Перетягнутий із панелі назад сюди, предмет зникає з неї',
   '{kinds} kinds · {n} in all': 'Видів: {kinds} · усього {n}',
-  'No items yet: they are bought for doubloons at the market in port, under Buy':
-    'Предметів поки немає: їх купують за дублони на ринку в порту, вкладка «Купити»',
+  'No items yet: they are bought for doubloons on the Golden Galleon in port':
+    'Предметів поки немає: їх купують за дублони на Золотому галеоні в порту',
   'On the skill bar: drag it off the bar back here to take it off':
     'На панелі умінь: перетягніть його з панелі сюди, щоб прибрати',
   'Drag it onto a quick slot of the skill bar, or click it': 'Перетягніть на швидкий слот панелі умінь або клацніть',
@@ -2025,8 +2147,7 @@ export const UK: Readonly<Record<string, string>> = {
   'Hale, harbour master. Good work out there, captain.': 'Гейл, начальник гавані. Добра робота, капітане.',
   'Funny thing: those sloops carried more glass than cloth. And all of it bound north-east.':
     'Дивна річ: скла ті шлюпи везли більше, ніж тканини. І все — на північний схід.',
-  'The tavern has bounties posted, for honest gold between errands.':
-    'У таверні вивішено нагороди — чесне золото між дорученнями.',
+  'Come and see me again: I may have more work for you.': 'Заходьте ще: можливо, у мене знайдеться для вас робота.',
   "There's more. The turtles on the reefs grow glass in their shells now, and they're as big as boats.":
     'Це ще не все. У черепах на рифах тепер у панцирах росте скло, і завбільшки вони з човен.',
   'Cannonballs glance off a shell: take the harpoon guns (E). And keep clear of the jaws.':
@@ -2053,9 +2174,38 @@ export const UK: Readonly<Record<string, string>> = {
     'Перш ніж іти на нього, розвідай його води. Поки не бийся: просто подивись.',
   'There she is: a brig with a mortar on her deck, and two smugglers off her beam.':
     'Ось і він: бриг із мортирою на палубі й двома контрабандистами по бортах.',
-  "His shells land where we are and where we're going. Watch for the circles on the water and get out of them.":
-    'Його снаряди падають туди, де ми є, і туди, куди ми йдемо. Стежте за колами на воді й виходьте з них.',
+  "His grapeshot lands where we are and where we're going. Where the water glows red, get out of it.":
+    'Його картеч падає туди, де ми є, і туди, куди ми йдемо. Де вода сяє червоним, виходьте звідти.',
   '...he has so much of me... I can feel it from here...': '...у нього стільки мене... я відчуваю це звідси...',
+  'Back to Saltwind': 'Назад до Солоного Вітру',
+  'Honest gold': 'Чесне золото',
+  'The workshop': 'Майстерня',
+  'Take a bounty at the tavern': 'Візьміть замовлення в таверні',
+  'Turn it in at the tavern': 'Здайте його в таверні',
+  'Buy and fit a piece of outfit at the workshop': 'Купіть і встановіть оснащення в майстерні',
+  "That's enough looking, captain: he'd send us down before we got a shot in. Back to the harbour, Edda will want to hear of him.":
+    'Досить дивитися, капітане: він пустив би нас на дно раніше, ніж ми встигли б вистрілити. Назад у гавань, Едда захоче про нього почути.',
+  "A brig, a mortar and two smugglers at his side. Your sloop wouldn't last a minute against that, not as she is.":
+    'Бриг, мортира й двоє контрабандистів під боком. Твій шлюп проти такого й хвилини не протримається, принаймні такий, як зараз.',
+  "Then she must grow. My bounties are posted at the tavern, and I've told them to take your name.":
+    'Значить, йому треба рости. Мої замовлення вивішено в таверні, і я сказав там записати ваше ім’я.',
+  "Do a couple of them, captain: your ship grows faster on bounties, and you'll want the gold for a new hull.":
+    'Виконайте кілька, капітане: на замовленнях корабель росте швидше, а золото вам знадобиться на новий корпус.',
+  "Go on. The Baron isn't going anywhere.": 'Іди. Барон нікуди не дінеться.',
+  'Start with an easy one: the fishing boats, say. Take it at the tavern, sink what it asks, and come back to the tavern for the gold.':
+    'Почніть із легкого: скажімо, рибальські човни. Візьміть його в таверні, потопіть, що просять, і поверніться туди по золото.',
+  'The bounties we take sit on the board at the top right, captain, with how many are left to sink.':
+    'Узяті замовлення висять на дошці вгорі праворуч, капітане, разом із тим, скільки ще лишилося потопити.',
+  'Paid in full. A few more of those and the shipyard will be glad to see you.':
+    'Сплачено сповна. Ще кілька таких — і на верфі вам будуть раді.',
+  "And while we're in port, captain: gold in the purse doesn't make her sail any faster. Let's see the workshop.":
+    'І поки ми в порту, капітане: від золота в гаманці корабель швидше не попливе. Зазирнімо в майстерню.',
+  'The workshop fits her out: sails, planking, a rudder, a spyglass. Each piece adds a little to how she sails and holds.':
+    'Майстерня оснащує корабель: вітрила, обшивка, стерно, підзорна труба. Кожна річ трохи додає йому ходу чи міцності.',
+  'Start with something cheap: canvas sails, say. A little more speed is a lot with a serpent on our heels.':
+    'Почніть із чогось дешевого: скажімо, з парусинових вітрил. Трохи більше швидкості — це багато, коли за нами женеться змія.',
+  'Feel that? She runs livelier already. The better pieces cost more: we come back for them as the gold comes in.':
+    'Відчуваєте? Він уже йде жвавіше. Кращі речі коштують дорожче: повернемося по них, коли надійде золото.',
   'Bring her up a few levels first, captain, and fit the best guns the arsenal sells. Then we take the Baron.':
     'Спершу наберіть кілька рівнів, капітане, і поставте найкращі гармати з арсеналу. Тоді візьмемося за Барона.',
   'The Baron sunk! Saltwind will drink to you tonight.':
@@ -2071,8 +2221,8 @@ export const UK: Readonly<Record<string, string>> = {
     'Верф закладає сильніші кільові камені в нові корпуси, під будь-яким прапором: Корони, Сходу, Чорного прапора, Півночі.',
   'Bring the sloop to her last level and save the gold the shipwright asks. Then choose your ship.':
     'Доведи шлюп до останнього рівня й збери золото, яке просить корабел. А тоді обирай свій корабель.',
-  'A fine ship. Fit her guns at the arsenal: a new hull comes with none.':
-    'Добрий корабель. Постав на нього гармати в арсеналі: новий корпус приходить без них.',
+  'A fine ship. A new hull comes bare: fit her from your hold (L), or buy her guns at the arsenal.':
+    'Добрий корабель. Новий корпус приходить порожнім: постав на нього те, що в трюмі (L), або купи гармати в арсеналі.',
   'The Seam to the east will let you through now. Beyond it lies the Coral Coast.':
     'Тепер Шов на сході тебе пропустить. За ним — Кораловий берег.',
   '...further... take me further...': '...далі... неси мене далі...',
@@ -2091,8 +2241,8 @@ export const UK: Readonly<Record<string, string>> = {
   Story: 'Сюжет',
   'Skip step': 'Пропустити крок',
   'told to its end': 'пройдено до кінця',
-  'The fishing boats drag our reefs for glass and scare the fish off. Sink five of them.':
-    'Рибальські човни прочісують наші рифи заради скла й розполохують рибу. Потопіть п’ять.',
+  'The fishing boats drag our reefs for glass and scare the fish off. Sink {count} of them.':
+    'Рибальські човни прочісують наші рифи заради скла й розполохують рибу. Потопіть {count}.',
   'Fitting out': 'Спорядження',
   'Fit four cannons (L)': 'Встановіть чотири гармати (L)',
   'Fit four harpoon guns (L)': 'Встановіть чотири гарпунні гармати (L)',
@@ -2113,10 +2263,17 @@ export const UK: Readonly<Record<string, string>> = {
   'Repair the hull: click here (R)': 'Полагодьте корпус: клацніть тут (R)',
   'Click to set sail': 'Клацніть, щоб вийти в море',
   'Sell the goods at the market': 'Продайте товари на ринку',
-  'Open the Sell tab': 'Відкрийте вкладку «Продати»',
   'Click to sell everything': 'Клацніть, щоб продати все',
   'Your new ship waits at the shipyard': 'Ваш новий корабель чекає на верфі',
   'Click to buy the ship': 'Клацніть, щоб купити корабель',
+  'Bounties wait at the tavern': 'У таверні чекають замовлення',
+  'Click to take the bounty': 'Клацніть, щоб узяти замовлення',
+  'Turn the bounty in at the tavern': 'Здайте замовлення в таверні',
+  'Click to turn it in': 'Клацніть, щоб здати його',
+  'Fit out your ship at the workshop': 'Оснастіть корабель у майстерні',
+  'Click to buy it: it is fitted at once': 'Клацніть, щоб купити: його одразу встановлять',
+  'Click to fit it': 'Клацніть, щоб установити',
+  'Open the {tab} tab': 'Відкрийте вкладку «{tab}»',
   "Her guns are still in the hold, packed in grease. Don't take her out bare: fit them first, then sail.":
     'Його гармати ще в трюмі, у мастилі. Не виводь його в море без них: спершу встанови, тоді вирушай.',
   "Tobin, your bosun. Click our sloop at the quay, or press L: that's the loadout. Drag a gun from the hold onto a slot. Four cannons, then four harpoon guns.":
@@ -2157,4 +2314,33 @@ export const UK: Readonly<Record<string, string>> = {
     'Скінчилося: {ammo}! Зарядіть інше, що під рукою (Z, X), або вертайтеся додому: в арсеналі в порту можна докупити.',
   'Nothing at hand for the {weapon}, captain: put some ammo on the bar in the loadout (L).':
     'Капітане, під рукою нічого — {weapon} мовчать: покладіть боєприпаси на панель в озброєнні (L).',
+  '{ammo} is aboard, captain, but not at hand: put it on the bar in the loadout (L), or load the other (Z, X).':
+    'Капітане, {ammo} на борту, та не під рукою: покладіть на панель в озброєнні (L) або зарядіть інше (Z, X).',
+  'Ink hides the target: sail out of it': 'Чорнило ховає ціль: випливіть із нього',
+  'The target dived: get out of the dark glow where it comes up':
+    'Ціль пірнула: виходьте з темного сяйва, де вона вирине',
+  'its arms, coming up': 'щупальця з-під води',
+  '{who} came up under you': '{who} виринає під вами',
+  '{who} dives at you: turn out of the dark glow!': '{who} пірнає до вас: відвертайте з темного сяйва!',
+  "She's gone under, captain! Where the water glows dark she comes up, her arms all round: turn hard out of it, don't stop.":
+    'Капітане, вона пірнула! Де вода засвітиться темним, там вона й вирине, б’ючи щупальцями довкола: круто відвертайте, не зупиняйтеся.',
+  "Her young, captain! They're quicker than us: harpoon them first, or they'll hold us for her.":
+    'Капітане, її мальки! Вони швидші за нас: спершу бийте їх гарпунами, інакше затримають нас для неї.',
+  "Ink! We're blind in it, captain: sail out of the cloud and we'll see again.":
+    'Чорнило! Капітане, у ньому ми сліпі: випливімо з хмари — і знову бачитимемо.',
+  Dive: 'Пірнання',
+  'every {n} s, {m} s below {share}': 'кожні {n} с, {m} с нижче {share}',
+  'At a foe this far': 'До ворога на відстані',
+  'Its arms as it comes up': 'Щупальця, коли виринає',
+  'Marked before · radius': 'Позначає заздалегідь · радіус',
+  Ink: 'Чорнило',
+  'at {shares} of its hull': 'при {shares} корпусу',
+  'Spreads to · lasts': 'Розпливається до · триває',
+  'Sight in it': 'Видимість у ньому',
+  Brood: 'Виводок',
+  '{n} × {name} at {share}': '{n} × {name} при {share}',
+  'Its ways': 'Прийоми',
+  Inkling: 'Чорнильний мальок',
+  'One of the Inkmother’s brood, as long as a rowing boat: it comes up round her when she is hurt and goes back to the deep with her. Quicker than a sloop, but two volleys of harpoons put it down.':
+    'Один із мальків Чорнильної Матері, завдовжки зі шлюпку: виринає довкола неї, коли її поранено, і йде з нею назад у глибину. Швидший за шлюп, але двох залпів гарпунів йому досить.',
 };

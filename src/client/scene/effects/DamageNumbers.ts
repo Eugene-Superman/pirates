@@ -1,5 +1,16 @@
 import { Container, Text, TextStyle } from 'pixi.js';
-import { GOODS, GOOD_IDS, ZONES, findUnit, isAfloat, talentOf, type GameEvent, type GameState } from '../../../game';
+import {
+  FEATS,
+  GOODS,
+  GOOD_IDS,
+  ZONES,
+  findUnit,
+  isAfloat,
+  talentOf,
+  type GameEvent,
+  type GameState,
+} from '../../../game';
+import { featRung } from '../../hud/rewardText';
 import { goldCoin, xpStar } from '../../hud/ui';
 import type { Camera3D } from '../../render/Camera3D';
 import { t } from '../../i18n/i18n';
@@ -43,7 +54,7 @@ const STYLES = {
   cargo: new TextStyle({ ...BASE, fontSize: 13, fill: 0xe8c48a, stroke: outline(0x2e1a06, 3) }),
   /** No room left in the hold */
   full: new TextStyle({ ...BASE, fontSize: 16, fill: 0xffa64d, stroke: outline(0x3a1800, 4) }),
-  /** The ship reached a level */
+  /** The ship reached a level, or the captain a feat's rung */
   level: new TextStyle({ ...BASE, fontSize: 15, fill: 0xffe680, stroke: outline(0x4a2a00, 3) }),
   /** An ability used */
   talent: new TextStyle({ ...BASE, fontSize: 12, fill: 0xffb347, stroke: outline(0x3a1800, 3) }),
@@ -149,6 +160,9 @@ export class DamageNumbers {
         this.spawn(STYLES.xp, `+${event.amount}`, over, event.at, XP_RAISE, 'xp');
       } else if (event.type === 'level' && event.shipId === state.ship.id) {
         this.spawn(STYLES.level, t('Level {level}!', { level: event.level }), event.shipId, event.at, LEVEL_RAISE);
+      } else if (event.type === 'feat' && event.shipId === state.ship.id) {
+        const feat = featRung(FEATS[event.feat], event.rung);
+        this.spawn(STYLES.level, t('Feat: {feat}!', { feat }), event.shipId, event.at, LEVEL_RAISE);
       } else if (event.type === 'talent' && event.shipId === state.ship.id) this.talent(event);
       else if (event.type === 'cargo' && event.shipId === state.ship.id) {
         const goods = GOOD_IDS.flatMap((id) => {

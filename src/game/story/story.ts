@@ -2,7 +2,9 @@ import { GUN_IDS } from '../combat/arsenal';
 import { isAfloat, type Unit, type UnitKind } from '../combat/units';
 import type { WeaponId } from '../combat/weapons';
 import type { GoodId } from '../economy/cargo';
+import { mayHaul } from '../economy/loot';
 import { earn, shipOf, type Player } from '../economy/player';
+import { questDone, shipQuests, takeQuest, type QuestId } from '../economy/quests';
 import { marketValue } from '../economy/shop';
 import type { GameState } from '../GameState';
 import type { Point } from '../lib/geometry';
@@ -13,7 +15,7 @@ import { START_ZONE, type ZoneId } from '../world/zones';
 
 /**
  * The story: what a new captain is told and asked to do, step by step, from the prologue to their first ship of a line.
- * The starting waters' part is all there is yet (docs/story.md): eleven steps in five chapters, each with what to do
+ * The starting waters' part is all there is yet (docs/story.md): fifteen steps in five chapters, each with what to do
  * (its objectives), what is said before (its opening) and after (its closing), and a reward. A step's objectives count
  * only once its opening has been told; it is done the moment they are, or turned in in port, where whoever waits for
  * the player tells its closing. The player's, not a ship's: any ship they sail counts for it
@@ -87,8 +89,8 @@ const WATCH_RADIUS = 260;
  */
 const WATCH_TIME = 60;
 /**
- * The good every prey leaves (economy/loot.ts): a step that asks for it hauled up brings in more prey till it is, so
- * a chest of it that sank unclaimed never stalls the story
+ * The good every prey leaves (economy/loot.ts), its chest kept for the player: a step that asks for it hauled up brings
+ * in more prey till it is, so a chest of it lost (the sea made afresh, as a game is loaded) never stalls the story
  */
 const PREY_GOOD: GoodId = 'moonGlass';
 // Where each mark is meant to be; the open water nearest it is where it goes
@@ -119,8 +121,14 @@ export type Objective =
   | { readonly kind: 'fit'; readonly weapon: WeaponId; readonly count: number; readonly text: string }
   /** Loot from a wreck hauled aboard: goods of this kind, or anything (gold too) */
   | { readonly kind: 'haul'; readonly good: GoodId | null; readonly text: string }
-  /** dock: the ship in port; talent: a talent taken; repair: a repair step at sea; sell: goods sold at the market */
-  | { readonly kind: 'dock' | 'talent' | 'repair' | 'sell'; readonly text: string }
+  /**
+   * dock: the ship in port; talent: a talent taken; repair: a repair step at sea; sell: goods sold at the market;
+   * takeQuest: a tavern quest the ship sailed has taken; turnInQuest: one turned in; outfit: a piece of outfit fitted
+   */
+  | {
+      readonly kind: 'dock' | 'talent' | 'repair' | 'sell' | 'takeQuest' | 'turnInQuest' | 'outfit';
+      readonly text: string;
+    }
   | { readonly kind: 'level'; readonly level: number; readonly text: string }
   /** The weapon picked (Q, E) */
   | { readonly kind: 'weapon'; readonly weapon: WeaponId; readonly text: string }
@@ -138,6 +146,9 @@ export type StoryStepId =
   | 'serpents'
   | 'baronsMen'
   | 'scout'
+  | 'report'
+  | 'bounty'
+  | 'workshop'
   | 'baron'
   | 'seal';
 
@@ -164,9 +175,11 @@ export interface StoryStep {
 }
 
 // The starting waters' story. Each step teaches a part of the game as it goes (the loadout, the helm, firing, loot,
-// the port, the talents, the market, the harpoons, the repair, the chart, the boss's mortar, the shipyard), and its
-// reward is a few kills' worth: about 1,200 gold and 2,500 experience in all, a fifth of the way to the sloop's last
-// level. The rest is the bounties and the hunting between. The last step asks for the ship the starting waters lead
+// the port, the talents, the market, the harpoons, the repair, the chart, the tavern, the workshop, the boss's mortar,
+// the shipyard), and its reward is a few kills' worth: about 1,400 gold and 2,900 experience in all, a quarter of the
+// way to the sloop's last level. The rest is the bounties and the hunting between: the tavern takes a new player's
+// name only once the Baron is scouted (tavernOpen), so they learn the sea from the story first, and then bounties are
+// what levels the sloop and saves the gold for the next ship. The last step asks for the ship the starting waters lead
 // to: one of tier 1, of any line (economy/shipyard.ts), its reward gold for the guns a new hull comes without
 export const STORY: readonly StoryStep[] = [
   {
@@ -333,7 +346,7 @@ export const STORY: readonly StoryStep[] = [
         speaker: 'harbourMaster',
         text: 'Funny thing: those sloops carried more glass than cloth. And all of it bound north-east.',
       },
-      { speaker: 'harbourMaster', text: 'The tavern has bounties posted, for honest gold between errands.' },
+      { speaker: 'harbourMaster', text: 'Come and see me again: I may have more work for you.' },
     ],
     turnIn: 'done',
     reward: { gold: 80, xp: 200 },
@@ -432,13 +445,95 @@ export const STORY: readonly StoryStep[] = [
       { speaker: 'bosun', text: 'There she is: a brig with a mortar on her deck, and two smugglers off her beam.' },
       {
         speaker: 'bosun',
-        text: "His shells land where we are and where we're going. Watch for the circles on the water and get out of them.",
+        text: "His grapeshot lands where we are and where we're going. Where the water glows red, get out of it.",
       },
       { speaker: 'shard', text: '...he has so much of me... I can feel it from here...' },
     ],
     turnIn: 'done',
     reward: { gold: 60, xp: 200 },
     watch: 'baronBrig',
+  },
+  {
+    // Home from his waters: only now does the tavern take the player's name (tavernOpen)
+    id: 'report',
+    chapter: 3,
+    title: 'Back to Saltwind',
+    objectives: [{ kind: 'dock', text: 'Sail into the harbour' }],
+    opening: [
+      {
+        speaker: 'bosun',
+        text: "That's enough looking, captain: he'd send us down before we got a shot in. Back to the harbour, Edda will want to hear of him.",
+      },
+    ],
+    closing: [
+      {
+        speaker: 'keeper',
+        text: "A brig, a mortar and two smugglers at his side. Your sloop wouldn't last a minute against that, not as she is.",
+      },
+      {
+        speaker: 'harbourMaster',
+        text: "Then she must grow. My bounties are posted at the tavern, and I've told them to take your name.",
+      },
+      {
+        speaker: 'harbourMaster',
+        text: "Do a couple of them, captain: your ship grows faster on bounties, and you'll want the gold for a new hull.",
+      },
+      { speaker: 'keeper', text: "Go on. The Baron isn't going anywhere." },
+    ],
+    turnIn: 'port',
+    reward: { gold: 40, xp: 100 },
+  },
+  {
+    id: 'bounty',
+    chapter: 3,
+    title: 'Honest gold',
+    objectives: [
+      { kind: 'takeQuest', text: 'Take a bounty at the tavern' },
+      { kind: 'turnInQuest', text: 'Turn it in at the tavern' },
+    ],
+    opening: [
+      {
+        speaker: 'harbourMaster',
+        text: 'Start with an easy one: the fishing boats, say. Take it at the tavern, sink what it asks, and come back to the tavern for the gold.',
+      },
+      {
+        speaker: 'bosun',
+        text: 'The bounties we take sit on the board at the top right, captain, with how many are left to sink.',
+      },
+    ],
+    closing: [
+      { speaker: 'harbourMaster', text: 'Paid in full. A few more of those and the shipyard will be glad to see you.' },
+      {
+        speaker: 'bosun',
+        text: "And while we're in port, captain: gold in the purse doesn't make her sail any faster. Let's see the workshop.",
+      },
+    ],
+    turnIn: 'done',
+    reward: { gold: 100, xp: 200 },
+  },
+  {
+    id: 'workshop',
+    chapter: 3,
+    title: 'The workshop',
+    objectives: [{ kind: 'outfit', text: 'Buy and fit a piece of outfit at the workshop' }],
+    opening: [
+      {
+        speaker: 'bosun',
+        text: 'The workshop fits her out: sails, planking, a rudder, a spyglass. Each piece adds a little to how she sails and holds.',
+      },
+      {
+        speaker: 'bosun',
+        text: 'Start with something cheap: canvas sails, say. A little more speed is a lot with a serpent on our heels.',
+      },
+    ],
+    closing: [
+      {
+        speaker: 'bosun',
+        text: 'Feel that? She runs livelier already. The better pieces cost more: we come back for them as the gold comes in.',
+      },
+    ],
+    turnIn: 'done',
+    reward: { gold: 60, xp: 100 },
   },
   {
     id: 'baron',
@@ -480,7 +575,10 @@ export const STORY: readonly StoryStep[] = [
       },
     ],
     closing: [
-      { speaker: 'keeper', text: 'A fine ship. Fit her guns at the arsenal: a new hull comes with none.' },
+      {
+        speaker: 'keeper',
+        text: 'A fine ship. A new hull comes bare: fit her from your hold (L), or buy her guns at the arsenal.',
+      },
       { speaker: 'keeper', text: 'The Seam to the east will let you through now. Beyond it lies the Coral Coast.' },
       { speaker: 'shard', text: '...further... take me further...' },
     ],
@@ -559,8 +657,9 @@ export function nearStoryMark(marks: readonly StoryMark[], x: number, y: number)
 
 /**
  * The mark the player is to sail to now, in this sea: one the step they are on asks for, not reached yet; or the
- * harbour, at its berth, while it asks them home (to sail into it, to turn the step in there, or to sell the goods
- * aboard at the market once that is all it still asks), the ship at sea
+ * harbour, at its berth, while it asks them home (to sail into it, to turn the step in there, to sell the goods
+ * aboard at the market once that is all it still asks, to take a bounty at the tavern, or another once the one taken
+ * was given up, to turn it in there once done, or to fit out the ship at the workshop), the ship at sea
  */
 export function storyMark(state: GameState, player: Player): StoryMark | null {
   const step = storyStep(player);
@@ -574,7 +673,12 @@ export function storyMark(state: GameState, player: Player): StoryMark | null {
     step.objectives.every((o, i) => o.kind === 'sell' || (counts[i] ?? 0) >= objectiveNeed(o)) &&
     ship !== undefined &&
     marketValue(ship) > 0;
-  if (unmet('dock') >= 0 || sells || (step.turnIn === 'port' && objectivesMet(player))) {
+  // What only the port does: a bounty taken or turned in at the tavern, the outfit bought at the workshop
+  const quests = shipQuests(state, player);
+  const tavern =
+    unmet('takeQuest') >= 0 || (unmet('turnInQuest') >= 0 && (quests.length === 0 || quests.some(questDone)));
+  const workshop = unmet('outfit') >= 0;
+  if (unmet('dock') >= 0 || sells || tavern || workshop || (step.turnIn === 'port' && objectivesMet(player))) {
     if (ship?.docked !== false) return null;
     const { mooring } = state.world.port;
     return { id: 'port', x: mooring.x, y: mooring.y, radius: PORT_MARK_RADIUS };
@@ -594,8 +698,9 @@ export function storyTargets(player: Player): UnitKind[] {
 
 /**
  * What the step the player is on still asks them to sink: each kind and how many more. Once every kind is sunk, while
- * the prey's good it asks them to haul up is not (its chest sank unclaimed, say), one more of its first kind, unless
- * a chest of that good floats (`goodAfloat`) for them to haul. None while its opening or a closing is still to be told
+ * the prey's good it asks them to haul up is not (its chest lost with the sea made afresh, say), one more of its first
+ * kind, unless a chest of that good floats (`goodAfloat`) for them to haul. None while its opening or a closing is
+ * still to be told
  */
 function huntsLeft(player: Player, goodAfloat: boolean): { readonly target: UnitKind; readonly count: number }[] {
   const step = storyStep(player);
@@ -639,16 +744,37 @@ export function setSail(state: GameState, player: Player) {
   return true;
 }
 
-/** Where the story sends the player, and what is there: a mark of its (storyMark), or the prey brought in for them */
+/**
+ * Whether the tavern takes the player's bounties: in the starting waters, only once the story has brought them home
+ * from the Baron's waters (Hale: "do a couple of them"), so a new player learns the sea from the story first; and
+ * while a quest of theirs is still to do or turn in, so none taken (an older save's) is ever stranded. Another sea's
+ * tavern is open: the story isn't told there
+ */
+export function tavernOpen(state: GameState, player: Player) {
+  return state.world.zone !== START_ZONE || storyReached(player, 'bounty') || player.quests.length > 0;
+}
+
+/**
+ * Takes a tavern quest (economy/quests.ts, takeQuest), unless the story keeps the tavern shut yet (tavernOpen). A
+ * player's action, like any; false if it isn't taken
+ */
+export function takeBounty(state: GameState, player: Player, id: QuestId) {
+  return tavernOpen(state, player) && takeQuest(state, player, id);
+}
+
+/**
+ * Where the story sends the player, and what is there: a mark of its (storyMark), the prey brought in for them, or
+ * loot it asks them to haul up
+ */
 export interface StoryGoal {
   readonly x: number;
   readonly y: number;
-  readonly kind: StoryMarkId | 'prey';
+  readonly kind: StoryMarkId | 'prey' | 'loot';
 }
 
 /**
  * Where the story sends the player now, for the client to point them there: its mark, or else the nearest of the prey
- * brought in for them, wherever it is; null if nowhere
+ * brought in for them and the chests afloat with what it asks them to haul up, wherever it is; null if nowhere
  */
 export function storyGoal(state: GameState, player: Player): StoryGoal | null {
   const mark = storyMark(state, player);
@@ -657,14 +783,33 @@ export function storyGoal(state: GameState, player: Player): StoryGoal | null {
   if (!ship) return null;
   let nearest: StoryGoal | null = null;
   let distance = Infinity;
-  for (const unit of state.ships) {
-    if (unit.bot?.prey !== ship.id || !isAfloat(unit)) continue;
-    const d = Math.hypot(unit.x - ship.x, unit.y - ship.y);
-    if (d >= distance) continue;
+  const consider = (x: number, y: number, kind: StoryGoal['kind']) => {
+    const d = Math.hypot(x - ship.x, y - ship.y);
+    if (d >= distance) return;
     distance = d;
-    nearest = { x: unit.x, y: unit.y, kind: 'prey' };
+    nearest = { x, y, kind };
+  };
+  for (const unit of state.ships) {
+    if (unit.bot?.prey === ship.id && isAfloat(unit)) consider(unit.x, unit.y, 'prey');
+  }
+  const goods = state.world.zone === START_ZONE ? haulsLeft(player) : [];
+  for (const chest of state.chests) {
+    // A bot's loot, not the player's own cargo lost: hauled back, that isn't loot (progress)
+    if (chest.lostBy !== null || !mayHaul(chest, ship.id)) continue;
+    if (goods.some((good) => good === null || (chest.goods[good] ?? 0) > 0)) consider(chest.x, chest.y, 'loot');
   }
   return nearest;
+}
+
+/**
+ * The goods the step the player is on asks them to haul up and they haven't yet (null: anything). None while its
+ * opening or a closing is still to be told
+ */
+function haulsLeft(player: Player): (GoodId | null)[] {
+  const step = storyStep(player);
+  const { told, counts, closing } = player.story;
+  if (!step || !told || closing !== null) return [];
+  return step.objectives.flatMap((o, i) => (o.kind === 'haul' && (counts[i] ?? 0) < 1 ? [o.good] : []));
 }
 
 /**
@@ -677,8 +822,10 @@ export function storyPrey(
   player: Player,
 ): { readonly target: UnitKind; readonly count: number } | null {
   if (state.world.zone !== START_ZONE) return null;
-  // A bot's loot, not the player's own cargo lost: hauled back, that isn't loot (progress)
-  const goodAfloat = state.chests.some((chest) => chest.lostBy === null && (chest.goods[PREY_GOOD] ?? 0) > 0);
+  // A bot's loot, not the player's own cargo lost: hauled back, that isn't loot (progress); and theirs to haul
+  const goodAfloat = state.chests.some(
+    (chest) => chest.lostBy === null && mayHaul(chest, player.shipId) && (chest.goods[PREY_GOOD] ?? 0) > 0,
+  );
   return huntsLeft(player, goodAfloat)[0] ?? null;
 }
 
@@ -818,6 +965,15 @@ function progress(state: GameState, player: Player, objective: Objective, before
       return events.some((e) => e.type === 'repair' && mine(e.shipId)) ? 1 : before;
     case 'sell':
       return events.some((e) => e.type === 'gold' && mine(e.shipId) && e.reason === 'market') ? 1 : before;
+    case 'takeQuest':
+      return shipQuests(state, player).length > 0 ? 1 : before;
+    case 'turnInQuest':
+      // A quest's gold, not a step of the story's (paid as a quest's too, with no quest named)
+      return events.some((e) => e.type === 'gold' && mine(e.shipId) && e.reason === 'quest' && e.quest !== null)
+        ? 1
+        : before;
+    case 'outfit':
+      return Object.values(ship.outfit).some((piece) => piece !== null) ? 1 : before;
     case 'level':
       return ship.level >= objective.level ? 1 : before;
     case 'weapon':
